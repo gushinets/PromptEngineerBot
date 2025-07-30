@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  prompt-improver-bot:
+    build: .
+    container_name: prompt-improver-bot
+    env_file:
+      - .env
+    restart: unless-stopped
+    # Uncomment and set if you need to expose a port for webhook
+    # ports:
+    #   - "8080:8080"
+    # volumes:
+    #   - ./bot.log:/app/bot.log

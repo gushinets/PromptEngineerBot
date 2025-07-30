@@ -1,0 +1,23 @@
+# Ignore Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore virtual environments
+venv/
+
+# Ignore version control and IDE files
+.git/
+.gitignore
+.vscode/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore test and temp files
+*.log
+*.tmp
+
+# Add more patterns as needed
