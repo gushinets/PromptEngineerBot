@@ -15,3 +15,9 @@ Thumbs.db
 
 # Log files
 bot.log
+
+# Test coverage and cache
+.coverage
+.pytest_cache/
+__pycache__/
+htmlcov/
