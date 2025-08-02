@@ -66,5 +66,16 @@ class OpenRouterClient:
                     raise Exception(f"API request failed: {error_text}")
                 data = await response.json()
                 response_text = data['choices'][0]['message']['content']
+                
+                # Log token usage if available
+                if 'usage' in data:
+                    usage = data['usage']
+                    logging.info(
+                        f"{log_prefix} Token usage - "
+                        f"Prompt: {usage.get('prompt_tokens', 'N/A')} tokens, "
+                        f"Completion: {usage.get('completion_tokens', 'N/A')} tokens, "
+                        f"Total: {usage.get('total_tokens', 'N/A')} tokens"
+                    )
+                
                 logging.info(f"{log_prefix} Received response from model: {response_text}")
                 return response_text

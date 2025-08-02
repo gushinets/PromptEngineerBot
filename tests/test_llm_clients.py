@@ -53,7 +53,13 @@ class TestOpenAIClient:
             )
             
             # Initialize client and send prompt
-            client = OpenAIClient(api_key="test-key", model_name="gpt-4")
+            client = OpenAIClient(
+                api_key="test-key",
+                model_name="gpt-4",
+                max_retries=5,
+                request_timeout=60.0,
+                max_wait_time=300.0
+            )
             messages = [{"role": "user", "content": "Test prompt"}]
             response = await client.send_prompt(messages)
             
@@ -67,7 +73,13 @@ class TestOpenAIClient:
         with patch('openai.resources.chat.completions.AsyncCompletions.create', 
                  side_effect=asyncio.TimeoutError("API timeout")):
             
-            client = OpenAIClient(api_key="test-key", model_name="gpt-4")
+            client = OpenAIClient(
+                api_key="test-key",
+                model_name="gpt-4",
+                max_retries=5,
+                request_timeout=60.0,
+                max_wait_time=300.0
+            )
             messages = [{"role": "user", "content": "Test prompt"}]
             
             with pytest.raises(Exception) as exc_info:

@@ -149,7 +149,10 @@ llm_backend = os.getenv('LLM_BACKEND', 'OPENROUTER').upper()
 if llm_backend == 'OPENAI':
     llm_client = OpenAIClient(
         api_key=os.getenv('OPENAI_API_KEY'),
-        model_name=os.getenv('MODEL_NAME', 'gpt-4o')
+        model_name=os.getenv('MODEL_NAME', 'gpt-4o'),
+        max_retries=5,  # Increased from default 3 to 5
+        request_timeout=60.0,  # 60 seconds per request
+        max_wait_time=300.0  # 5 minutes total including retries
     )
 else:
     llm_client = OpenRouterClient(
