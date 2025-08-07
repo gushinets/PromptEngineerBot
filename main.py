@@ -28,6 +28,13 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 from state_manager import StateManager
 from openrouter_client import OpenRouterClient
+from messages import (
+    WELCOME_MESSAGE, SELECT_METHOD_MESSAGE, 
+    NEW_PROMPT_BUTTON, CRAFT_BUTTON, LYRA_BASIC_BUTTON, GGL_BUTTON, LYRA_DETAIL_BUTTON,
+    SELECT_METHOD_KEYBOARD, ENTER_PROMPT_MESSAGE, get_processing_message,
+    ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
+    parse_llm_response, format_improved_prompt_response
+)
 from openai_client import OpenAIClient
 from conversation_manager import ConversationManager
 
@@ -57,8 +64,15 @@ async def safe_reply(update: Update, text: str, **kwargs) -> bool:
     Returns:
         bool: True if message was sent successfully, False otherwise
     """
-    if not update or not update.message:
-        logger.error("Invalid update or message object")
+    if not text or text.strip() == '':
+        logger.warning("Attempted to send empty message")
+        await update.message.reply_text(ERROR_EMPTY_MESSAGE)
+        return False
+    
+    # Check message length (Telegram's limit is 4096 characters)
+    if len(text) > 4000:  # Leave some room for potential formatting
+        logger.warning(f"Message too long: {len(text)} characters")
+        await update.message.reply_text(ERROR_TOO_LONG)
         return False
         
     for attempt in range(MAX_RETRIES):
@@ -70,18 +84,21 @@ async def safe_reply(update: Update, text: str, **kwargs) -> bool:
             # Handle flood control limits
             wait_time = e.retry_after + 5  # Add some buffer time
             logger.warning(f"Rate limited. Waiting {wait_time} seconds before retry...")
+            await update.message.reply_text(ERROR_RATE_LIMIT)
             await asyncio.sleep(wait_time)
             
-        except TimedOut:
-            logger.warning(f"Timeout while sending message (attempt {attempt + 1}/{MAX_RETRIES})")
+        except TimedOut as e:
+            logger.warning(f"Timeout while sending message (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
             if attempt == MAX_RETRIES - 1:
                 logger.error("Max retries reached. Giving up.")
+                await update.message.reply_text(ERROR_NETWORK)
                 return False
             await asyncio.sleep(2 ** attempt)  # Exponential backoff
             
         except NetworkError as e:
-            logger.error(f"Network error: {e}")
+            logger.error(f"Network error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
             if attempt == MAX_RETRIES - 1:
+                await update.message.reply_text(ERROR_NETWORK)
                 return False
             await asyncio.sleep(2 ** attempt)
             
@@ -93,6 +110,18 @@ async def safe_reply(update: Update, text: str, **kwargs) -> bool:
             
         except BadRequest as e:
             logger.error(f"Bad request: {e}")
+            if "message is too long" in str(e).lower():
+                await update.message.reply_text(ERROR_TOO_LONG)
+            else:
+                await update.message.reply_text(ERROR_GENERIC)
+            return False
+            
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}", exc_info=True)
+            if attempt == MAX_RETRIES - 1:
+                await update.message.reply_text(ERROR_GENERIC)
+                return False
+            await asyncio.sleep(2 ** attempt)
             return False
             
         except Exception as e:
@@ -161,25 +190,41 @@ else:
     )
 
 
-NEW_PROMPT_BUTTON = 'Написать новый промпт'
-keyboard = ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+# Keyboard is now defined in messages.py
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+def reset_user_state(user_id: int):
+    """
+    Reset the user's state and conversation history.
+    
+    Args:
+        user_id: The ID of the user whose state should be reset
+    """
     state_manager.set_waiting_for_prompt(user_id, True)
     state_manager.set_last_interaction(user_id, None)
     conversation_manager.reset(user_id)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /start command or New Prompt button."""
+    user_id = update.effective_user.id
+    reset_user_state(user_id)
+    
+    # Send welcome message
     await safe_reply(
         update,
-        'Введите промпт, который хотите улучшить.',
-        reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True)
+        WELCOME_MESSAGE,
+        parse_mode='Markdown'
     )
-
+    
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
     user_state = state_manager.get_user_state(user_id)
+
+    # If user presses NEW_PROMPT_BUTTON, always reset the conversation
+    if text == NEW_PROMPT_BUTTON:
+        await start(update, context)
+        return
 
     # If waiting for prompt
     if user_state.waiting_for_prompt:
@@ -188,11 +233,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conversation_manager.append_message(user_id, "user", text)  # Store user prompt
         conversation_manager.set_waiting_for_method(user_id, True)
         user_state.waiting_for_prompt = False
+        
+        # Add NEW_PROMPT_BUTTON to the method selection keyboard
         method_keyboard = list(SELECT_METHOD_KEYBOARD.keyboard)
         method_keyboard.append([NEW_PROMPT_BUTTON])
         await safe_reply(
             update,
-            'Какой методикой оптимизурем промпт?',
+            SELECT_METHOD_MESSAGE,
             reply_markup=ReplyKeyboardMarkup(method_keyboard, resize_keyboard=True)
         )
         return
@@ -200,71 +247,169 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # If waiting for method selection
     if conversation_manager.is_waiting_for_method(user_id):
         transcript = conversation_manager.get_transcript(user_id)
-        if text == CRAFT_BUTTON:
+        if text == CRAFT_BUTTON or text == '/craft':
             # Insert system prompt at the start if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": craft_prompt})
             conversation_manager.set_waiting_for_method(user_id, False)
-            try:
-                response = await llm_client.send_prompt(transcript)
-            except Exception as e:
-                response = f"Ошибка: {e}"
-            conversation_manager.append_message(user_id, "assistant", response)  # Store assistant response
-            await safe_reply(
-                update,
-                response,
-                reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+            conversation_manager.set_current_method(user_id, "CRAFT")
+            # Send processing message with method name
+            await update.message.reply_text(
+                get_processing_message("craft"),
+                parse_mode='Markdown'
             )
+            try:
+                raw_response = await llm_client.send_prompt(transcript)
+                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
+                conversation_manager.append_message(user_id, "assistant", raw_response)
+                
+                if is_improved_prompt:
+                    # Format the improved prompt response
+                    user_prompt = conversation_manager.get_user_prompt(user_id)
+                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
+                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    # Reset conversation after sending improved prompt
+                    conversation_manager.reset(user_id)
+                    # Reset the user state using the state manager
+                    state_manager.set_waiting_for_prompt(user_id, True)
+                
+                await safe_reply(
+                    update,
+                    response,
+                    parse_mode='Markdown',
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
+            except Exception as e:
+                logger.error(f"Error in CRAFT processing: {e}", exc_info=True)
+                await safe_reply(
+                    update,
+                    f"{ERROR_GENERIC}\n\n{str(e)}",
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
             return
-        elif text == LYRA_BASIC_BUTTON:
+        elif text == LYRA_BASIC_BUTTON or text == '/lyra':
             # Insert LYRA system prompt if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": lyra_prompt})
             conversation_manager.append_message(user_id, "user", "BASIC using ChatGPT")
             conversation_manager.set_waiting_for_method(user_id, False)
-            try:
-                response = await llm_client.send_prompt(transcript)
-            except Exception as e:
-                response = f"Ошибка: {e}"
-            conversation_manager.append_message(user_id, "assistant", response)
-            await safe_reply(
-                update,
-                response,
-                reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+            conversation_manager.set_current_method(user_id, "LYRA Basic")
+            # Send processing message with method name
+            await update.message.reply_text(
+                get_processing_message("lyra"),
+                parse_mode='Markdown'
             )
+            try:
+                raw_response = await llm_client.send_prompt(transcript)
+                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
+                conversation_manager.append_message(user_id, "assistant", raw_response)
+                
+                if is_improved_prompt:
+                    # Format the improved prompt response
+                    user_prompt = conversation_manager.get_user_prompt(user_id)
+                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
+                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    # Reset conversation after sending improved prompt
+                    conversation_manager.reset(user_id)
+                    # Reset the user state using the state manager
+                    state_manager.set_waiting_for_prompt(user_id, True)
+                
+                await safe_reply(
+                    update,
+                    response,
+                    parse_mode='Markdown',
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
+            except Exception as e:
+                error_msg = f"Ошибка: {e}"
+                conversation_manager.append_message(user_id, "assistant", error_msg)
+                await safe_reply(
+                    update,
+                    error_msg,
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
             return
         elif text == LYRA_DETAIL_BUTTON:
             # Insert LYRA system prompt if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": lyra_prompt})
-            conversation_manager.append_message(user_id, "user", "DETAIL using ChatGPT")
+            conversation_manager.append_message(user_id, "user", "DETAILED using ChatGPT")
             conversation_manager.set_waiting_for_method(user_id, False)
-            try:
-                response = await llm_client.send_prompt(transcript)
-            except Exception as e:
-                response = f"Ошибка: {e}"
-            conversation_manager.append_message(user_id, "assistant", response)
-            await safe_reply(
-                update,
-                response,
-                reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+            conversation_manager.set_current_method(user_id, "LYRA Detail")
+            # Send processing message with method name
+            await update.message.reply_text(
+                get_processing_message("lyra_detail"),
+                parse_mode='Markdown'
             )
+            try:
+                raw_response = await llm_client.send_prompt(transcript)
+                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
+                conversation_manager.append_message(user_id, "assistant", raw_response)
+                
+                if is_improved_prompt:
+                    # Format the improved prompt response
+                    user_prompt = conversation_manager.get_user_prompt(user_id)
+                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
+                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    # Reset conversation after sending improved prompt
+                    conversation_manager.reset(user_id)
+                    # Reset the user state using the state manager
+                    state_manager.set_waiting_for_prompt(user_id, True)
+                
+                await safe_reply(
+                    update,
+                    response,
+                    parse_mode='Markdown',
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
+            except Exception as e:
+                error_msg = f"Ошибка: {e}"
+                conversation_manager.append_message(user_id, "assistant", error_msg)
+                await safe_reply(
+                    update,
+                    error_msg,
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
             return
-        elif text == GGL_BUTTON:
+        elif text == GGL_BUTTON or text == '/ggl':
             # Insert GGL system prompt if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": ggl_prompt})
             conversation_manager.set_waiting_for_method(user_id, False)
-            try:
-                response = await llm_client.send_prompt(transcript)
-            except Exception as e:
-                response = f"Ошибка: {e}"
-            conversation_manager.append_message(user_id, "assistant", response)
-            await safe_reply(
-                update,
-                response,
-                reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+            # Send processing message with method name
+            await update.message.reply_text(
+                get_processing_message("ggl"),
+                parse_mode='Markdown'
             )
+            try:
+                raw_response = await llm_client.send_prompt(transcript)
+                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
+                conversation_manager.append_message(user_id, "assistant", raw_response)
+                
+                if is_improved_prompt:
+                    # Format the improved prompt response
+                    user_prompt = conversation_manager.get_user_prompt(user_id)
+                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
+                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    # Reset conversation after sending improved prompt
+                    conversation_manager.reset(user_id)
+                    # Reset the user state using the state manager
+                    state_manager.set_waiting_for_prompt(user_id, True)
+                
+                await safe_reply(
+                    update,
+                    response,
+                    parse_mode='Markdown',
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
+            except Exception as e:
+                error_msg = f"Ошибка: {e}"
+                conversation_manager.append_message(user_id, "assistant", error_msg)
+                await safe_reply(
+                    update,
+                    error_msg,
+                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                )
             return
         else:
             # Add NEW_PROMPT_BUTTON to the method selection keyboard
@@ -272,29 +417,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             method_keyboard.append([NEW_PROMPT_BUTTON])
             await safe_reply(
                 update,
-                'Пожалуйста, выберите методику: LYRA basic, CRAFT или GGL Guide.',
+                SELECT_METHOD_MESSAGE,
                 reply_markup=ReplyKeyboardMarkup(method_keyboard, resize_keyboard=True)
             )
             return
 
-    # If user presses NEW_PROMPT_BUTTON
-    if text == NEW_PROMPT_BUTTON:
-        await start(update, context)
-        return
+    # This check is now at the beginning of the function
 
     # Multi-turn: continue conversation with full transcript
     transcript = conversation_manager.get_transcript(user_id)
     conversation_manager.append_message(user_id, "user", text)
     try:
-        response = await llm_client.send_prompt(transcript)
+        raw_response = await llm_client.send_prompt(transcript)
+        response, is_question, is_improved_prompt = parse_llm_response(raw_response)
+        conversation_manager.append_message(user_id, "assistant", raw_response)
+        
+        if is_improved_prompt:
+            # Format the improved prompt response
+            user_prompt = conversation_manager.get_user_prompt(user_id)
+            method_name = conversation_manager.get_current_method(user_id)
+            response = format_improved_prompt_response(user_prompt, response, method_name)
+            # Reset user state after sending improved prompt
+            reset_user_state(user_id)
+        
+        await safe_reply(
+            update,
+            response,
+            parse_mode='Markdown',
+            reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+        )
     except Exception as e:
-        response = f"Ошибка: {e}"
-    conversation_manager.append_message(user_id, "assistant", response)
-    await safe_reply(
-        update,
-        response,
-        reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
-    )
+        error_msg = f"Ошибка: {e}"
+        conversation_manager.append_message(user_id, "assistant", error_msg)
+        await safe_reply(
+            update,
+            error_msg,
+            reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+        )
 
 async def main():
     """Start the bot."""
