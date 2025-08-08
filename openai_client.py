@@ -35,6 +35,7 @@ class OpenAIClient:
         self.max_wait_time = max_wait_time
         self.client = OpenAI(api_key=api_key)
         self.start_time = None
+        self.last_usage = None  # will hold dict with token usage if available
 
     def _log_retry(self, retry_state: RetryCallState) -> bool:
         """Log retry attempts and check max wait time."""
@@ -84,7 +85,16 @@ class OpenAIClient:
                 timeout=Timeout(self.request_timeout)  # 60-second timeout
             )
         )
-        return response.choices[0].message.content, getattr(response, 'usage', None)
+        usage = getattr(response, 'usage', None)
+        usage_dict = None
+        if usage is not None:
+            # Convert pydantic-like object to plain dict safely
+            usage_dict = {
+                'prompt_tokens': getattr(usage, 'prompt_tokens', None),
+                'completion_tokens': getattr(usage, 'completion_tokens', None),
+                'total_tokens': getattr(usage, 'total_tokens', None),
+            }
+        return response.choices[0].message.content, usage_dict
 
     async def send_prompt(self, messages: List[Dict[str, str]], log_prefix: str = "[OpenAI]") -> str:
         """
@@ -105,14 +115,15 @@ class OpenAIClient:
         
         try:
             response_text, usage = await self._call_openai_api(messages, log_prefix)
+            self.last_usage = usage
             
             # Log token usage if available
             if usage:
                 logging.info(
                     f"{log_prefix} Token usage - "
-                    f"Prompt: {getattr(usage, 'prompt_tokens', 'N/A')} tokens, "
-                    f"Completion: {getattr(usage, 'completion_tokens', 'N/A')} tokens, "
-                    f"Total: {getattr(usage, 'total_tokens', 'N/A')} tokens"
+                    f"Prompt: {usage.get('prompt_tokens', 'N/A')} tokens, "
+                    f"Completion: {usage.get('completion_tokens', 'N/A')} tokens, "
+                    f"Total: {usage.get('total_tokens', 'N/A')} tokens"
                 )
             
             logging.info(f"{log_prefix} Received response from OpenAI: {response_text}")

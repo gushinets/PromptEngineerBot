@@ -16,62 +16,41 @@ def _(text_ru, text_en):
     return text_ru if LANGUAGE == 'ru' else text_en
 
 # ===== UI Elements =====
-# Button labels
-NEW_PROMPT_BUTTON = _('Начать с начала', 'Start over')
-CRAFT_BUTTON = _('CRAFT', 'CRAFT')
-LYRA_BASIC_BUTTON = _('LYRA basic', 'LYRA basic')
-LYRA_DETAIL_BUTTON = _('LYRA detail', 'LYRA detail')
-GGL_BUTTON = _('GGL Guide', 'GGL Guide')
+# Localized, emoji-enhanced button labels (single source of truth)
+BTN_RESET = _("🔄 Сбросить диалог", "🔄 Reset Conversation")
+BTN_CRAFT = _("🛠 CRAFT", "🛠 CRAFT")
+BTN_LYRA = _("⚡ LYRA", "⚡ LYRA")
+BTN_LYRA_DETAIL = _("🧩 LYRA detail", "🧩 LYRA detail")
+BTN_GGL = _("🔍 GGL", "🔍 GGL")
+BTN_HELP = _("❓ Помощь", "❓ Help")
 
 # ===== Welcome and Help Messages =====
 WELCOME_MESSAGE = _(
-    "🤖 **Добро пожаловать в Prompt Engineering Bot!**\n\n"
-    "Я помогу вам создать эффективные промпты для больших языковых моделей.\n\n"
-    "**Доступные методы оптимизации:**\n"
-    "• **CRAFT** - Структурированный подход с контекстом, ролью, действиями, форматом и целевой аудиторией\n"
-    "• **LYRA** - Оптимизация языка, результатов, ролей и действий\n"
-    "• **GGL** - Фокус на цели, руководящие принципы и язык\n\n"
-    "**Как использовать:**\n"
-    "1. Отправьте ваш промпт\n"
-    "2. Выберите метод оптимизации\n"
-    "3. Получите улучшенную версию промпта\n"
-    "4. Скопируйте и отправьте в нейросеть\n\n"
-    "Отправьте ваш промпт, и я помогу его оптимизировать! 🚀",
+    "🤖 Добро пожаловать в Prompt Engineering Bot!\n"
+    "💡 Ваш помощник по созданию мощных и точных промптов для больших языковых моделей.\n\n"
+    "🎯 Методы оптимизации:\n"
+    "⚡ LYRA — мгновенный результат\n"
+    "🛠 CRAFT — структурированный подход\n"
+    "🔍 GGL — фокус на цели, минимум вопросов\n\n"
+    "📌 Как это работает:\n"
+    "1️⃣ Отправьте ваш промпт\n"
+    "2️⃣ Выберите метод оптимизации\n"
+    "3️⃣ Получите улучшенную версию\n"
+    "4️⃣ Используйте её в нейросети 🚀\n\n"
+    "✍️ Отправьте свой промпт прямо сейчас — и я превращу его в инструмент, который добьётся лучших результатов!",
     
-    "🤖 **Welcome to Prompt Engineering Bot!**\n\n"
-    "I can help you create effective prompts for large language models.\n\n"
-    "**Available optimization methods:**\n"
-    "• **CRAFT** - Structured approach with context, role, actions, format, and target audience\n"
-    "• **LYRA** - Language, yield, roles, and actions optimization\n"
-    "• **GGL** - Focus on goals, guidelines, and language\n\n"
-    "**How to use:**\n"
-    "1. Send your prompt\n"
-    "2. Choose an optimization method\n"
-    "3. Get an improved version of your prompt\n"
-    "4. Copy and send it to the AI model\n\n"
-    "Send me your prompt, and I'll help you optimize it! 🚀"
-)
-
-HELP_MESSAGE = _(
-    "ℹ️ *Доступные команды*\n\n"
-    "*Методики*\n"
-    "/craft* - Методика CRAFT для оптимизации промптов\n"
-    "/lyra* - Методика LYRA для оптимизации промптов\n"
-    "/ggl* - Методика GGL для оптимизации промптов\n\n"
-    "*Общие команды*\n"
-    "/start* - Показать приветственное сообщение\n"
-    "/help* - Показать это сообщение\n"
-    "/reset* - Сбросить текущий диалог",
-    
-    "ℹ️ *Available Commands*\n\n"
-    "*Methodologies*\n"
-    "/craft* - CRAFT methodology for prompt optimization\n"
-    "/lyra* - LYRA methodology for prompt optimization\n"
-    "/ggl* - GGL methodology for prompt optimization\n\n"
-    "*General*\n"
-    "/start* - Show welcome message\n"
-    "/help* - Show this help message\n"
-    "/reset* - Reset the current conversation"
+    "🤖 Welcome to Prompt Engineering Bot!\n"
+    "💡 Your assistant for creating powerful and precise prompts for large language models.\n\n"
+    "🎯 Optimization methods:\n"
+    "⚡ LYRA — instant results\n"
+    "🛠 CRAFT — structured approach\n"
+    "🔍 GGL — goal-focused, minimal questions\n\n"
+    "📌 How it works:\n"
+    "1️⃣ Send your prompt\n"
+    "2️⃣ Choose an optimization method\n"
+    "3️⃣ Get an improved version\n"
+    "4️⃣ Use it in your AI model 🚀\n\n"
+    "✍️ Send your prompt now — and I'll turn it into a tool that achieves better results!"
 )
 
 # ===== Error Messages =====
@@ -114,16 +93,16 @@ RESET_CONFIRMATION = _(
 SELECT_METHOD_MESSAGE = _(
     "📝 **Ваш промпт получен!**\n\n"
     "Теперь выберите метод оптимизации:\n\n"
-    "**CRAFT** - Детальный структурированный подход\n"
-    "**LYRA** - Оптимизация языка и результатов  \n"
-    "**GGL** - Фокус на цели и руководящие принципы\n\n"
-    "Выберите метод:",
+    "⚡ LYRA — мгновенный результат\n"
+    "🛠 CRAFT — структурированный подход\n"
+    "🔍 GGL — фокус на цели, минимум вопросов\n\n"
+    "👉 *Нажмите на метод ниже, чтобы начать*:",
     "📝 **Your prompt has been received!**\n\n"
     "Now choose an optimization method:\n\n"
-    "**CRAFT** - Detailed structured approach\n"
-    "**LYRA** - Language and results optimization\n"
-    "**GGL** - Focus on goals and guidelines\n\n"
-    "Choose a method:"
+    "⚡ LYRA — instant results\n"
+    "🛠 CRAFT — structured approach\n"
+    "🔍 GGL — goal-focused, minimal questions\n\n"
+    "👉 *Click on the method below to start*:"
 )
 
 ENTER_PROMPT_MESSAGE = _(
@@ -165,75 +144,10 @@ METHODOLOGY_SELECTED = _(
 # Method selection keyboard
 SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
     [
-        [LYRA_BASIC_BUTTON, CRAFT_BUTTON],
-        [GGL_BUTTON, LYRA_DETAIL_BUTTON]
+        [BTN_LYRA, BTN_CRAFT, BTN_GGL]
     ],
     resize_keyboard=True
 )
-
-# Main keyboard with all options
-MAIN_KEYBOARD = [
-    [CRAFT_BUTTON, LYRA_BASIC_BUTTON, GGL_BUTTON],
-    [NEW_PROMPT_BUTTON]
-]
-
-# ===== Prompt Templates =====
-PROMPT_TEMPLATE = _(
-    "**Ваш оригинальный промпт:**\n{user_prompt}\n\n"
-    "**Оптимизированный промпт:**\n{optimized_prompt}\n\n"
-    "**Объяснение:**\n{explanation}",
-    
-    "**Your original prompt:**\n{user_prompt}\n\n"
-    "**Optimized prompt:**\n{optimized_prompt}\n\n"
-    "**Explanation:**\n{explanation}"
-)
-
-
-
-# Button labels
-BTN_RESET = "🔄 Reset Conversation"
-BTN_CRAFT = "🛠 CRAFT"
-BTN_LYRA = "🎯 LYRA"
-BTN_GGL = "🔍 GGL"
-BTN_HELP = "❓ Help"
-
-# Keyboard layouts
-MAIN_KEYBOARD = [[BTN_CRAFT, BTN_LYRA, BTN_GGL], [BTN_HELP, BTN_RESET]]
-
-# Methodologies
-def get_methodology_description(method: str) -> str:
-    """Get a description of the selected methodology."""
-    descriptions = {
-        "craft": (
-            "🛠 *CRAFT Methodology*\n\n"
-            "CRAFT helps you create clear, specific, and effective prompts by:\n"
-            "• Clarifying the task\n"
-            "• Providing context and examples\n"
-            "• Specifying the desired output format\n"
-            "• Adding constraints and requirements"
-        ),
-        "lyra": (
-            "🎯 *LYRA Methodology*\n\n"
-            "LYRA focuses on creating prompts that are:\n"
-            "• Logical and structured\n"
-            "• Yield specific results\n"
-            "• Relevant to the task\n"
-            "• Actionable for the AI"
-        ),
-        "ggl": (
-            "🔍 *GGL Methodology*\n\n"
-            "GGL (Google's Generative Language) approach emphasizes:\n"
-            "• Clear goal definition\n"
-            "• Guiding principles for the AI\n"
-            "• Layered instructions for complex tasks"
-        )
-    }
-    return descriptions.get(method.lower(), "Select a methodology to get started.")
-
-def get_typing_delay(text: str) -> float:
-    """Calculate typing delay based on message length."""
-    # 10 seconds for first 100 chars, then 1 second per 100 chars
-    return min(5.0, 10.0 + (len(text) / 100))
 
 # ===== Improved Prompt Response =====
 IMPROVED_PROMPT_RESPONSE = _(
@@ -291,6 +205,57 @@ def format_improved_prompt_response(user_prompt: str, improved_prompt: str, meth
         improved_prompt=improved_prompt.strip()
     )
 
+def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:
+    """Extract content between an opening tag and any acceptable closing marker.
+
+    Closing markers supported (case-insensitive):
+    - </TAG>
+    - <END TAG>
+    - <END_TAG>
+    - [END TAG]
+    - [ /TAG ] or [/TAG]
+    - <TAG_END>
+    - <END>
+
+    Returns the extracted content and the index where the opening tag started.
+    If opening tag not found, returns (None, None).
+    """
+    lowered = text.lower()
+    normalized_tag = tag.lower()
+    opening = f"<{normalized_tag}>"
+    start = lowered.find(opening)
+    if start == -1:
+        return None, None
+
+    content_start = start + len(opening)
+    remainder = text[content_start:]
+    remainder_lower = lowered[content_start:]
+
+    # Build list of possible closing markers
+    closing_candidates = [
+        f"</{normalized_tag}>",
+        f"<end {normalized_tag}>",
+        f"<end_{normalized_tag}>",
+        f"[{ 'end ' + normalized_tag}]",
+        f"[/{normalized_tag}]",
+        f"<{normalized_tag}_end>",
+        "<end>",
+    ]
+
+    earliest_idx = None
+    for marker in closing_candidates:
+        idx = remainder_lower.find(marker)
+        if idx != -1:
+            if earliest_idx is None or idx < earliest_idx:
+                earliest_idx = idx
+
+    if earliest_idx is not None:
+        extracted = remainder[:earliest_idx].strip()
+    else:
+        extracted = remainder.strip()
+
+    return extracted, start
+
 def parse_llm_response(response: str) -> tuple[str, bool, bool]:
     """
     Parse LLM response to extract content and determine if it's a question or improved prompt.
@@ -305,27 +270,16 @@ def parse_llm_response(response: str) -> tuple[str, bool, bool]:
     is_question = False
     is_improved_prompt = False
     
-    # Check for QUESTION tags
-    question_start = response.find('<QUESTION>')
-    
-    if question_start != -1:
-        # If we find the opening tag, extract everything after it
-        response = response[question_start + 10:].strip()
-        # Try to find the closing tag, but if not found, keep everything
-        question_end = response.find('</QUESTION>')
-        if question_end != -1:
-            response = response[:question_end].strip()
+    # Prefer QUESTION if present
+    extracted, _ = _extract_tag_block(response, 'QUESTION')
+    if extracted is not None:
+        response = extracted
         is_question = True
     else:
         # Only check for IMPROVED_PROMPT if no QUESTION tag was found
-        prompt_start = response.find('<IMPROVED_PROMPT>')
-        if prompt_start != -1:
-            # If we find the opening tag, extract everything after it
-            response = response[prompt_start + 17:].strip()
-            # Try to find the closing tag, but if not found, keep everything
-            prompt_end = response.find('</IMPROVED_PROMPT>')
-            if prompt_end != -1:
-                response = response[:prompt_end].strip()
+        extracted, _ = _extract_tag_block(response, 'IMPROVED_PROMPT')
+        if extracted is not None:
+            response = extracted
             is_improved_prompt = True
     
     return response, is_question, is_improved_prompt

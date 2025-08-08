@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import logging
 
 class OpenRouterClient:
@@ -20,6 +21,7 @@ class OpenRouterClient:
             "HTTP-Referer": "https://github.com/", # Replace with your actual domain
             "Content-Type": "application/json"
         }
+        self.last_usage = None  # dict with token usage if available
 
     async def send_prompt(self, prompt: str = None, system_prompt: str = None, log_prefix: str = "", messages=None) -> str:
         """
@@ -55,27 +57,59 @@ class OpenRouterClient:
             logging.info(f"{log_prefix} Sending prompt to model: {prompt}")
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                self.base_url,
-                headers=self.headers,
-                json=payload
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    logging.error(f"{log_prefix} API request failed: {error_text}")
-                    raise Exception(f"API request failed: {error_text}")
-                data = await response.json()
-                response_text = data['choices'][0]['message']['content']
-                
-                # Log token usage if available
-                if 'usage' in data:
-                    usage = data['usage']
-                    logging.info(
-                        f"{log_prefix} Token usage - "
-                        f"Prompt: {usage.get('prompt_tokens', 'N/A')} tokens, "
-                        f"Completion: {usage.get('completion_tokens', 'N/A')} tokens, "
-                        f"Total: {usage.get('total_tokens', 'N/A')} tokens"
-                    )
-                
-                logging.info(f"{log_prefix} Received response from model: {response_text}")
-                return response_text
+            async def _do_request():
+                # Support both real session.post (async CM) and AsyncMock returning coroutine in tests
+                post_result = session.post(
+                    self.base_url,
+                    headers=self.headers,
+                    json=payload
+                )
+                # If the result is an async context manager, use it; otherwise await it and wrap
+                if hasattr(post_result, "__aenter__"):
+                    response_cm = post_result
+                else:
+                    response_obj = await post_result
+                    class _ResponseWrapper:
+                        def __init__(self, resp):
+                            self._resp = resp
+                        async def __aenter__(self):
+                            return self._resp
+                        async def __aexit__(self, exc_type, exc, tb):
+                            return False
+                    response_cm = _ResponseWrapper(response_obj)
+
+                async with response_cm as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logging.error(f"{log_prefix} API request failed: {error_text}")
+                        raise Exception(f"API request failed: {error_text}")
+                    data = await response.json()
+                    response_text = data['choices'][0]['message']['content']
+                    
+                    # Log token usage if available
+                    if 'usage' in data:
+                        usage = data['usage']
+                        # Save usage for external logging
+                        self.last_usage = {
+                            'prompt_tokens': usage.get('prompt_tokens'),
+                            'completion_tokens': usage.get('completion_tokens'),
+                            'total_tokens': usage.get('total_tokens'),
+                        }
+                        logging.info(
+                            f"{log_prefix} Token usage - "
+                            f"Prompt: {usage.get('prompt_tokens', 'N/A')} tokens, "
+                            f"Completion: {usage.get('completion_tokens', 'N/A')} tokens, "
+                            f"Total: {usage.get('total_tokens', 'N/A')} tokens"
+                        )
+                    
+                    logging.info(f"{log_prefix} Received response from model: {response_text}")
+                    return response_text
+
+            # Respect an optional self.timeout (aiohttp.ClientTimeout or seconds) using asyncio.wait_for
+            timeout_seconds = None
+            if hasattr(self, 'timeout') and self.timeout is not None:
+                t = self.timeout
+                timeout_seconds = getattr(t, 'total', None) if not isinstance(t, (int, float)) else t
+            if timeout_seconds:
+                return await asyncio.wait_for(_do_request(), timeout=timeout_seconds)
+            return await _do_request()

@@ -94,4 +94,5 @@ class ConversationManager:
         Returns:
             str: The name of the current optimization method, or 'CUSTOM' if not set
         """
-        return self.current_methods.get(user_id, 'CUSTOM')
+        value = self.current_methods.get(user_id)
+        return value or 'CUSTOM'

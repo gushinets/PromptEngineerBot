@@ -13,6 +13,7 @@ Main responsibilities:
 """
 
 import logging
+import json
 import os
 import asyncio
 from dotenv import load_dotenv
@@ -29,16 +30,17 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from state_manager import StateManager
 from openrouter_client import OpenRouterClient
 from messages import (
-    WELCOME_MESSAGE, SELECT_METHOD_MESSAGE, 
-    NEW_PROMPT_BUTTON, CRAFT_BUTTON, LYRA_BASIC_BUTTON, GGL_BUTTON, LYRA_DETAIL_BUTTON,
-    SELECT_METHOD_KEYBOARD, ENTER_PROMPT_MESSAGE, get_processing_message,
+    WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
+    SELECT_METHOD_KEYBOARD, get_processing_message,
     ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
-    parse_llm_response, format_improved_prompt_response
+    parse_llm_response, format_improved_prompt_response,
+    BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
 )
 from openai_client import OpenAIClient
 from conversation_manager import ConversationManager
+from gsheets_logging import build_google_sheets_handler_from_env
 
-# Configure logging
+# Configure logging (keep internal logging to file/console unchanged)
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
@@ -48,6 +50,90 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Dedicated Google Sheets logger (only for selected events)
+_sheets_logger = None
+try:
+    _gsheets_handler = build_google_sheets_handler_from_env(os.getenv)
+    if _gsheets_handler:
+        _sheets_logger = logging.getLogger('sheets')
+        _sheets_logger.setLevel(logging.INFO)
+        _sheets_logger.propagate = False
+        _sheets_logger.addHandler(_gsheets_handler)
+except Exception:
+    # Do not fail if gsheets handler cannot be created
+    _sheets_logger = None
+
+
+def log_sheets(event: str, payload: dict) -> None:
+    """Log a structured event to Google Sheets if enabled."""
+    if not _sheets_logger or not _sheets_logger.handlers:
+        return
+    try:
+        message = json.dumps({"event": event, **payload}, ensure_ascii=False)
+    except Exception:
+        message = str({"event": event, **payload})
+    _sheets_logger.info(message)
+
+
+def log_method_selection_to_file(user_id: int, trigger_text: str, method_name: str) -> None:
+    """Log to bot.log when a user selects an optimization method."""
+    try:
+        logger.info(
+            "method_selected | user_id=%s | method=%s | trigger=%s",
+            user_id,
+            method_name,
+            trigger_text,
+        )
+    except Exception:
+        # Best-effort logging; do not break flow
+        pass
+
+
+def _compose_llm_name() -> str:
+    try:
+        model_name = getattr(llm_client, 'model_name', None)
+        return f"{llm_backend}:{model_name}" if model_name else llm_backend
+    except Exception:
+        return llm_backend
+
+
+def log_llm_exchange_to_sheets(user_id: int, method_name: str, user_request: str, answer_text: str) -> None:
+    """Emit a single structured row for an LLM exchange with token usage if available."""
+    bot_id = _get_bot_identifier()
+    usage = getattr(llm_client, 'last_usage', None) or {}
+    payload = {
+        "BotID": bot_id,
+        "TelegramID": user_id,
+        "LLM": _compose_llm_name(),
+        "OptimizationModel": method_name,
+        "UserRequest": user_request,
+        "Answer": answer_text,
+        "prompt_tokens": usage.get('prompt_tokens'),
+        "completion_tokens": usage.get('completion_tokens'),
+        "total_tokens": usage.get('total_tokens'),
+    }
+    log_sheets("llm_exchange", payload)
+
+
+# Global bot identifier, set at startup; can be overridden with BOT_ID env
+BOT_IDENTIFIER = os.getenv('BOT_ID')
+
+
+def _parse_bot_id_from_token() -> str:
+    token = os.getenv('TELEGRAM_TOKEN') or ''
+    if ':' in token:
+        candidate = token.split(':', 1)[0]
+        if candidate.isdigit():
+            return candidate
+    return 'UNKNOWN'
+
+
+def _get_bot_identifier() -> str:
+    if BOT_IDENTIFIER:
+        return BOT_IDENTIFIER
+    # Fallback to numeric id from token if available
+    return _parse_bot_id_from_token()
 
 # Maximum number of retries for sending messages
 MAX_RETRIES = 3
@@ -119,16 +205,14 @@ async def safe_reply(update: Update, text: str, **kwargs) -> bool:
         except Exception as e:
             logger.error(f"Unexpected error: {e}", exc_info=True)
             if attempt == MAX_RETRIES - 1:
-                await update.message.reply_text(ERROR_GENERIC)
+                try:
+                    await update.message.reply_text(ERROR_GENERIC)
+                except Exception:
+                    pass
                 return False
+            # Retry after brief backoff
             await asyncio.sleep(2 ** attempt)
-            return False
-            
-        except Exception as e:
-            logger.exception(f"Unexpected error while sending message: {e}")
-            if attempt == MAX_RETRIES - 1:
-                return False
-            await asyncio.sleep(1)
+            continue
     
     return False
 
@@ -161,13 +245,7 @@ craft_prompt = load_prompt(CRAFT_PROMPT_PATH)
 lyra_prompt = load_prompt(LYRA_PROMPT_PATH)
 ggl_prompt = load_prompt(GGL_PROMPT_PATH)
 
-CRAFT_BUTTON = 'CRAFT'
-LYRA_BASIC_BUTTON = 'LYRA basic'
-GGL_BUTTON = 'GGL Guide'
-LYRA_DETAIL_BUTTON = 'LYRA detail'  # Kept for functionality but not shown in UI
-SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup([
-    [LYRA_BASIC_BUTTON, CRAFT_BUTTON, GGL_BUTTON]
-], resize_keyboard=True)
+# Button constants and keyboards are imported from messages.py
 
 state_manager = StateManager()
 conversation_manager = ConversationManager()
@@ -212,8 +290,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_reply(
         update,
         WELCOME_MESSAGE,
-        parse_mode='Markdown'
+        parse_mode='Markdown',
+        reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True)
     )
+
+    # Sheets: log session start
+    log_sheets("session_start", {"user_id": user_id})
     
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -221,8 +303,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_state = state_manager.get_user_state(user_id)
 
-    # If user presses NEW_PROMPT_BUTTON, always reset the conversation
-    if text == NEW_PROMPT_BUTTON:
+    # If user presses reset button, always reset the conversation
+    if text == BTN_RESET:
         await start(update, context)
         return
 
@@ -233,10 +315,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conversation_manager.append_message(user_id, "user", text)  # Store user prompt
         conversation_manager.set_waiting_for_method(user_id, True)
         user_state.waiting_for_prompt = False
+
+        # Sheets: log prompt received (truncated)
+        log_sheets("prompt_received", {"user_id": user_id, "length": len(text), "preview": text[:120]})
         
-        # Add NEW_PROMPT_BUTTON to the method selection keyboard
+        # Add reset button to the method selection keyboard
         method_keyboard = list(SELECT_METHOD_KEYBOARD.keyboard)
-        method_keyboard.append([NEW_PROMPT_BUTTON])
+        method_keyboard.append([BTN_RESET])
         await safe_reply(
             update,
             SELECT_METHOD_MESSAGE,
@@ -247,7 +332,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # If waiting for method selection
     if conversation_manager.is_waiting_for_method(user_id):
         transcript = conversation_manager.get_transcript(user_id)
-        if text == CRAFT_BUTTON or text == '/craft':
+        if text == BTN_CRAFT:
+            log_method_selection_to_file(user_id, text, "CRAFT")
+            log_sheets("method_selected", {"user_id": user_id, "method": "CRAFT"})
             # Insert system prompt at the start if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": craft_prompt})
@@ -266,8 +353,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if is_improved_prompt:
                     # Format the improved prompt response
                     user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
-                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    method_name = "CRAFT"
+                    improved_prompt_only = response
+                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
+                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                     # Reset conversation after sending improved prompt
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
@@ -277,17 +366,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     update,
                     response,
                     parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             except Exception as e:
                 logger.error(f"Error in CRAFT processing: {e}", exc_info=True)
+                log_sheets("error", {"stage": "CRAFT", "user_id": user_id, "error": str(e)})
                 await safe_reply(
                     update,
                     f"{ERROR_GENERIC}\n\n{str(e)}",
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             return
-        elif text == LYRA_BASIC_BUTTON or text == '/lyra':
+        elif text == BTN_LYRA:
+            log_method_selection_to_file(user_id, text, "LYRA Basic")
+            log_sheets("method_selected", {"user_id": user_id, "method": "LYRA Basic"})
             # Insert LYRA system prompt if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": lyra_prompt})
@@ -307,29 +399,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if is_improved_prompt:
                     # Format the improved prompt response
                     user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
-                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    method_name = "LYRA"
+                    improved_prompt_only = response
+                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
                     # Reset conversation after sending improved prompt
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
                     state_manager.set_waiting_for_prompt(user_id, True)
+                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                 
                 await safe_reply(
                     update,
                     response,
                     parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             except Exception as e:
                 error_msg = f"Ошибка: {e}"
                 conversation_manager.append_message(user_id, "assistant", error_msg)
+                log_sheets("error", {"stage": "LYRA Basic", "user_id": user_id, "error": str(e)})
                 await safe_reply(
                     update,
                     error_msg,
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             return
-        elif text == LYRA_DETAIL_BUTTON:
+        elif text == BTN_LYRA_DETAIL:
+            log_method_selection_to_file(user_id, text, "LYRA Detail")
+            log_sheets("method_selected", {"user_id": user_id, "method": "LYRA Detail"})
             # Insert LYRA system prompt if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": lyra_prompt})
@@ -349,33 +446,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if is_improved_prompt:
                     # Format the improved prompt response
                     user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
-                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    method_name = "LYRA"
+                    improved_prompt_only = response
+                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
                     # Reset conversation after sending improved prompt
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
                     state_manager.set_waiting_for_prompt(user_id, True)
+                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                 
                 await safe_reply(
                     update,
                     response,
                     parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             except Exception as e:
                 error_msg = f"Ошибка: {e}"
                 conversation_manager.append_message(user_id, "assistant", error_msg)
+                log_sheets("error", {"stage": "LYRA Detail", "user_id": user_id, "error": str(e)})
                 await safe_reply(
                     update,
                     error_msg,
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             return
-        elif text == GGL_BUTTON or text == '/ggl':
+        elif text == BTN_GGL:
+            log_method_selection_to_file(user_id, text, "GGL")
+            log_sheets("method_selected", {"user_id": user_id, "method": "GGL"})
             # Insert GGL system prompt if not present
             if not transcript or transcript[0]["role"] != "system":
                 transcript.insert(0, {"role": "system", "content": ggl_prompt})
             conversation_manager.set_waiting_for_method(user_id, False)
+            conversation_manager.set_current_method(user_id, "GGL")
             # Send processing message with method name
             await update.message.reply_text(
                 get_processing_message("ggl"),
@@ -389,32 +492,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if is_improved_prompt:
                     # Format the improved prompt response
                     user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "CRAFT" if text == CRAFT_BUTTON or text == '/craft' else "LYRA" if text in [LYRA_BASIC_BUTTON, LYRA_DETAIL_BUTTON, '/lyra'] else "GGL"
-                    response = format_improved_prompt_response(user_prompt, response, method_name)
+                    method_name = "GGL"
+                    improved_prompt_only = response
+                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
                     # Reset conversation after sending improved prompt
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
                     state_manager.set_waiting_for_prompt(user_id, True)
+                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                 
                 await safe_reply(
                     update,
                     response,
                     parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             except Exception as e:
                 error_msg = f"Ошибка: {e}"
                 conversation_manager.append_message(user_id, "assistant", error_msg)
+                log_sheets("error", {"stage": "GGL", "user_id": user_id, "error": str(e)})
                 await safe_reply(
                     update,
                     error_msg,
-                    reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
                 )
             return
         else:
-            # Add NEW_PROMPT_BUTTON to the method selection keyboard
+            # Add reset button to the method selection keyboard
             method_keyboard = list(SELECT_METHOD_KEYBOARD.keyboard)
-            method_keyboard.append([NEW_PROMPT_BUTTON])
+            method_keyboard.append([BTN_RESET])
             await safe_reply(
                 update,
                 SELECT_METHOD_MESSAGE,
@@ -436,23 +542,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Format the improved prompt response
             user_prompt = conversation_manager.get_user_prompt(user_id)
             method_name = conversation_manager.get_current_method(user_id)
-            response = format_improved_prompt_response(user_prompt, response, method_name)
+            improved_prompt_only = response
+            response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
             # Reset user state after sending improved prompt
             reset_user_state(user_id)
+            log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
         
         await safe_reply(
             update,
             response,
             parse_mode='Markdown',
-            reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
         )
     except Exception as e:
         error_msg = f"Ошибка: {e}"
         conversation_manager.append_message(user_id, "assistant", error_msg)
+        log_sheets("error", {"stage": "multi_turn", "user_id": user_id, "error": str(e)})
         await safe_reply(
             update,
             error_msg,
-            reply_markup=ReplyKeyboardMarkup([[NEW_PROMPT_BUTTON]], resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
         )
 
 async def main():

@@ -1,7 +1,7 @@
 """Pytest configuration and fixtures for the test suite."""
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 
 import pytest
 from dotenv import load_dotenv
@@ -19,7 +19,7 @@ def mock_update():
     update.effective_user.id = 12345
     update.message = MagicMock()
     update.message.text = "test message"
-    update.message.reply_text = MagicMock()
+    update.message.reply_text = AsyncMock(return_value=None)
     return update
 
 @pytest.fixture
@@ -44,11 +44,18 @@ def mock_application():
             get_updates_read_timeout=MagicMock(return_value=MagicMock()),
             build=MagicMock(return_value=mock_app)
         )
+        # Make application lifecycle methods awaitable
+        mock_app.initialize = AsyncMock(return_value=None)
+        mock_app.start = AsyncMock(return_value=None)
+        mock_app.stop = AsyncMock(return_value=None)
+        mock_app.shutdown = AsyncMock(return_value=None)
+        mock_app.updater = MagicMock()
+        mock_app.updater.start_polling = AsyncMock(return_value=None)
         yield mock_app
 
 @pytest.fixture(autouse=True)
 def mock_llm_client():
     """Mock the LLM client to avoid real API calls during testing."""
     with patch('main.llm_client') as mock_client:
-        mock_client.send_prompt = MagicMock(return_value="Mocked LLM response")
+        mock_client.send_prompt = AsyncMock(return_value="Mocked LLM response")
         yield mock_client
