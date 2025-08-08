@@ -27,18 +27,18 @@ from telegram.error import (
 )
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-from state_manager import StateManager
-from openrouter_client import OpenRouterClient
-from messages import (
+from src.state_manager import StateManager
+from src.openrouter_client import OpenRouterClient
+from src.messages import (
     WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
     SELECT_METHOD_KEYBOARD, get_processing_message,
     ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
     parse_llm_response, format_improved_prompt_response,
     BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
 )
-from openai_client import OpenAIClient
-from conversation_manager import ConversationManager
-from gsheets_logging import build_google_sheets_handler_from_env
+from src.openai_client import OpenAIClient
+from src.conversation_manager import ConversationManager
+from src.gsheets_logging import build_google_sheets_handler_from_env
 
 # Configure logging (keep internal logging to file/console unchanged)
 logging.basicConfig(
