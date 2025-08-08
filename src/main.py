@@ -27,18 +27,34 @@ from telegram.error import (
 )
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-from src.state_manager import StateManager
-from src.openrouter_client import OpenRouterClient
-from src.messages import (
-    WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
-    SELECT_METHOD_KEYBOARD, get_processing_message,
-    ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
-    parse_llm_response, format_improved_prompt_response,
-    BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
-)
-from src.openai_client import OpenAIClient
-from src.conversation_manager import ConversationManager
-from src.gsheets_logging import build_google_sheets_handler_from_env
+try:
+    # When running as module: python -m src.main
+    from src.state_manager import StateManager
+    from src.openrouter_client import OpenRouterClient
+    from src.messages import (
+        WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
+        SELECT_METHOD_KEYBOARD, get_processing_message,
+        ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
+        parse_llm_response, format_improved_prompt_response,
+        BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
+    )
+    from src.openai_client import OpenAIClient
+    from src.conversation_manager import ConversationManager
+    from src.gsheets_logging import build_google_sheets_handler_from_env
+except ImportError:
+    # When running directly: python src/main.py
+    from state_manager import StateManager
+    from openrouter_client import OpenRouterClient
+    from messages import (
+        WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
+        SELECT_METHOD_KEYBOARD, get_processing_message,
+        ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
+        parse_llm_response, format_improved_prompt_response,
+        BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
+    )
+    from openai_client import OpenAIClient
+    from conversation_manager import ConversationManager
+    from gsheets_logging import build_google_sheets_handler_from_env
 
 # Configure logging (keep internal logging to file/console unchanged)
 logging.basicConfig(
@@ -51,6 +67,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load env early so Sheets handler sees variables from .env
+load_dotenv()
+
 # Dedicated Google Sheets logger (only for selected events)
 _sheets_logger = None
 try:
@@ -60,20 +79,33 @@ try:
         _sheets_logger.setLevel(logging.INFO)
         _sheets_logger.propagate = False
         _sheets_logger.addHandler(_gsheets_handler)
-except Exception:
+        logger.info("Google Sheets logging enabled successfully")
+    else:
+        logger.warning("Google Sheets handler not created - check environment variables")
+except Exception as e:
     # Do not fail if gsheets handler cannot be created
+    logger.error(f"Failed to initialize Google Sheets logging: {e}", exc_info=True)
     _sheets_logger = None
 
 
 def log_sheets(event: str, payload: dict) -> None:
     """Log a structured event to Google Sheets if enabled."""
     if not _sheets_logger or not _sheets_logger.handlers:
+        logger.debug(f"Sheets logging disabled, skipping event: {event}")
         return
     try:
         message = json.dumps({"event": event, **payload}, ensure_ascii=False)
-    except Exception:
-        message = str({"event": event, **payload})
-    _sheets_logger.info(message)
+        _sheets_logger.info(message)
+        logger.debug(f"Successfully logged to sheets: {event}")
+    except Exception as e:
+        logger.error(f"Failed to log to Google Sheets for event '{event}': {e}", exc_info=True)
+        # Fallback to string format
+        try:
+            message = str({"event": event, **payload})
+            _sheets_logger.info(message)
+            logger.debug(f"Logged to sheets with fallback format: {event}")
+        except Exception as e2:
+            logger.error(f"Failed to log to sheets even with fallback format for event '{event}': {e2}")
 
 
 def log_method_selection_to_file(user_id: int, trigger_text: str, method_name: str) -> None:
@@ -129,6 +161,7 @@ def log_conversation_totals_to_sheets(user_id: int, method_name: str, answer_tex
             and (usage_totals.get('completion_tokens') or 0) == 0
             and (usage_totals.get('total_tokens') or 0) == 0
         ):
+            logger.debug(f"No token usage to log for user {user_id}")
             return
         payload = {
             "BotID": bot_id,
@@ -143,9 +176,9 @@ def log_conversation_totals_to_sheets(user_id: int, method_name: str, answer_tex
             "total_tokens": usage_totals.get('total_tokens'),
         }
         log_sheets("conversation_totals", payload)
-    except Exception:
-        # Best-effort logging; ignore errors
-        pass
+    except Exception as e:
+        # Best-effort logging; log errors for debugging
+        logger.error(f"Failed to log conversation totals to sheets for user {user_id}: {e}", exc_info=True)
 
 
 # Global bot identifier, set at startup; can be overridden with BOT_ID env
