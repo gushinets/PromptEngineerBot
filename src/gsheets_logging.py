@@ -10,7 +10,7 @@ class GoogleSheetsHandler(logging.Handler):
     """
     A logging handler that buffers records and appends them to a Google Sheet
     using a background worker thread for non-blocking, batched writes.
-
+    
     Configuration supports either a credentials JSON string (env) or a path
     to a service account file. Target sheet can be specified by spreadsheet ID
     or by spreadsheet name.
@@ -217,7 +217,7 @@ class GoogleSheetsHandler(logging.Handler):
 def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHandler]:
     """
     Create a GoogleSheetsHandler if GSHEETS_LOGGING_ENABLED is truthy.
-
+    
     Reads configuration from environment using the provided getter (e.g., os.getenv):
       - GSHEETS_LOGGING_ENABLED: 'true' to enable
       - GOOGLE_SERVICE_ACCOUNT_JSON: Raw JSON credentials (optional)
@@ -230,7 +230,7 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
     enabled = str(env_getter("GSHEETS_LOGGING_ENABLED", "")).strip().lower() in {"1", "true", "yes", "on"}
     if not enabled:
         return None
-
+    
     credentials_json = env_getter("GOOGLE_SERVICE_ACCOUNT_JSON")
     credentials_file = env_getter("GOOGLE_APPLICATION_CREDENTIALS")
     spreadsheet_id = env_getter("GSHEETS_SPREADSHEET_ID")
@@ -238,7 +238,7 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
     worksheet_title = env_getter("GSHEETS_WORKSHEET", "Logs")
     batch_size = int(env_getter("GSHEETS_BATCH_SIZE", 20))
     flush_interval_seconds = float(env_getter("GSHEETS_FLUSH_INTERVAL_SECONDS", 5.0))
-
+    
     # Optional fields configuration (comma-separated);
     # default to a schema suited for LLM exchange logging
     fields_env = env_getter("GSHEETS_FIELDS")
@@ -258,7 +258,7 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
             "completion_tokens",
             "total_tokens",
         ]
-
+    
     try:
         handler = GoogleSheetsHandler(
             credentials_json=credentials_json,
@@ -278,5 +278,6 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
         # If handler cannot be created, fail silently but note in root logger once stdout/stderr available
         logging.getLogger(__name__).warning(f"GoogleSheetsHandler disabled due to initialization error: {exc}")
         return None
+
 
 

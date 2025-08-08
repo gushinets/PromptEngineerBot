@@ -5,11 +5,11 @@
             "name": "Run Telegram Bot",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/src/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
             }
         },
         {
@@ -25,7 +25,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
             }
         },
         {
@@ -41,7 +41,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
             }
         },
         {
@@ -57,7 +57,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
             }
         }
     ]

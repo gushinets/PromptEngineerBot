@@ -96,3 +96,5 @@ class ConversationManager:
         """
         value = self.current_methods.get(user_id)
         return value or 'CUSTOM'
+
+

@@ -7,12 +7,7 @@ WORKDIR /app
 # Copy requirements and source code
 COPY requirements.txt .
 COPY .env .
-COPY main.py .
-COPY openai_client.py .
-COPY openrouter_client.py .
-COPY state_manager.py .
-COPY conversation_manager.py .
-COPY prompts ./prompts
+COPY src ./src
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -21,4 +16,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # EXPOSE 8080
 
 # Run the bot
-CMD ["python", "main.py"]
+CMD ["python", "src/main.py"]

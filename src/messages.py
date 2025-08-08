@@ -152,39 +152,39 @@ SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
 # ===== Improved Prompt Response =====
 IMPROVED_PROMPT_RESPONSE = _(
     """
-✅ **Промпт оптимизирован с помощью {method_name}!**
-
-**Ваш исходный промпт:**
-```
-{user_prompt}
-```
-
-**Улучшенный промпт:**
-```
-{improved_prompt}
-```
-Ваш промпт готов к использованию. 
-📋 Скопируйте и вставьте его в Ваш Искусственный интеллект: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek
-
-А мне отправьте новый промпт для дальнейшей оптимизации! 🚀
-""",
+    ✅ **Промпт оптимизирован с помощью {method_name}!**
+    
+    **Ваш исходный промпт:**
+    ```
+    {user_prompt}
+    ```
+    
+    **Улучшенный промпт:**
+    ```
+    {improved_prompt}
+    ```
+    Ваш промпт готов к использованию. 
+    📋 Скопируйте и вставьте его в Ваш Искусственный интеллект: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek
+    
+    А мне отправьте новый промпт для дальнейшей оптимизации! 🚀
+    """,
     """
-✅ **Prompt optimized with {method_name}!**
-
-**Your original prompt:**
-```
-{user_prompt}
-```
-
-**Improved prompt:**
-```
-{improved_prompt}
-```
-Your prompt is ready to use.
-📋 Copy and paste it into your AI: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek
-
-Send me a new prompt for further optimization! 🚀
-"""
+    ✅ **Prompt optimized with {method_name}!**
+    
+    **Your original prompt:**
+    ```
+    {user_prompt}
+    ```
+    
+    **Improved prompt:**
+    ```
+    {improved_prompt}
+    ```
+    Your prompt is ready to use.
+    📋 Copy and paste it into your AI: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek
+    
+    Send me a new prompt for further optimization! 🚀
+    """
 )
 
 def format_improved_prompt_response(user_prompt: str, improved_prompt: str, method_name: str) -> str:
@@ -207,7 +207,7 @@ def format_improved_prompt_response(user_prompt: str, improved_prompt: str, meth
 
 def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:
     """Extract content between an opening tag and any acceptable closing marker.
-
+    
     Closing markers supported (case-insensitive):
     - </TAG>
     - <END TAG>
@@ -216,7 +216,7 @@ def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:
     - [ /TAG ] or [/TAG]
     - <TAG_END>
     - <END>
-
+    
     Returns the extracted content and the index where the opening tag started.
     If opening tag not found, returns (None, None).
     """
@@ -226,11 +226,11 @@ def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:
     start = lowered.find(opening)
     if start == -1:
         return None, None
-
+    
     content_start = start + len(opening)
     remainder = text[content_start:]
     remainder_lower = lowered[content_start:]
-
+    
     # Build list of possible closing markers
     closing_candidates = [
         f"</{normalized_tag}>",
@@ -241,19 +241,19 @@ def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:
         f"<{normalized_tag}_end>",
         "<end>",
     ]
-
+    
     earliest_idx = None
     for marker in closing_candidates:
         idx = remainder_lower.find(marker)
         if idx != -1:
             if earliest_idx is None or idx < earliest_idx:
                 earliest_idx = idx
-
+    
     if earliest_idx is not None:
         extracted = remainder[:earliest_idx].strip()
     else:
         extracted = remainder.strip()
-
+    
     return extracted, start
 
 def parse_llm_response(response: str) -> tuple[str, bool, bool]:
@@ -283,3 +283,5 @@ def parse_llm_response(response: str) -> tuple[str, bool, bool]:
             is_improved_prompt = True
     
     return response, is_question, is_improved_prompt
+
+

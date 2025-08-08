@@ -135,3 +135,5 @@ class OpenAIClient:
                 f"{log_prefix} OpenAI API request failed after {total_time:.2f}s: {str(e)}"
             )
             raise
+
+

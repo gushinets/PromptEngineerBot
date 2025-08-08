@@ -18,7 +18,7 @@
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
-                "main.py"
+                "src/main.py"
             ],
             "group": {
                 "kind": "build",

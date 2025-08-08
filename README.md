@@ -41,7 +41,7 @@ A Telegram bot that processes user prompts through OpenRouter or OpenAI API, wit
 
 3. Run the bot:
     ```bash
-    python main.py
+    python src/main.py
     ```
 
 ### Docker Deployment

@@ -51,3 +51,5 @@ class StateManager:
         """
         state = self.get_user_state(user_id)
         state.last_interaction = interaction
+
+

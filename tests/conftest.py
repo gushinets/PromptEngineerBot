@@ -6,8 +6,9 @@ from unittest.mock import MagicMock, AsyncMock, patch
 import pytest
 from dotenv import load_dotenv
 
-# Add the project root to the Python path
+# Add the project root and src folder to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Load environment variables from .env file
 load_dotenv()
