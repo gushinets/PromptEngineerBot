@@ -116,6 +116,38 @@ def log_llm_exchange_to_sheets(user_id: int, method_name: str, user_request: str
     log_sheets("llm_exchange", payload)
 
 
+def log_conversation_totals_to_sheets(user_id: int, method_name: str, answer_text: str | None = None) -> None:
+    """Log the aggregated token totals for the user's conversation to Google Sheets.
+    If provided, include the improved prompt in the Answer field.
+    """
+    try:
+        bot_id = _get_bot_identifier()
+        usage_totals = conversation_manager.get_token_totals(user_id)
+        # Skip if nothing accumulated
+        if not usage_totals or (
+            (usage_totals.get('prompt_tokens') or 0) == 0
+            and (usage_totals.get('completion_tokens') or 0) == 0
+            and (usage_totals.get('total_tokens') or 0) == 0
+        ):
+            return
+        payload = {
+            "BotID": bot_id,
+            "TelegramID": user_id,
+            "LLM": _compose_llm_name(),
+            "OptimizationModel": method_name,
+            # For totals rows, include original user prompt for context
+            "UserRequest": conversation_manager.get_user_prompt(user_id) or "",
+            "Answer": answer_text or "",
+            "prompt_tokens": usage_totals.get('prompt_tokens'),
+            "completion_tokens": usage_totals.get('completion_tokens'),
+            "total_tokens": usage_totals.get('total_tokens'),
+        }
+        log_sheets("conversation_totals", payload)
+    except Exception:
+        # Best-effort logging; ignore errors
+        pass
+
+
 # Global bot identifier, set at startup; can be overridden with BOT_ID env
 BOT_IDENTIFIER = os.getenv('BOT_ID')
 
@@ -284,7 +316,12 @@ def reset_user_state(user_id: int):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /start command or New Prompt button."""
     user_id = update.effective_user.id
-    reset_user_state(user_id)
+    # If there was an ongoing conversation, log its totals before resetting
+    try:
+        method_name = conversation_manager.get_current_method(user_id)
+        log_conversation_totals_to_sheets(user_id, method_name)
+    finally:
+        reset_user_state(user_id)
     
     # Send welcome message
     await safe_reply(
@@ -347,6 +384,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 raw_response = await llm_client.send_prompt(transcript)
+                # Accumulate token usage for this turn
+                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
                 response, is_question, is_improved_prompt = parse_llm_response(raw_response)
                 conversation_manager.append_message(user_id, "assistant", raw_response)
                 
@@ -356,7 +395,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     method_name = "CRAFT"
                     improved_prompt_only = response
                     response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
+                    # Log aggregated totals at conversation end (include improved prompt)
+                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
                     # Reset conversation after sending improved prompt
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
@@ -393,6 +433,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 raw_response = await llm_client.send_prompt(transcript)
+                # Accumulate token usage for this turn
+                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
                 response, is_question, is_improved_prompt = parse_llm_response(raw_response)
                 conversation_manager.append_message(user_id, "assistant", raw_response)
                 
@@ -402,11 +444,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     method_name = "LYRA"
                     improved_prompt_only = response
                     response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Reset conversation after sending improved prompt
+                    # Log aggregated totals at conversation end (include improved prompt)
+                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
+                    # Reset conversation after logging totals
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
                     state_manager.set_waiting_for_prompt(user_id, True)
-                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                 
                 await safe_reply(
                     update,
@@ -440,6 +483,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 raw_response = await llm_client.send_prompt(transcript)
+                # Accumulate token usage for this turn
+                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
                 response, is_question, is_improved_prompt = parse_llm_response(raw_response)
                 conversation_manager.append_message(user_id, "assistant", raw_response)
                 
@@ -449,11 +494,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     method_name = "LYRA"
                     improved_prompt_only = response
                     response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Reset conversation after sending improved prompt
+                    # Log aggregated totals at conversation end (include improved prompt)
+                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
+                    # Reset conversation after logging totals
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
                     state_manager.set_waiting_for_prompt(user_id, True)
-                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                 
                 await safe_reply(
                     update,
@@ -486,6 +532,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             try:
                 raw_response = await llm_client.send_prompt(transcript)
+                # Accumulate token usage for this turn
+                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
                 response, is_question, is_improved_prompt = parse_llm_response(raw_response)
                 conversation_manager.append_message(user_id, "assistant", raw_response)
                 
@@ -495,11 +543,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     method_name = "GGL"
                     improved_prompt_only = response
                     response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Reset conversation after sending improved prompt
+                    # Log aggregated totals at conversation end (include improved prompt)
+                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
+                    # Reset conversation after logging totals
                     conversation_manager.reset(user_id)
                     # Reset the user state using the state manager
                     state_manager.set_waiting_for_prompt(user_id, True)
-                    log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
                 
                 await safe_reply(
                     update,
@@ -535,6 +584,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conversation_manager.append_message(user_id, "user", text)
     try:
         raw_response = await llm_client.send_prompt(transcript)
+        # Accumulate token usage for this turn
+        conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
         response, is_question, is_improved_prompt = parse_llm_response(raw_response)
         conversation_manager.append_message(user_id, "assistant", raw_response)
         
@@ -544,9 +595,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             method_name = conversation_manager.get_current_method(user_id)
             improved_prompt_only = response
             response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-            # Reset user state after sending improved prompt
+            # Log aggregated totals at conversation end (include improved prompt)
+            log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
+            # Reset user state after logging totals
             reset_user_state(user_id)
-            log_llm_exchange_to_sheets(user_id, method_name, user_prompt, improved_prompt_only)
         
         await safe_reply(
             update,

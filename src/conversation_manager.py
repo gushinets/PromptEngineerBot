@@ -12,6 +12,9 @@ class ConversationManager:
         self.user_prompts = {}  # Store user prompt before method selection
         self.method_selection = {}  # Track if waiting for method selection
         self.current_methods = {}  # Track the current optimization method for each user
+        # Track per-conversation token usage totals per user
+        # Structure: { user_id: { 'prompt_tokens': int, 'completion_tokens': int, 'total_tokens': int } }
+        self.token_totals = {}
 
     def get_transcript(self, user_id):
         """
@@ -46,6 +49,7 @@ class ConversationManager:
         self.user_prompts[user_id] = None
         self.method_selection[user_id] = False
         self.current_methods[user_id] = None
+        self.token_totals[user_id] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     def set_user_prompt(self, user_id, prompt):
         """
@@ -96,5 +100,28 @@ class ConversationManager:
         """
         value = self.current_methods.get(user_id)
         return value or 'CUSTOM'
+
+    def accumulate_token_usage(self, user_id, usage):
+        """
+        Accumulate token usage for the user's current conversation.
+        'usage' is expected to be a dict with keys 'prompt_tokens', 'completion_tokens', 'total_tokens'.
+        Missing keys or None values are treated as zero.
+        """
+        if user_id not in self.token_totals:
+            self.token_totals[user_id] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        if not usage:
+            return
+        totals = self.token_totals[user_id]
+        try:
+            totals["prompt_tokens"] += int(usage.get("prompt_tokens") or 0)
+            totals["completion_tokens"] += int(usage.get("completion_tokens") or 0)
+            totals["total_tokens"] += int(usage.get("total_tokens") or 0)
+        except Exception:
+            # Best-effort accounting; ignore malformed usage
+            pass
+
+    def get_token_totals(self, user_id):
+        """Return the current token totals dict for the user (zeros if none)."""
+        return self.token_totals.get(user_id, {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0})
 
 
