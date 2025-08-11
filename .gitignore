@@ -8,7 +8,7 @@ venv/
 
 # Environment variables and secrets
 .env
-google_sevice_key.json
+google_service_key.json
 
 # OS generated files
 .DS_Store

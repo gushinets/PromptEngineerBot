@@ -7,6 +7,7 @@ WORKDIR /app
 # Copy requirements and source code
 COPY requirements.txt .
 COPY .env .
+COPY google_service_key.json .
 COPY src ./src
 
 # Install dependencies
