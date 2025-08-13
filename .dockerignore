@@ -1,23 +1,51 @@
-# Ignore Python cache and compiled files
-__pycache__/
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
 *.pyc
 *.pyo
 *.pyd
+.Python
+*.so
+.pytest_cache
+.coverage
+htmlcov/
 
-# Ignore virtual environments
+# Virtual environments
+.venv
 venv/
+env/
 
-# Ignore version control and IDE files
-.git/
-.gitignore
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
 
-# Ignore OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Ignore test and temp files
+# Logs
 *.log
-*.tmp
+bot.log
 
-# Add more patterns as needed
+# Test files
+tests/
+test_imports.py
+
+# Documentation
+README.md
+docs/
+
+# Development files
+.env.example
+docker-compose.yml
+Dockerfile
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

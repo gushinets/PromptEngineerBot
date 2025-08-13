@@ -6,19 +6,25 @@
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
-                "-m", "pip", "install", "-r", "requirements.txt"
+                "-m",
+                "pip",
+                "install",
+                "-r",
+                "requirements.txt"
             ],
             "group": "build",
             "presentation": {
-                "reveal": "always"
-            }
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
         },
         {
-            "label": "Run Telegram Bot",
+            "label": "Run Telegram Bot (Entry Point)",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
-                "src/main.py"
+                "run_bot.py"
             ],
             "group": {
                 "kind": "build",
@@ -27,6 +33,159 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Telegram Bot (Module)",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "src.main"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run All Tests",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "pytest",
+                "tests/",
+                "-v"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Tests with Coverage",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "pytest",
+                "tests/",
+                "--cov=src",
+                "--cov-report=html",
+                "--cov-report=term"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test Imports",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "test_imports.py"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Format Code (Black)",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "black",
+                "src/",
+                "tests/",
+                "--line-length",
+                "88"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint Code (Flake8)",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "flake8",
+                "src/",
+                "tests/",
+                "--max-line-length=88",
+                "--extend-ignore=E203,W503"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build Docker Image",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "build",
+                "-t",
+                "prompt-improver-bot",
+                "."
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Docker Container",
+            "type": "shell",
+            "command": "docker",
+            "args": [
+                "run",
+                "--env-file",
+                ".env",
+                "prompt-improver-bot"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": [],
+            "dependsOn": "Build Docker Image"
+        },
+        {
+            "label": "Clean Python Cache",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-c",
+                "import shutil, pathlib; [shutil.rmtree(p) for p in pathlib.Path('.').rglob('__pycache__') if p.is_dir()]"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
             },
             "problemMatcher": []
         }

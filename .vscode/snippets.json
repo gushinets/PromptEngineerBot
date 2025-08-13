@@ -1,0 +1,77 @@
+{
+    "Python Test Function": {
+        "prefix": "pytest",
+        "body": [
+            "def test_${1:function_name}(self${2:, mock_update, mock_context}):",
+            "    \"\"\"Test ${3:description}.\"\"\"",
+            "    # Arrange",
+            "    ${4:# Setup test data}",
+            "    ",
+            "    # Act",
+            "    ${5:# Execute the function}",
+            "    ",
+            "    # Assert",
+            "    ${6:# Verify the results}",
+            "    assert ${7:condition}"
+        ],
+        "description": "Create a pytest test function with AAA pattern"
+    },
+    "Async Test Function": {
+        "prefix": "atest",
+        "body": [
+            "@pytest.mark.asyncio",
+            "async def test_${1:function_name}(self${2:, mock_update, mock_context}):",
+            "    \"\"\"Test ${3:description}.\"\"\"",
+            "    # Arrange",
+            "    ${4:# Setup test data}",
+            "    ",
+            "    # Act",
+            "    ${5:result = await function_under_test()}",
+            "    ",
+            "    # Assert",
+            "    ${6:# Verify the results}",
+            "    assert ${7:condition}"
+        ],
+        "description": "Create an async pytest test function"
+    },
+    "Mock LLM Client": {
+        "prefix": "mockclient",
+        "body": [
+            "mock_client = MagicMock()",
+            "mock_client.send_prompt = AsyncMock(return_value=\"${1:Mocked response}\")",
+            "mock_client.get_last_usage = MagicMock(return_value={",
+            "    'prompt_tokens': ${2:10},",
+            "    'completion_tokens': ${3:20},",
+            "    'total_tokens': ${4:30}",
+            "})"
+        ],
+        "description": "Create a mock LLM client for testing"
+    },
+    "Bot Handler Test Setup": {
+        "prefix": "bothandler",
+        "body": [
+            "# Create mock dependencies",
+            "mock_config = MagicMock(spec=BotConfig)",
+            "mock_config.bot_id = \"test_bot\"",
+            "mock_config.llm_backend = \"TEST\"",
+            "mock_config.model_name = \"test-model\"",
+            "",
+            "mock_llm_client = MagicMock()",
+            "mock_llm_client.send_prompt = AsyncMock(return_value=\"${1:Test response}\")",
+            "",
+            "# Create bot handler",
+            "bot_handler = BotHandler(mock_config, mock_llm_client, lambda event, payload: None)"
+        ],
+        "description": "Set up BotHandler for testing"
+    },
+    "Environment Variable": {
+        "prefix": "envvar",
+        "body": [
+            "with patch.dict(os.environ, {",
+            "    '${1:VARIABLE_NAME}': '${2:value}'",
+            "}, clear=True):",
+            "    ${3:# Test code here}"
+        ],
+        "description": "Mock environment variables for testing"
+    }
+}

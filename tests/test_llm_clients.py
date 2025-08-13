@@ -10,8 +10,8 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 
 # Import the clients to test
-from openai_client import OpenAIClient
-from openrouter_client import OpenRouterClient
+from src.openai_client import OpenAIClient
+from src.openrouter_client import OpenRouterClient
 
 class TestOpenAIClient:
     """Test cases for the OpenAI client."""
@@ -33,7 +33,7 @@ class TestOpenAIClient:
     @pytest.mark.asyncio
     async def test_send_prompt_success(self, mock_openai_response):
         """Test successful prompt sending to OpenAI."""
-        with patch('openai_client.OpenAIClient._call_openai_api') as mock_call:
+        with patch('src.openai_client.OpenAIClient._call_openai_api') as mock_call:
             # Mock underlying API call
             mock_call.return_value = ("Mocked response", None)
 
@@ -54,7 +54,7 @@ class TestOpenAIClient:
     @pytest.mark.asyncio
     async def test_send_prompt_timeout(self):
         """Test timeout handling in OpenAI client."""
-        with patch('openai_client.OpenAIClient._call_openai_api', 
+        with patch('src.openai_client.OpenAIClient._call_openai_api', 
                  side_effect=asyncio.TimeoutError("API timeout")):
             
             client = OpenAIClient(
@@ -66,7 +66,7 @@ class TestOpenAIClient:
             )
             messages = [{"role": "user", "content": "Test prompt"}]
             
-            with patch('openai_client.OpenAIClient._call_openai_api', side_effect=asyncio.TimeoutError("API timeout")):
+            with patch('src.openai_client.OpenAIClient._call_openai_api', side_effect=asyncio.TimeoutError("API timeout")):
                 with pytest.raises(Exception) as exc_info:
                     await client.send_prompt(messages)
                 assert "timeout" in str(exc_info.value).lower()
@@ -152,7 +152,7 @@ class TestLLMClientIntegration:
             with patch('aiohttp.ClientSession.post', new=AsyncMock(side_effect=mock_post)) as mock_post:
                 # Also stub the OpenAI call to raise a timeout to avoid real API call
                 if client_class is OpenAIClient:
-                    with patch('openai_client.OpenAIClient._call_openai_api', side_effect=asyncio.TimeoutError("API timeout")):
+                    with patch('src.openai_client.OpenAIClient._call_openai_api', side_effect=asyncio.TimeoutError("API timeout")):
                         # Initialize client before invoking send_prompt
                         client = client_class(**client_kwargs)
                         with pytest.raises(asyncio.TimeoutError):

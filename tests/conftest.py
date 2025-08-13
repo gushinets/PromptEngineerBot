@@ -34,7 +34,7 @@ def mock_context():
 @pytest.fixture
 def mock_application():
     """Create a mock Application object."""
-    with patch('main.Application.builder') as mock_builder:
+    with patch('src.main.Application.builder') as mock_builder:
         mock_app = MagicMock()
         mock_builder.return_value = MagicMock(
             token=MagicMock(return_value=MagicMock()),
@@ -57,6 +57,17 @@ def mock_application():
 @pytest.fixture(autouse=True)
 def mock_llm_client():
     """Mock the LLM client to avoid real API calls during testing."""
-    with patch('main.llm_client') as mock_client:
-        mock_client.send_prompt = AsyncMock(return_value="Mocked LLM response")
+    from unittest.mock import MagicMock, AsyncMock
+    
+    # Create a mock LLM client
+    mock_client = MagicMock()
+    mock_client.send_prompt = AsyncMock(return_value="Mocked LLM response")
+    mock_client.get_last_usage = MagicMock(return_value={'prompt_tokens': 10, 'completion_tokens': 20, 'total_tokens': 30})
+    
+    # Mock the bot_handler instance in main.py
+    with patch('src.main.bot_handler') as mock_bot_handler:
+        mock_bot_handler.llm_client = mock_client
+        mock_bot_handler.handle_start = AsyncMock()
+        mock_bot_handler.handle_message = AsyncMock()
+        
         yield mock_client

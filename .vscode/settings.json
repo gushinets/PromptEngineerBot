@@ -1,8 +1,65 @@
 {
+    // Python Configuration
     "python.analysis.extraPaths": [
         "${workspaceFolder}",
         "${workspaceFolder}/src"
     ],
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
-    "python.terminal.activateEnvironment": true
+    "python.terminal.activateEnvironment": true,
+    
+    // Testing Configuration
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    
+    // Code Analysis
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true,
+    
+    // Formatting and Linting
+    "python.formatting.provider": "black",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": false,
+    
+    // File Associations
+    "files.associations": {
+        "*.env*": "dotenv",
+        "Dockerfile*": "dockerfile"
+    },
+    
+    // Editor Settings
+    "editor.rulers": [88, 120],
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    
+    // File Exclusions
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.pytest_cache": true,
+        "**/htmlcov": true,
+        "**/.coverage": true
+    },
+    
+    // Search Exclusions
+    "search.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.pytest_cache": true,
+        "**/htmlcov": true,
+        "**/.coverage": true,
+        "**/node_modules": true,
+        "**/.venv": true
+    },
+    
+    // Kiro Configuration
+    "kiroAgent.configureMCP": "Disabled"
 }

@@ -5,12 +5,19 @@
             "name": "Run Telegram Bot",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/main.py",
+            "program": "${workspaceFolder}/run_bot.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
-            }
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Run Telegram Bot (Module)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Run Tests (Current File)",
@@ -24,9 +31,7 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
-            }
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Run All Tests",
@@ -40,9 +45,23 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
-            }
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Run Tests with Coverage",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v",
+                "--cov=src",
+                "--cov-report=html",
+                "--cov-report=term",
+                "tests/"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Debug Test",
@@ -56,9 +75,16 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}${pathSeparator}${workspaceFolder}/src"
-            }
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Test Imports",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_imports.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

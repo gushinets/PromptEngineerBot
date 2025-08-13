@@ -27,34 +27,10 @@ from telegram.error import (
 )
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-try:
-    # When running as module: python -m src.main
-    from src.state_manager import StateManager
-    from src.openrouter_client import OpenRouterClient
-    from src.messages import (
-        WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
-        SELECT_METHOD_KEYBOARD, get_processing_message,
-        ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
-        parse_llm_response, format_improved_prompt_response,
-        BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
-    )
-    from src.openai_client import OpenAIClient
-    from src.conversation_manager import ConversationManager
-    from src.gsheets_logging import build_google_sheets_handler_from_env
-except ImportError:
-    # When running directly: python src/main.py
-    from state_manager import StateManager
-    from openrouter_client import OpenRouterClient
-    from messages import (
-        WELCOME_MESSAGE, SELECT_METHOD_MESSAGE,
-        SELECT_METHOD_KEYBOARD, get_processing_message,
-        ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG,
-        parse_llm_response, format_improved_prompt_response,
-        BTN_RESET, BTN_CRAFT, BTN_LYRA, BTN_GGL, BTN_LYRA_DETAIL
-    )
-    from openai_client import OpenAIClient
-    from conversation_manager import ConversationManager
-    from gsheets_logging import build_google_sheets_handler_from_env
+from .messages import (
+    ERROR_EMPTY_MESSAGE, ERROR_GENERIC, ERROR_NETWORK, ERROR_RATE_LIMIT, ERROR_TOO_LONG
+)
+from .gsheets_logging import build_google_sheets_handler_from_env
 
 # Configure logging (keep internal logging to file/console unchanged)
 logging.basicConfig(
@@ -281,56 +257,24 @@ async def safe_reply(update: Update, text: str, **kwargs) -> bool:
     
     return False
 
-# Load environment variables
-load_dotenv()
+# Initialize configuration and components
+from .config import BotConfig
+from .llm_factory import LLMClientFactory
+from .bot_handler import BotHandler
 
-# Debug: Log environment variables
-logger.info("Environment variables loaded. Checking required variables...")
-required_vars = ['TELEGRAM_TOKEN', 'LLM_BACKEND']
-missing_vars = [var for var in required_vars if not os.getenv(var)]
-if missing_vars:
-    logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
-else:
-    logger.info("All required environment variables are present.")
-    logger.debug(f"LLM_BACKEND: {os.getenv('LLM_BACKEND')}")
-    # Don't log tokens for security
-    logger.debug("TELEGRAM_TOKEN present: Yes")
+# Load and validate configuration
+config = BotConfig.from_env()
+config.validate()
 
-# --- PROMPT LOADING ---
-def load_prompt(filename):
-    with open(filename, 'r', encoding='utf-8') as f:
-        return f.read()
+logger.info("Configuration loaded successfully")
+logger.info(f"LLM Backend: {config.llm_backend}")
+logger.info(f"Model: {config.model_name}")
 
-PROMPTS_DIR = os.path.join(os.path.dirname(__file__), 'prompts')
-CRAFT_PROMPT_PATH = os.path.join(PROMPTS_DIR, 'CRAFT_prompt.txt')
-LYRA_PROMPT_PATH = os.path.join(PROMPTS_DIR, 'LYRA_prompt.txt')
-GGL_PROMPT_PATH = os.path.join(PROMPTS_DIR, 'GGL_prompt.txt')
+# Create LLM client
+llm_client = LLMClientFactory.create_client(config)
 
-craft_prompt = load_prompt(CRAFT_PROMPT_PATH)
-lyra_prompt = load_prompt(LYRA_PROMPT_PATH)
-ggl_prompt = load_prompt(GGL_PROMPT_PATH)
-
-# Button constants and keyboards are imported from messages.py
-
-state_manager = StateManager()
-conversation_manager = ConversationManager()
-
-
-# Select LLM backend
-llm_backend = os.getenv('LLM_BACKEND', 'OPENROUTER').upper()
-if llm_backend == 'OPENAI':
-    llm_client = OpenAIClient(
-        api_key=os.getenv('OPENAI_API_KEY'),
-        model_name=os.getenv('MODEL_NAME', 'gpt-4o'),
-        max_retries=5,  # Increased from default 3 to 5
-        request_timeout=60.0,  # 60 seconds per request
-        max_wait_time=300.0  # 5 minutes total including retries
-    )
-else:
-    llm_client = OpenRouterClient(
-        api_key=os.getenv('OPENROUTER_API_KEY'),
-        model_name=os.getenv('MODEL_NAME', 'openai/gpt-4')
-    )
+# Create bot handler
+bot_handler = BotHandler(config, llm_client, log_sheets)
 
 
 # Keyboard is now defined in messages.py
@@ -348,306 +292,11 @@ def reset_user_state(user_id: int):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the /start command or New Prompt button."""
-    user_id = update.effective_user.id
-    # If there was an ongoing conversation, log its totals before resetting
-    try:
-        method_name = conversation_manager.get_current_method(user_id)
-        log_conversation_totals_to_sheets(user_id, method_name)
-    finally:
-        reset_user_state(user_id)
-    
-    # Send welcome message
-    await safe_reply(
-        update,
-        WELCOME_MESSAGE,
-        parse_mode='Markdown',
-        reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True)
-    )
-
-    # Sheets: log session start
-    log_sheets("session_start", {"user_id": user_id})
-    
+    await bot_handler.handle_start(update, context)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
-    user_state = state_manager.get_user_state(user_id)
-
-    # If user presses reset button, always reset the conversation
-    if text == BTN_RESET:
-        await start(update, context)
-        return
-
-    # If waiting for prompt
-    if user_state.waiting_for_prompt:
-        conversation_manager.reset(user_id)
-        conversation_manager.set_user_prompt(user_id, text)
-        conversation_manager.append_message(user_id, "user", text)  # Store user prompt
-        conversation_manager.set_waiting_for_method(user_id, True)
-        user_state.waiting_for_prompt = False
-
-        # Sheets: log prompt received (truncated)
-        log_sheets("prompt_received", {"user_id": user_id, "length": len(text), "preview": text[:120]})
-        
-        # Add reset button to the method selection keyboard
-        method_keyboard = list(SELECT_METHOD_KEYBOARD.keyboard)
-        method_keyboard.append([BTN_RESET])
-        await safe_reply(
-            update,
-            SELECT_METHOD_MESSAGE,
-            reply_markup=ReplyKeyboardMarkup(method_keyboard, resize_keyboard=True)
-        )
-        return
-
-    # If waiting for method selection
-    if conversation_manager.is_waiting_for_method(user_id):
-        transcript = conversation_manager.get_transcript(user_id)
-        if text == BTN_CRAFT:
-            log_method_selection_to_file(user_id, text, "CRAFT")
-            log_sheets("method_selected", {"user_id": user_id, "method": "CRAFT"})
-            # Insert system prompt at the start if not present
-            if not transcript or transcript[0]["role"] != "system":
-                transcript.insert(0, {"role": "system", "content": craft_prompt})
-            conversation_manager.set_waiting_for_method(user_id, False)
-            conversation_manager.set_current_method(user_id, "CRAFT")
-            # Send processing message with method name
-            await update.message.reply_text(
-                get_processing_message("craft"),
-                parse_mode='Markdown'
-            )
-            try:
-                raw_response = await llm_client.send_prompt(transcript)
-                # Accumulate token usage for this turn
-                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
-                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
-                conversation_manager.append_message(user_id, "assistant", raw_response)
-                
-                if is_improved_prompt:
-                    # Format the improved prompt response
-                    user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "CRAFT"
-                    improved_prompt_only = response
-                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Log aggregated totals at conversation end (include improved prompt)
-                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
-                    # Reset conversation after sending improved prompt
-                    conversation_manager.reset(user_id)
-                    # Reset the user state using the state manager
-                    state_manager.set_waiting_for_prompt(user_id, True)
-                
-                await safe_reply(
-                    update,
-                    response,
-                    parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            except Exception as e:
-                logger.error(f"Error in CRAFT processing: {e}", exc_info=True)
-                log_sheets("error", {"stage": "CRAFT", "user_id": user_id, "error": str(e)})
-                await safe_reply(
-                    update,
-                    f"{ERROR_GENERIC}\n\n{str(e)}",
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            return
-        elif text == BTN_LYRA:
-            log_method_selection_to_file(user_id, text, "LYRA Basic")
-            log_sheets("method_selected", {"user_id": user_id, "method": "LYRA Basic"})
-            # Insert LYRA system prompt if not present
-            if not transcript or transcript[0]["role"] != "system":
-                transcript.insert(0, {"role": "system", "content": lyra_prompt})
-            conversation_manager.append_message(user_id, "user", "BASIC using ChatGPT")
-            conversation_manager.set_waiting_for_method(user_id, False)
-            conversation_manager.set_current_method(user_id, "LYRA Basic")
-            # Send processing message with method name
-            await update.message.reply_text(
-                get_processing_message("lyra"),
-                parse_mode='Markdown'
-            )
-            try:
-                raw_response = await llm_client.send_prompt(transcript)
-                # Accumulate token usage for this turn
-                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
-                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
-                conversation_manager.append_message(user_id, "assistant", raw_response)
-                
-                if is_improved_prompt:
-                    # Format the improved prompt response
-                    user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "LYRA"
-                    improved_prompt_only = response
-                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Log aggregated totals at conversation end (include improved prompt)
-                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
-                    # Reset conversation after logging totals
-                    conversation_manager.reset(user_id)
-                    # Reset the user state using the state manager
-                    state_manager.set_waiting_for_prompt(user_id, True)
-                
-                await safe_reply(
-                    update,
-                    response,
-                    parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            except Exception as e:
-                error_msg = f"Ошибка: {e}"
-                conversation_manager.append_message(user_id, "assistant", error_msg)
-                log_sheets("error", {"stage": "LYRA Basic", "user_id": user_id, "error": str(e)})
-                await safe_reply(
-                    update,
-                    error_msg,
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            return
-        elif text == BTN_LYRA_DETAIL:
-            log_method_selection_to_file(user_id, text, "LYRA Detail")
-            log_sheets("method_selected", {"user_id": user_id, "method": "LYRA Detail"})
-            # Insert LYRA system prompt if not present
-            if not transcript or transcript[0]["role"] != "system":
-                transcript.insert(0, {"role": "system", "content": lyra_prompt})
-            conversation_manager.append_message(user_id, "user", "DETAILED using ChatGPT")
-            conversation_manager.set_waiting_for_method(user_id, False)
-            conversation_manager.set_current_method(user_id, "LYRA Detail")
-            # Send processing message with method name
-            await update.message.reply_text(
-                get_processing_message("lyra_detail"),
-                parse_mode='Markdown'
-            )
-            try:
-                raw_response = await llm_client.send_prompt(transcript)
-                # Accumulate token usage for this turn
-                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
-                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
-                conversation_manager.append_message(user_id, "assistant", raw_response)
-                
-                if is_improved_prompt:
-                    # Format the improved prompt response
-                    user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "LYRA"
-                    improved_prompt_only = response
-                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Log aggregated totals at conversation end (include improved prompt)
-                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
-                    # Reset conversation after logging totals
-                    conversation_manager.reset(user_id)
-                    # Reset the user state using the state manager
-                    state_manager.set_waiting_for_prompt(user_id, True)
-                
-                await safe_reply(
-                    update,
-                    response,
-                    parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            except Exception as e:
-                error_msg = f"Ошибка: {e}"
-                conversation_manager.append_message(user_id, "assistant", error_msg)
-                log_sheets("error", {"stage": "LYRA Detail", "user_id": user_id, "error": str(e)})
-                await safe_reply(
-                    update,
-                    error_msg,
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            return
-        elif text == BTN_GGL:
-            log_method_selection_to_file(user_id, text, "GGL")
-            log_sheets("method_selected", {"user_id": user_id, "method": "GGL"})
-            # Insert GGL system prompt if not present
-            if not transcript or transcript[0]["role"] != "system":
-                transcript.insert(0, {"role": "system", "content": ggl_prompt})
-            conversation_manager.set_waiting_for_method(user_id, False)
-            conversation_manager.set_current_method(user_id, "GGL")
-            # Send processing message with method name
-            await update.message.reply_text(
-                get_processing_message("ggl"),
-                parse_mode='Markdown'
-            )
-            try:
-                raw_response = await llm_client.send_prompt(transcript)
-                # Accumulate token usage for this turn
-                conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
-                response, is_question, is_improved_prompt = parse_llm_response(raw_response)
-                conversation_manager.append_message(user_id, "assistant", raw_response)
-                
-                if is_improved_prompt:
-                    # Format the improved prompt response
-                    user_prompt = conversation_manager.get_user_prompt(user_id)
-                    method_name = "GGL"
-                    improved_prompt_only = response
-                    response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-                    # Log aggregated totals at conversation end (include improved prompt)
-                    log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
-                    # Reset conversation after logging totals
-                    conversation_manager.reset(user_id)
-                    # Reset the user state using the state manager
-                    state_manager.set_waiting_for_prompt(user_id, True)
-                
-                await safe_reply(
-                    update,
-                    response,
-                    parse_mode='Markdown',
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            except Exception as e:
-                error_msg = f"Ошибка: {e}"
-                conversation_manager.append_message(user_id, "assistant", error_msg)
-                log_sheets("error", {"stage": "GGL", "user_id": user_id, "error": str(e)})
-                await safe_reply(
-                    update,
-                    error_msg,
-                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-                )
-            return
-        else:
-            # Add reset button to the method selection keyboard
-            method_keyboard = list(SELECT_METHOD_KEYBOARD.keyboard)
-            method_keyboard.append([BTN_RESET])
-            await safe_reply(
-                update,
-                SELECT_METHOD_MESSAGE,
-                reply_markup=ReplyKeyboardMarkup(method_keyboard, resize_keyboard=True)
-            )
-            return
-
-    # This check is now at the beginning of the function
-
-    # Multi-turn: continue conversation with full transcript
-    transcript = conversation_manager.get_transcript(user_id)
-    conversation_manager.append_message(user_id, "user", text)
-    try:
-        raw_response = await llm_client.send_prompt(transcript)
-        # Accumulate token usage for this turn
-        conversation_manager.accumulate_token_usage(user_id, getattr(llm_client, 'last_usage', None))
-        response, is_question, is_improved_prompt = parse_llm_response(raw_response)
-        conversation_manager.append_message(user_id, "assistant", raw_response)
-        
-        if is_improved_prompt:
-            # Format the improved prompt response
-            user_prompt = conversation_manager.get_user_prompt(user_id)
-            method_name = conversation_manager.get_current_method(user_id)
-            improved_prompt_only = response
-            response = format_improved_prompt_response(user_prompt, improved_prompt_only, method_name)
-            # Log aggregated totals at conversation end (include improved prompt)
-            log_conversation_totals_to_sheets(user_id, method_name, improved_prompt_only)
-            # Reset user state after logging totals
-            reset_user_state(user_id)
-        
-        await safe_reply(
-            update,
-            response,
-            parse_mode='Markdown',
-            reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-        )
-    except Exception as e:
-        error_msg = f"Ошибка: {e}"
-        conversation_manager.append_message(user_id, "assistant", error_msg)
-        log_sheets("error", {"stage": "multi_turn", "user_id": user_id, "error": str(e)})
-        await safe_reply(
-            update,
-            error_msg,
-            reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True)
-        )
+    """Handle incoming messages from users."""
+    await bot_handler.handle_message(update, context)
 
 async def main():
     """Start the bot."""

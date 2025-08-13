@@ -1,60 +1,47 @@
 import aiohttp
 import asyncio
 import logging
+from typing import List, Dict
 
-class OpenRouterClient:
+from .llm_client_base import LLMClientBase, TokenUsage
+
+class OpenRouterClient(LLMClientBase):
     """
     Client for interacting with the OpenRouter API for chat completions.
     """
-    def __init__(self, api_key: str, model_name: str):
+    def __init__(self, api_key: str, model_name: str, timeout: float = 60.0):
         """
         Initialize the OpenRouter client.
         Args:
             api_key (str): OpenRouter API key.
             model_name (str): Model name to use (e.g., 'openai/gpt-4').
+            timeout (float): Request timeout in seconds.
         """
-        self.api_key = api_key
-        self.model_name = model_name
+        super().__init__(api_key, model_name)
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.timeout = timeout
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "HTTP-Referer": "https://github.com/", # Replace with your actual domain
             "Content-Type": "application/json"
         }
-        self.last_usage = None  # dict with token usage if available
 
-    async def send_prompt(self, prompt: str = None, system_prompt: str = None, log_prefix: str = "", messages=None) -> str:
+    async def send_prompt(self, messages: List[Dict[str, str]], log_prefix: str = "") -> str:
         """
-        Send a prompt or list of messages to the OpenRouter chat completion API asynchronously.
+        Send messages to the OpenRouter chat completion API asynchronously.
         Args:
-            prompt (str, optional): User prompt if not using messages.
-            system_prompt (str, optional): System prompt if not using messages.
-            log_prefix (str): Prefix for logging.
-            messages (list, optional): List of message dicts (role/content) for the conversation.
+            messages: List of message dicts with 'role' and 'content' keys
+            log_prefix: Optional prefix for logging
         Returns:
             str: The assistant's response from OpenRouter.
         Raises:
             Exception: If the API request fails.
         """
-        # If messages is provided, use it directly
-        if messages is not None:
-            payload = {
-                "model": self.model_name,
-                "messages": messages
-            }
-            logging.info(f"{log_prefix} Sending transcript to model: {messages}")
-        else:
-            # Fallback to old behavior
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            if prompt:
-                messages.append({"role": "user", "content": prompt})
-            payload = {
-                "model": self.model_name,
-                "messages": messages
-            }
-            logging.info(f"{log_prefix} Sending prompt to model: {prompt}")
+        payload = {
+            "model": self.model_name,
+            "messages": messages
+        }
+        self.logger.info(f"{log_prefix} Sending transcript to model: {messages}")
 
         async with aiohttp.ClientSession() as session:
             async def _do_request():
@@ -89,29 +76,21 @@ class OpenRouterClient:
                     # Log token usage if available
                     if 'usage' in data:
                         usage = data['usage']
-                        # Save usage for external logging
-                        self.last_usage = {
-                            'prompt_tokens': usage.get('prompt_tokens'),
-                            'completion_tokens': usage.get('completion_tokens'),
-                            'total_tokens': usage.get('total_tokens'),
-                        }
-                        logging.info(
+                        self.last_usage = TokenUsage(
+                            prompt_tokens=usage.get('prompt_tokens', 0),
+                            completion_tokens=usage.get('completion_tokens', 0),
+                            total_tokens=usage.get('total_tokens', 0)
+                        )
+                        self.logger.info(
                             f"{log_prefix} Token usage - "
-                            f"Prompt: {usage.get('prompt_tokens', 'N/A')} tokens, "
-                            f"Completion: {usage.get('completion_tokens', 'N/A')} tokens, "
-                            f"Total: {usage.get('total_tokens', 'N/A')} tokens"
+                            f"Prompt: {self.last_usage.prompt_tokens} tokens, "
+                            f"Completion: {self.last_usage.completion_tokens} tokens, "
+                            f"Total: {self.last_usage.total_tokens} tokens"
                         )
                     
-                    logging.info(f"{log_prefix} Received response from model: {response_text}")
+                    self.logger.info(f"{log_prefix} Received response from model: {response_text}")
                     return response_text
 
-            # Respect an optional self.timeout (aiohttp.ClientTimeout or seconds) using asyncio.wait_for
-            timeout_seconds = None
-            if hasattr(self, 'timeout') and self.timeout is not None:
-                t = self.timeout
-                timeout_seconds = getattr(t, 'total', None) if not isinstance(t, (int, float)) else t
-            if timeout_seconds:
-                return await asyncio.wait_for(_do_request(), timeout=timeout_seconds)
-            return await _do_request()
+            return await asyncio.wait_for(_do_request(), timeout=self.timeout)
 
 

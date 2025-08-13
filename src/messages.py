@@ -119,9 +119,12 @@ def get_processing_message(method: str) -> str:
     Returns:
         str: A formatted processing message in the user's language
     """
+    # Clean method name for display (remove underscores, capitalize)
+    display_method = method.replace("_", " ").upper()
+    
     return _(
-        f"🔄 Обрабатываю ваш промпт с помощью метода **{method.upper()}**...\n\nЭто может занять несколько секунд.",
-        f"🔄 Processing your prompt using the **{method.upper()}** method...\n\nThis may take a few seconds."
+        f"🔄 Обрабатываю ваш промпт с помощью метода *{display_method}*...\n\nЭто может занять несколько секунд.",
+        f"🔄 Processing your prompt using the *{display_method}* method...\n\nThis may take a few seconds."
     )
 
 GENERATING_RESPONSE = _(
@@ -199,10 +202,14 @@ def format_improved_prompt_response(user_prompt: str, improved_prompt: str, meth
     Returns:
         str: Formatted response with the original and improved prompts
     """
+    # Escape potential Markdown characters in user content
+    safe_user_prompt = user_prompt.replace('`', '\\`').replace('*', '\\*').replace('_', '\\_')
+    safe_improved_prompt = improved_prompt.strip().replace('`', '\\`').replace('*', '\\*').replace('_', '\\_')
+    
     return IMPROVED_PROMPT_RESPONSE.format(
         method_name=method_name,
-        user_prompt=user_prompt,
-        improved_prompt=improved_prompt.strip()
+        user_prompt=safe_user_prompt,
+        improved_prompt=safe_improved_prompt
     )
 
 def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:

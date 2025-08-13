@@ -12,7 +12,9 @@ from tenacity import (
 )
 from datetime import datetime
 
-class OpenAIClient:
+from .llm_client_base import LLMClientBase, TokenUsage
+
+class OpenAIClient(LLMClientBase):
     """
     Client for interacting with the OpenAI API for chat completions.
     """
@@ -28,14 +30,12 @@ class OpenAIClient:
             request_timeout (float): Timeout in seconds for each API request.
             max_wait_time (float): Maximum total time to wait for a response including retries.
         """
-        self.api_key = api_key
-        self.model_name = model_name
+        super().__init__(api_key, model_name)
         self.max_retries = max_retries
         self.request_timeout = request_timeout
         self.max_wait_time = max_wait_time
         self.client = OpenAI(api_key=api_key)
         self.start_time = None
-        self.last_usage = None  # will hold dict with token usage if available
 
     def _log_retry(self, retry_state: RetryCallState) -> bool:
         """Log retry attempts and check max wait time."""
@@ -86,15 +86,14 @@ class OpenAIClient:
             )
         )
         usage = getattr(response, 'usage', None)
-        usage_dict = None
+        token_usage = None
         if usage is not None:
-            # Convert pydantic-like object to plain dict safely
-            usage_dict = {
-                'prompt_tokens': getattr(usage, 'prompt_tokens', None),
-                'completion_tokens': getattr(usage, 'completion_tokens', None),
-                'total_tokens': getattr(usage, 'total_tokens', None),
-            }
-        return response.choices[0].message.content, usage_dict
+            token_usage = TokenUsage(
+                prompt_tokens=getattr(usage, 'prompt_tokens', 0),
+                completion_tokens=getattr(usage, 'completion_tokens', 0),
+                total_tokens=getattr(usage, 'total_tokens', 0)
+            )
+        return response.choices[0].message.content, token_usage
 
     async def send_prompt(self, messages: List[Dict[str, str]], log_prefix: str = "[OpenAI]") -> str:
         """
@@ -119,11 +118,11 @@ class OpenAIClient:
             
             # Log token usage if available
             if usage:
-                logging.info(
+                self.logger.info(
                     f"{log_prefix} Token usage - "
-                    f"Prompt: {usage.get('prompt_tokens', 'N/A')} tokens, "
-                    f"Completion: {usage.get('completion_tokens', 'N/A')} tokens, "
-                    f"Total: {usage.get('total_tokens', 'N/A')} tokens"
+                    f"Prompt: {usage.prompt_tokens} tokens, "
+                    f"Completion: {usage.completion_tokens} tokens, "
+                    f"Total: {usage.total_tokens} tokens"
                 )
             
             logging.info(f"{log_prefix} Received response from OpenAI: {response_text}")
