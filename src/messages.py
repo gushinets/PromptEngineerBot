@@ -143,6 +143,11 @@ METHODOLOGY_SELECTED = _(
     "✅ Выбрана методика: {methodology}", "✅ Methodology selected: {methodology}"
 )
 
+PROMPT_READY_FOLLOW_UP = _(
+    "✅Ваш промпт готов к использованию. 📋 Скопируйте и вставьте его в Ваш Искусственный интеллект: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek\n\nА мне отправьте новый промпт для дальнейшей оптимизации! 🚀",
+    "✅Your prompt is ready to use. 📋 Copy and paste it into your AI: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek\n\nSend me a new prompt for further optimization! 🚀",
+)
+
 # ===== Keyboard Layouts =====
 # Method selection keyboard
 SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
@@ -193,6 +198,10 @@ def format_improved_prompt_response(
 ) -> str:
     """
     Format the improved prompt response with the specified method name.
+
+    NOTE: This function is kept for potential future use but is currently not used
+    in the main flow. The bot now sends the optimized prompt immediately followed
+    by a separate follow-up message.
 
     Args:
         user_prompt: The original prompt from the user

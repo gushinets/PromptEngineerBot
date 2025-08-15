@@ -16,10 +16,10 @@ from .messages import (
     BTN_LYRA,
     BTN_LYRA_DETAIL,
     BTN_RESET,
+    PROMPT_READY_FOLLOW_UP,
     SELECT_METHOD_KEYBOARD,
     SELECT_METHOD_MESSAGE,
     WELCOME_MESSAGE,
-    format_improved_prompt_response,
     get_processing_message,
     parse_llm_response,
 )
@@ -222,10 +222,24 @@ class BotHandler:
                 # Store the optimized prompt before formatting
                 optimized_prompt = response
 
-                # Format final response and reset conversation
-                user_prompt = self.conversation_manager.get_user_prompt(user_id)
-                response = format_improved_prompt_response(
-                    user_prompt, optimized_prompt, method_name
+                # Send the optimized prompt immediately
+                await self._safe_reply(
+                    update,
+                    optimized_prompt,
+                    parse_mode="Markdown",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+
+                # Send the follow-up message
+                await self._safe_reply(
+                    update,
+                    PROMPT_READY_FOLLOW_UP,
+                    parse_mode="Markdown",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
                 )
 
                 # Log conversation totals with only the optimized prompt
@@ -234,6 +248,8 @@ class BotHandler:
                 # Reset state
                 self.conversation_manager.reset(user_id)
                 self.state_manager.set_waiting_for_prompt(user_id, True)
+
+                return  # Exit early since we've handled the improved prompt case
 
             await self._safe_reply(
                 update,

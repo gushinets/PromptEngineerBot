@@ -2,8 +2,6 @@
 Factory for creating LLM clients based on configuration.
 """
 
-from typing import Union
-
 from .config import BotConfig
 from .llm_client_base import LLMClientBase
 from .openai_client import OpenAIClient
