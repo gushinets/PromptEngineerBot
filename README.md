@@ -231,23 +231,9 @@ To enable Google Sheets logging:
 - For multi-instance deployment, consider adding Redis for shared state
 - Google Sheets logging is batched and non-blocking for performance
 
-## 🤝 Contributing
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes** following the existing architecture patterns
-4. **Add tests** for new functionality
-5. **Ensure all tests pass**: `python -m pytest tests/`
-6. **Update documentation** as needed
-7. **Submit a pull request**
-
 ### Development Guidelines:
 - Follow the existing modular architecture
 - Add comprehensive tests for new features
 - Use type hints and proper documentation
 - Follow the established error handling patterns
 - Update configuration management for new settings
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

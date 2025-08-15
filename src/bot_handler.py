@@ -3,27 +3,28 @@ Telegram bot message handlers and core logic.
 """
 
 import logging
-from telegram import Update, ReplyKeyboardMarkup
+
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from .config import BotConfig
-from .llm_client_base import LLMClientBase
-from .state_manager import StateManager
 from .conversation_manager import ConversationManager
+from .llm_client_base import LLMClientBase
 from .messages import (
-    WELCOME_MESSAGE,
-    SELECT_METHOD_MESSAGE,
-    SELECT_METHOD_KEYBOARD,
-    get_processing_message,
-    parse_llm_response,
-    format_improved_prompt_response,
-    BTN_RESET,
     BTN_CRAFT,
+    BTN_GGL,
     BTN_LYRA,
     BTN_LYRA_DETAIL,
-    BTN_GGL,
+    BTN_RESET,
+    SELECT_METHOD_KEYBOARD,
+    SELECT_METHOD_MESSAGE,
+    WELCOME_MESSAGE,
+    format_improved_prompt_response,
+    get_processing_message,
+    parse_llm_response,
 )
 from .prompt_loader import PromptLoader
+from .state_manager import StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ class BotHandler:
         )
 
         # Log session start
-        self.log_sheets("session_start", {"user_id": user_id})
+        logger.info(f"session_start | user_id={user_id}")
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming messages from users."""
@@ -105,9 +106,8 @@ class BotHandler:
         user_state.waiting_for_prompt = False
 
         # Log prompt received
-        self.log_sheets(
-            "prompt_received",
-            {"user_id": user_id, "length": len(text), "preview": text[:120]},
+        logger.info(
+            f"prompt_received | user_id={user_id} | length={len(text)} | preview={text[:120]}"
         )
 
         # Show method selection with reset button
@@ -219,14 +219,17 @@ class BotHandler:
             self.conversation_manager.append_message(user_id, "assistant", raw_response)
 
             if is_improved_prompt:
+                # Store the optimized prompt before formatting
+                optimized_prompt = response
+
                 # Format final response and reset conversation
                 user_prompt = self.conversation_manager.get_user_prompt(user_id)
                 response = format_improved_prompt_response(
-                    user_prompt, response, method_name
+                    user_prompt, optimized_prompt, method_name
                 )
 
-                # Log conversation totals
-                self._log_conversation_totals(user_id, method_name, response)
+                # Log conversation totals with only the optimized prompt
+                self._log_conversation_totals(user_id, method_name, optimized_prompt)
 
                 # Reset state
                 self.conversation_manager.reset(user_id)
@@ -241,8 +244,8 @@ class BotHandler:
 
         except Exception as e:
             logger.error(f"Error processing LLM request: {e}", exc_info=True)
-            self.log_sheets(
-                "error", {"stage": method_name, "user_id": user_id, "error": str(e)}
+            logger.error(
+                f"error | stage={method_name} | user_id={user_id} | error={str(e)}"
             )
 
             error_msg = f"Ошибка: {e}"
@@ -253,9 +256,8 @@ class BotHandler:
             )
 
     def _log_method_selection(self, user_id: int, method_name: str):
-        """Log method selection to both file and sheets."""
+        """Log method selection to file only."""
         logger.info(f"method_selected | user_id={user_id} | method={method_name}")
-        self.log_sheets("method_selected", {"user_id": user_id, "method": method_name})
 
     def _log_conversation_totals(
         self, user_id: int, method_name: str, answer_text: str = None
@@ -280,9 +282,49 @@ class BotHandler:
             logger.error(f"Failed to log conversation totals: {e}", exc_info=True)
 
     async def _safe_reply(self, update: Update, text: str, **kwargs) -> bool:
-        """Safely send a reply with error handling."""
+        """Safely send a reply with error handling and length limits."""
+        MAX_MESSAGE_LENGTH = 4096
+
         try:
-            await update.message.reply_text(text, **kwargs)
+            if len(text) > MAX_MESSAGE_LENGTH:
+                # Log message splitting
+                user_id = update.effective_user.id
+                num_chunks = (len(text) + MAX_MESSAGE_LENGTH - 1) // MAX_MESSAGE_LENGTH
+                logger.info(
+                    f"message_split | user_id={user_id} | original_length={len(text)} | chunks={num_chunks}"
+                )
+
+                # Split long messages
+                for i in range(0, len(text), MAX_MESSAGE_LENGTH):
+                    chunk = text[i : i + MAX_MESSAGE_LENGTH]
+                    chunk_num = (i // MAX_MESSAGE_LENGTH) + 1
+
+                    try:
+                        await update.message.reply_text(chunk, **kwargs)
+                        logger.debug(
+                            f"message_chunk_sent | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
+                        )
+                    except Exception as e:
+                        # If it's a Markdown parsing error, try without parse_mode
+                        if (
+                            "parse entities" in str(e).lower()
+                            or "markdown" in str(e).lower()
+                        ):
+                            kwargs_no_parse = {
+                                k: v for k, v in kwargs.items() if k != "parse_mode"
+                            }
+                            await update.message.reply_text(chunk, **kwargs_no_parse)
+                            logger.info(
+                                f"message_chunk_sent_no_markdown | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
+                            )
+                        else:
+                            raise e
+
+                    # Only use special formatting and reply markup for first message
+                    kwargs.pop("parse_mode", None)
+                    kwargs.pop("reply_markup", None)
+            else:
+                await update.message.reply_text(text, **kwargs)
             return True
         except Exception as e:
             logger.error(f"Failed to send message: {e}")

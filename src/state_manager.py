@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Optional
 
+
 @dataclass
 class UserState:
     """
@@ -9,14 +10,19 @@ class UserState:
         waiting_for_prompt (bool): Whether the bot is waiting for the user to enter a prompt.
         last_interaction (Optional[str]): The last message or action from the user.
     """
-    waiting_for_prompt: bool = False
+
+    waiting_for_prompt: bool = (
+        True  # Default to True so new users start in prompt input mode
+    )
     last_interaction: Optional[str] = None
+
 
 class StateManager:
     """
     Manages the state of all users interacting with the Telegram bot.
     Stores and retrieves per-user state, such as prompt waiting status and last interaction.
     """
+
     def __init__(self):
         self.states: Dict[int, UserState] = {}
 
@@ -51,5 +57,3 @@ class StateManager:
         """
         state = self.get_user_state(user_id)
         state.last_interaction = interaction
-
-
