@@ -38,6 +38,7 @@ class TestPromptLoader:
             "CRAFT_prompt.txt": "CRAFT prompt content",
             "LYRA_prompt.txt": "LYRA prompt content",
             "GGL_prompt.txt": "GGL prompt content",
+            "Follow_up_questions_prompt.txt": "Follow-up prompt content",
         }
 
         def mock_open_func(filepath, *args, **kwargs):
@@ -52,6 +53,7 @@ class TestPromptLoader:
             assert loader._prompts["craft"] == "CRAFT prompt content"
             assert loader._prompts["lyra"] == "LYRA prompt content"
             assert loader._prompts["ggl"] == "GGL prompt content"
+            assert loader._prompts["followup"] == "Follow-up prompt content"
 
     def test_load_prompts_missing_file(self):
         """Test loading prompts when a file is missing."""
@@ -62,7 +64,28 @@ class TestPromptLoader:
     def test_load_prompts_read_error(self):
         """Test loading prompts when file read fails."""
         with patch("builtins.open", side_effect=PermissionError("Permission denied")):
-            with pytest.raises(Exception, match="Error loading prompt file"):
+            with pytest.raises(
+                Exception, match="Critical error: Cannot read prompt file"
+            ):
+                PromptLoader("/test/prompts")
+
+    def test_load_prompts_empty_file(self):
+        """Test loading prompts when a file is empty."""
+        mock_files = {
+            "CRAFT_prompt.txt": "",  # Empty file
+            "LYRA_prompt.txt": "LYRA prompt content",
+            "GGL_prompt.txt": "GGL prompt content",
+            "Follow_up_questions_prompt.txt": "Follow-up prompt content",
+        }
+
+        def mock_open_func(filepath, *args, **kwargs):
+            filename = os.path.basename(filepath)
+            if filename in mock_files:
+                return mock_open(read_data=mock_files[filename])()
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+        with patch("builtins.open", side_effect=mock_open_func):
+            with pytest.raises(ValueError, match="Prompt file is empty"):
                 PromptLoader("/test/prompts")
 
     def test_craft_prompt_property(self):
@@ -89,6 +112,14 @@ class TestPromptLoader:
 
             assert loader.ggl_prompt == "GGL content"
 
+    def test_followup_prompt_property(self):
+        """Test followup_prompt property."""
+        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+            loader = PromptLoader()
+            loader._prompts = {"followup": "Follow-up content"}
+
+            assert loader.followup_prompt == "Follow-up content"
+
     def test_get_prompt_success(self):
         """Test get_prompt method with valid method name."""
         with patch("src.prompt_loader.PromptLoader._load_prompts"):
@@ -114,6 +145,7 @@ class TestPromptLoader:
             "CRAFT_prompt.txt": "  \n  CRAFT prompt content  \n  ",
             "LYRA_prompt.txt": "\t\tLYRA prompt content\t\t",
             "GGL_prompt.txt": "GGL prompt content",
+            "Follow_up_questions_prompt.txt": "  Follow-up prompt content  ",
         }
 
         def mock_open_func(filepath, *args, **kwargs):
@@ -128,3 +160,4 @@ class TestPromptLoader:
             assert loader._prompts["craft"] == "CRAFT prompt content"
             assert loader._prompts["lyra"] == "LYRA prompt content"
             assert loader._prompts["ggl"] == "GGL prompt content"
+            assert loader._prompts["followup"] == "Follow-up prompt content"

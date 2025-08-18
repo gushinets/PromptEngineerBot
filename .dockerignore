@@ -21,6 +21,7 @@ env/
 # IDE
 .vscode/
 .idea/
+.kiro/
 *.swp
 *.swo
 
@@ -35,6 +36,7 @@ bot.log
 # Test files
 tests/
 test_imports.py
+test_token_flow.py
 
 # Documentation
 README.md

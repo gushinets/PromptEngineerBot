@@ -26,6 +26,11 @@ BTN_LYRA_DETAIL = _("🧩 LYRA detail", "🧩 LYRA detail")
 BTN_GGL = _("🔍 GGL", "🔍 GGL")
 BTN_HELP = _("❓ Помощь", "❓ Help")
 
+# Follow-up feature buttons
+BTN_YES = _("✅ДА", "✅YES")
+BTN_NO = _("❌НЕТ", "❌NO")
+BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Generate Prompt")
+
 # ===== Welcome and Help Messages =====
 WELCOME_MESSAGE = _(
     "🤖 Добро пожаловать в Prompt Engineering Bot!\n"
@@ -83,6 +88,32 @@ ERROR_RATE_LIMIT = _(
 ERROR_NETWORK = _(
     "🌐 Ошибка сети. Пожалуйста, проверьте подключение и попробуйте снова.",
     "🌐 Network error. Please check your connection and try again.",
+)
+
+# Follow-up specific error messages
+ERROR_FOLLOWUP_TIMEOUT = _(
+    "⏱️ Время ожидания истекло во время уточняющих вопросов. Используем исходный улучшенный промпт.",
+    "⏱️ Timeout occurred during follow-up questions. Using the original improved prompt.",
+)
+
+ERROR_FOLLOWUP_NETWORK = _(
+    "🌐 Проблемы с сетью во время уточняющих вопросов. Используем исходный улучшенный промпт.",
+    "🌐 Network issues during follow-up questions. Using the original improved prompt.",
+)
+
+ERROR_FOLLOWUP_GENERIC = _(
+    "❌ Произошла ошибка во время уточняющих вопросов. Используем исходный улучшенный промпт.",
+    "❌ An error occurred during follow-up questions. Using the original improved prompt.",
+)
+
+ERROR_FOLLOWUP_STATE_CORRUPTED = _(
+    "⚠️ Состояние диалога повреждено. Восстанавливаем с исходного улучшенного промпта.",
+    "⚠️ Conversation state corrupted. Recovering with the original improved prompt.",
+)
+
+ERROR_FOLLOWUP_PARSING = _(
+    "⚠️ Не удалось обработать ответ. Используем исходный улучшенный промпт.",
+    "⚠️ Failed to process response. Using the original improved prompt.",
 )
 
 # ===== Status Messages =====
@@ -148,10 +179,25 @@ PROMPT_READY_FOLLOW_UP = _(
     "✅Your prompt is ready to use. 📋 Copy and paste it into your AI: 🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek\n\nSend me a new prompt for further optimization! 🚀",
 )
 
+# Follow-up feature messages
+FOLLOWUP_OFFER_MESSAGE = _(
+    "✅Ваш промпт уже готов к использованию, но мы можем сделать его ещё лучше. Готовы ответить на несколько вопросов?",
+    "✅Your prompt is ready to use, but we can make it even better. Ready to answer a few questions?",
+)
+
 # ===== Keyboard Layouts =====
 # Method selection keyboard
 SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
     [[BTN_LYRA, BTN_CRAFT, BTN_GGL]], resize_keyboard=True
+)
+
+# Follow-up feature keyboards
+FOLLOWUP_CHOICE_KEYBOARD = ReplyKeyboardMarkup(
+    [[BTN_YES, BTN_NO]], resize_keyboard=True
+)
+
+FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
+    [[BTN_GENERATE_PROMPT], [BTN_RESET]], resize_keyboard=True
 )
 
 # ===== Improved Prompt Response =====
@@ -308,3 +354,41 @@ def parse_llm_response(response: str) -> tuple[str, bool, bool]:
             is_improved_prompt = True
 
     return response, is_question, is_improved_prompt
+
+
+def parse_followup_response(response: str) -> tuple[str, bool]:
+    """
+    Parse follow-up LLM response to extract refined prompts.
+
+    This function specifically handles REFINED_PROMPT tags from follow-up conversations.
+    It supports various tag formats including missing closing tags and provides
+    fallback parsing for malformed responses.
+
+    Args:
+        response: The raw response from the follow-up LLM
+
+    Returns:
+        tuple: (parsed_content, is_refined_prompt)
+            - parsed_content: The extracted refined prompt content or original response
+            - is_refined_prompt: True if a REFINED_PROMPT tag was found and parsed
+    """
+    try:
+        # Check for REFINED_PROMPT tag
+        extracted, _ = _extract_tag_block(response, "REFINED_PROMPT")
+        if extracted is not None:
+            # Validate extracted content
+            if extracted.strip():
+                return extracted, True
+            else:
+                # Empty content, fall back to original response
+                return response.strip(), False
+
+        # No REFINED_PROMPT tag found, return original response
+        return response.strip(), False
+
+    except Exception as e:
+        # Parsing error, return original response
+        import logging
+
+        logging.error(f"Error parsing follow-up response: {e}")
+        return response.strip(), False
