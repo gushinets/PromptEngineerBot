@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from telegram import ReplyKeyboardMarkup
+from telegram import KeyboardButton, ReplyKeyboardMarkup
 
 from src.bot_handler import BotHandler
 from src.config import BotConfig
@@ -190,9 +190,11 @@ class TestFollowupIntegration:
         call_args = mock_update.message.reply_text.call_args
         assert RESET_CONFIRMATION in call_args[0][0]
 
-        # Verify empty keyboard was set
+        # Verify reset button keyboard was set
         assert isinstance(call_args[1]["reply_markup"], ReplyKeyboardMarkup)
-        assert call_args[1]["reply_markup"].keyboard == ((),)
+        assert call_args[1]["reply_markup"].keyboard == (
+            (KeyboardButton(text="🔄 Сбросить диалог"),),
+        )
 
         # Step 4: Verify state was properly reset
         user_state = bot_handler.state_manager.get_user_state(user_id)
