@@ -28,15 +28,18 @@ The Follow-up questions feature enhances the prompt improvement process by allow
 
 ### Requirement 3
 
-**User Story:** As a user, I want to engage in a follow-up question session, so that I can provide additional context to improve my prompt further.
+**User Story:** As a user, I want to see the improved prompt in the Telegram input area before starting follow-up questions, so that I can review and modify it if needed.
 
 #### Acceptance Criteria
 
-1. WHEN the user clicks the [ДА] button THEN the system SHALL start a new conversation for follow-up questions
-2. WHEN starting follow-up conversation THEN the system SHALL load the prompt from "prompts/Follow_up_questions_prompt.txt" as system context
-3. WHEN system context is loaded THEN the system SHALL add the improved prompt from previous conversation as user context
-4. WHEN conversation context is prepared THEN the system SHALL send the conversation to LLM and wait for response
-5. WHEN LLM responds THEN the system SHALL send the LLM's questions back to the user
+1. WHEN the user clicks the [ДА] button THEN the system SHALL send the message "Поменяйте или добавьте любые детали промпта. Если всё верно, просто отправьте этот промпт мне:" (English: "Modify or add any details to the prompt. If everything is correct, just send this prompt to me:")
+2. WHEN the instruction message is sent THEN the system SHALL send the improved prompt wrapped in code blocks (```) to make it copyable in one click
+3. WHEN the copyable prompt is sent THEN the system SHALL show the improved prompt in the Telegram input text area using ForceReply functionality
+4. WHEN the user sends the prompt (modified or unmodified) THEN the system SHALL start a new conversation for follow-up questions
+5. WHEN starting follow-up conversation THEN the system SHALL load the follow-up questions prompt using PromptLoader.followup_prompt as system context
+6. WHEN system context is loaded THEN the system SHALL add the received prompt (from input area) as user context
+7. WHEN conversation context is prepared THEN the system SHALL send the conversation to LLM and wait for response
+8. WHEN LLM responds THEN the system SHALL send the LLM's questions back to the user
 
 ### Requirement 4
 

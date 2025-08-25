@@ -34,6 +34,11 @@ src/
     ├── CRAFT_prompt.txt
     ├── LYRA_prompt.txt
     └── GGL_prompt.txt
+
+tools/
+├── diagnose_gsheets.py     # Google Sheets diagnostic tool
+├── repair_gsheets.py       # Google Sheets repair tool
+└── README.md               # Tools documentation
 ```
 
 ## 📦 Setup
@@ -195,6 +200,60 @@ To enable Google Sheets logging:
 5. **Set spreadsheet target** using either:
    - `GSHEETS_SPREADSHEET_ID`: Spreadsheet ID (recommended)
    - `GSHEETS_SPREADSHEET_NAME`: Spreadsheet name
+
+## 🔍 Troubleshooting
+
+### Google Sheets Issues
+
+#### Empty Cells in Google Sheets
+If you see empty cells at the beginning of your Google Sheets rows:
+
+1. **Diagnose the issue:**
+   ```bash
+   python tools/diagnose_gsheets.py
+   ```
+
+2. **Common causes:**
+   - Extra empty columns in your Google Sheet
+   - Header mismatch between sheet and expected fields
+   - Custom `GSHEETS_FIELDS` configuration
+
+3. **Quick fix:**
+   ```bash
+   python tools/repair_gsheets.py
+   ```
+
+4. **Manual fix:**
+   - Open your Google Sheet
+   - Ensure the first row headers exactly match: `DateTime, BotID, TelegramID, LLM, OptimizationModel, UserRequest, Answer, prompt_tokens, completion_tokens, total_tokens`
+   - Delete any extra empty columns at the beginning
+
+#### Header Validation
+The bot now automatically validates Google Sheets headers and logs warnings if mismatches are detected. Check your logs for detailed mismatch information.
+
+### API Issues
+
+#### OpenAI Region Restrictions
+If you see "Country, region, or territory not supported" errors:
+- Switch to OpenRouter: Set `LLM_BACKEND=OPENROUTER`
+- Or use a VPN/proxy if appropriate for your use case
+
+#### Rate Limiting
+- The bot includes automatic retry logic with exponential backoff
+- For high-volume usage, consider upgrading your API plan
+
+### General Debugging
+
+#### Enable Debug Logging
+Add to your `.env`:
+```env
+LOG_LEVEL=DEBUG
+```
+
+#### Check Bot Logs
+```bash
+tail -f bot.log
+```
 
 ## 🏛️ Architecture Details
 

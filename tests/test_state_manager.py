@@ -15,6 +15,7 @@ class TestUserState:
         assert state.waiting_for_prompt is True  # Updated to match new default
         assert state.last_interaction is None
         assert state.waiting_for_followup_choice is False
+        assert state.waiting_for_followup_prompt_input is False
         assert state.in_followup_conversation is False
         assert state.improved_prompt_cache is None
 
@@ -24,6 +25,7 @@ class TestUserState:
             waiting_for_prompt=True,
             last_interaction="test",
             waiting_for_followup_choice=True,
+            waiting_for_followup_prompt_input=True,
             in_followup_conversation=True,
             improved_prompt_cache="cached prompt",
         )
@@ -31,6 +33,7 @@ class TestUserState:
         assert state.waiting_for_prompt is True
         assert state.last_interaction == "test"
         assert state.waiting_for_followup_choice is True
+        assert state.waiting_for_followup_prompt_input is True
         assert state.in_followup_conversation is True
         assert state.improved_prompt_cache == "cached prompt"
 
@@ -55,6 +58,7 @@ class TestStateManager:
         assert state.waiting_for_prompt is True  # Updated to match new default
         assert state.last_interaction is None
         assert state.waiting_for_followup_choice is False
+        assert state.waiting_for_followup_prompt_input is False
         assert state.in_followup_conversation is False
         assert state.improved_prompt_cache is None
         assert user_id in manager.states
@@ -138,6 +142,20 @@ class TestStateManager:
         manager.set_waiting_for_followup_choice(user_id, False)
         assert state.waiting_for_followup_choice is False
 
+    def test_set_waiting_for_followup_prompt_input(self):
+        """Test setting waiting_for_followup_prompt_input flag."""
+        manager = StateManager()
+        user_id = 12345
+
+        # Test setting to True
+        manager.set_waiting_for_followup_prompt_input(user_id, True)
+        state = manager.get_user_state(user_id)
+        assert state.waiting_for_followup_prompt_input is True
+
+        # Test setting to False
+        manager.set_waiting_for_followup_prompt_input(user_id, False)
+        assert state.waiting_for_followup_prompt_input is False
+
     def test_set_in_followup_conversation(self):
         """Test setting in_followup_conversation flag."""
         manager = StateManager()
@@ -197,10 +215,12 @@ class TestStateManager:
 
         # Set different follow-up states for different users
         manager.set_waiting_for_followup_choice(user1_id, True)
+        manager.set_waiting_for_followup_prompt_input(user1_id, False)
         manager.set_in_followup_conversation(user1_id, False)
         manager.set_improved_prompt_cache(user1_id, prompt1)
 
         manager.set_waiting_for_followup_choice(user2_id, False)
+        manager.set_waiting_for_followup_prompt_input(user2_id, True)
         manager.set_in_followup_conversation(user2_id, True)
         manager.set_improved_prompt_cache(user2_id, prompt2)
 
@@ -209,10 +229,12 @@ class TestStateManager:
         user2_state = manager.get_user_state(user2_id)
 
         assert user1_state.waiting_for_followup_choice is True
+        assert user1_state.waiting_for_followup_prompt_input is False
         assert user1_state.in_followup_conversation is False
         assert user1_state.improved_prompt_cache == prompt1
 
         assert user2_state.waiting_for_followup_choice is False
+        assert user2_state.waiting_for_followup_prompt_input is True
         assert user2_state.in_followup_conversation is True
         assert user2_state.improved_prompt_cache == prompt2
 
@@ -226,6 +248,7 @@ class TestStateManager:
         state = manager.get_user_state(user_id)
         assert state.waiting_for_prompt is True
         assert state.waiting_for_followup_choice is False
+        assert state.waiting_for_followup_prompt_input is False
         assert state.in_followup_conversation is False
         assert state.improved_prompt_cache is None
 
@@ -236,15 +259,27 @@ class TestStateManager:
 
         assert state.waiting_for_prompt is False
         assert state.waiting_for_followup_choice is True
+        assert state.waiting_for_followup_prompt_input is False
         assert state.in_followup_conversation is False
         assert state.improved_prompt_cache == test_prompt
 
-        # User chooses ДА - start follow-up conversation
+        # User chooses ДА - wait for prompt input
         manager.set_waiting_for_followup_choice(user_id, False)
+        manager.set_waiting_for_followup_prompt_input(user_id, True)
+
+        assert state.waiting_for_prompt is False
+        assert state.waiting_for_followup_choice is False
+        assert state.waiting_for_followup_prompt_input is True
+        assert state.in_followup_conversation is False
+        assert state.improved_prompt_cache == test_prompt
+
+        # User sends prompt - start follow-up conversation
+        manager.set_waiting_for_followup_prompt_input(user_id, False)
         manager.set_in_followup_conversation(user_id, True)
 
         assert state.waiting_for_prompt is False
         assert state.waiting_for_followup_choice is False
+        assert state.waiting_for_followup_prompt_input is False
         assert state.in_followup_conversation is True
         assert state.improved_prompt_cache == test_prompt
 
@@ -255,5 +290,6 @@ class TestStateManager:
 
         assert state.waiting_for_prompt is True
         assert state.waiting_for_followup_choice is False
+        assert state.waiting_for_followup_prompt_input is False
         assert state.in_followup_conversation is False
         assert state.improved_prompt_cache is None

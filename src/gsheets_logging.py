@@ -10,7 +10,7 @@ class GoogleSheetsHandler(logging.Handler):
     """
     A logging handler that buffers records and appends them to a Google Sheet
     using a background worker thread for non-blocking, batched writes.
-    
+
     Configuration supports either a credentials JSON string (env) or a path
     to a service account file. Target sheet can be specified by spreadsheet ID
     or by spreadsheet name.
@@ -31,7 +31,9 @@ class GoogleSheetsHandler(logging.Handler):
         super().__init__()
 
         if not spreadsheet_id and not spreadsheet_name:
-            raise ValueError("Either spreadsheet_id or spreadsheet_name must be provided")
+            raise ValueError(
+                "Either spreadsheet_id or spreadsheet_name must be provided"
+            )
 
         self._credentials_json = credentials_json
         self._credentials_file = credentials_file
@@ -65,7 +67,9 @@ class GoogleSheetsHandler(logging.Handler):
         self._worksheet = None
 
         self._start_client()
-        self._worker_thread = threading.Thread(target=self._worker_loop, name="GoogleSheetsHandlerWorker", daemon=True)
+        self._worker_thread = threading.Thread(
+            target=self._worker_loop, name="GoogleSheetsHandlerWorker", daemon=True
+        )
         self._worker_thread.start()
 
     def _start_client(self) -> None:
@@ -76,7 +80,9 @@ class GoogleSheetsHandler(logging.Handler):
             try:
                 data: Dict[str, Any] = json.loads(self._credentials_json)
             except json.JSONDecodeError as exc:
-                raise ValueError("Invalid GOOGLE_SERVICE_ACCOUNT_JSON provided") from exc
+                raise ValueError(
+                    "Invalid GOOGLE_SERVICE_ACCOUNT_JSON provided"
+                ) from exc
             self._client = gspread.service_account_from_dict(data)
         elif self._credentials_file:
             self._client = gspread.service_account(filename=self._credentials_file)
@@ -92,9 +98,13 @@ class GoogleSheetsHandler(logging.Handler):
         # Get or create worksheet
         try:
             self._worksheet = spreadsheet.worksheet(self._worksheet_title)
+            # Validate existing headers
+            self._validate_headers()
         except Exception:
             # Create if missing
-            self._worksheet = spreadsheet.add_worksheet(title=self._worksheet_title, rows=1000, cols=20)
+            self._worksheet = spreadsheet.add_worksheet(
+                title=self._worksheet_title, rows=1000, cols=20
+            )
             # Optionally add a header row matching include_fields exactly
             header = list(self._include_fields)
             try:
@@ -144,7 +154,8 @@ class GoogleSheetsHandler(logging.Handler):
             # Skip rows that only contain DateTime/time and nothing else
             try:
                 non_time_values = [
-                    value for idx, value in enumerate(row)
+                    value
+                    for idx, value in enumerate(row)
                     if self._include_fields[idx] not in self._datetime_field_names
                 ]
                 has_non_time_content = any(
@@ -204,6 +215,72 @@ class GoogleSheetsHandler(logging.Handler):
                 with self._buffer_lock:
                     self._buffer = payload + self._buffer
 
+    def _validate_headers(self) -> None:
+        """
+        Validate that the worksheet headers match the expected include_fields.
+        Log warnings if there are mismatches that could cause data alignment issues.
+        """
+        try:
+            # Get the first row (headers)
+            if self._worksheet.row_count == 0:
+                # Empty sheet, no headers to validate
+                return
+
+            headers = self._worksheet.row_values(1)
+            expected_headers = list(self._include_fields)
+
+            # Check if headers match exactly
+            if headers == expected_headers:
+                return  # Perfect match, no issues
+
+            # Log detailed mismatch information
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.warning(
+                f"Google Sheets header mismatch detected in worksheet '{self._worksheet_title}'"
+            )
+            logger.warning(f"Expected headers: {expected_headers}")
+            logger.warning(f"Actual headers:   {headers}")
+
+            # Check for common issues
+            if len(headers) > len(expected_headers):
+                extra_columns = len(headers) - len(expected_headers)
+                logger.warning(
+                    f"Sheet has {extra_columns} extra columns. This may cause data to appear in wrong columns."
+                )
+
+                # Check if expected headers exist but are shifted
+                if (
+                    headers[extra_columns : extra_columns + len(expected_headers)]
+                    == expected_headers
+                ):
+                    logger.warning(
+                        f"Expected headers found starting at column {extra_columns + 1}. Data will appear {extra_columns} columns to the right."
+                    )
+                    logger.warning(
+                        "SOLUTION: Delete the first {extra_columns} columns from your Google Sheet, or set GSHEETS_FIELDS to match your sheet structure."
+                    )
+
+            elif len(headers) < len(expected_headers):
+                missing_columns = len(expected_headers) - len(headers)
+                logger.warning(
+                    f"Sheet is missing {missing_columns} columns. Some data may not be logged."
+                )
+
+            # Check for partial matches
+            matching_headers = [h for h in headers if h in expected_headers]
+            if matching_headers:
+                logger.warning(f"Matching headers found: {matching_headers}")
+
+        except Exception as e:
+            # Don't fail logging setup due to header validation issues
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not validate Google Sheets headers: {e}")
+
     def close(self) -> None:
         try:
             self._stop_event.set()
@@ -217,7 +294,7 @@ class GoogleSheetsHandler(logging.Handler):
 def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHandler]:
     """
     Create a GoogleSheetsHandler if GSHEETS_LOGGING_ENABLED is truthy.
-    
+
     Reads configuration from environment using the provided getter (e.g., os.getenv):
       - GSHEETS_LOGGING_ENABLED: 'true' to enable
       - GOOGLE_SERVICE_ACCOUNT_JSON: Raw JSON credentials (optional)
@@ -227,10 +304,15 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
       - GSHEETS_BATCH_SIZE: int (default 20)
       - GSHEETS_FLUSH_INTERVAL_SECONDS: float (default 5.0)
     """
-    enabled = str(env_getter("GSHEETS_LOGGING_ENABLED", "")).strip().lower() in {"1", "true", "yes", "on"}
+    enabled = str(env_getter("GSHEETS_LOGGING_ENABLED", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     if not enabled:
         return None
-    
+
     credentials_json = env_getter("GOOGLE_SERVICE_ACCOUNT_JSON")
     credentials_file = env_getter("GOOGLE_APPLICATION_CREDENTIALS")
     spreadsheet_id = env_getter("GSHEETS_SPREADSHEET_ID")
@@ -238,13 +320,15 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
     worksheet_title = env_getter("GSHEETS_WORKSHEET", "Logs")
     batch_size = int(env_getter("GSHEETS_BATCH_SIZE", 20))
     flush_interval_seconds = float(env_getter("GSHEETS_FLUSH_INTERVAL_SECONDS", 5.0))
-    
+
     # Optional fields configuration (comma-separated);
     # default to a schema suited for LLM exchange logging
     fields_env = env_getter("GSHEETS_FIELDS")
     include_fields = None
     if fields_env:
-        include_fields = [item.strip() for item in str(fields_env).split(',') if item.strip()]
+        include_fields = [
+            item.strip() for item in str(fields_env).split(",") if item.strip()
+        ]
     else:
         include_fields = [
             "DateTime",
@@ -258,7 +342,7 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
             "completion_tokens",
             "total_tokens",
         ]
-    
+
     try:
         handler = GoogleSheetsHandler(
             credentials_json=credentials_json,
@@ -276,8 +360,7 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
         return handler
     except Exception as exc:
         # If handler cannot be created, fail silently but note in root logger once stdout/stderr available
-        logging.getLogger(__name__).warning(f"GoogleSheetsHandler disabled due to initialization error: {exc}")
+        logging.getLogger(__name__).warning(
+            f"GoogleSheetsHandler disabled due to initialization error: {exc}"
+        )
         return None
-
-
-

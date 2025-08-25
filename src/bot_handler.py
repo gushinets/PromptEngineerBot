@@ -6,6 +6,13 @@ import logging
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from .config import BotConfig
 from .conversation_manager import ConversationManager
@@ -22,11 +29,13 @@ from .messages import (
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
+    FOLLOWUP_PROMPT_INPUT_MESSAGE,
     PROMPT_READY_FOLLOW_UP,
     RESET_CONFIRMATION,
     SELECT_METHOD_KEYBOARD,
     SELECT_METHOD_MESSAGE,
     WELCOME_MESSAGE,
+    create_prompt_input_reply,
     get_processing_message,
     parse_followup_response,
     parse_llm_response,
@@ -35,6 +44,44 @@ from .prompt_loader import PromptLoader
 from .state_manager import StateManager
 
 logger = logging.getLogger(__name__)
+
+
+def _is_network_error(exception: Exception) -> bool:
+    """Check if an exception is a network-related error that should be retried."""
+    if not exception:
+        return False
+
+    error_str = str(exception).lower()
+    error_type = type(exception).__name__.lower()
+
+    # Check for specific network-related error types
+    network_error_types = [
+        "connectionerror",
+        "timeouterror",
+        "networkerror",
+        "timedout",
+        "connecterror",
+        "httpxconnecterror",
+        "httpxtimeoutexception",
+        "httpxnetworkerror",
+    ]
+
+    if error_type in network_error_types:
+        return True
+
+    # Check for network-related keywords in error message
+    network_keywords = [
+        "connect",
+        "network",
+        "timeout",
+        "httpx",
+        "connection",
+        "timed out",
+        "unreachable",
+        "dns",
+    ]
+
+    return any(keyword in error_str for keyword in network_keywords)
 
 
 class BotHandler:
@@ -58,6 +105,7 @@ class BotHandler:
         self.state_manager.set_last_interaction(user_id, None)
         # Reset follow-up states
         self.state_manager.set_waiting_for_followup_choice(user_id, False)
+        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_improved_prompt_cache(user_id, None)
         self.conversation_manager.reset(user_id)
@@ -95,6 +143,11 @@ class BotHandler:
         # Handle follow-up choice waiting state
         if user_state.waiting_for_followup_choice:
             await self._handle_followup_choice(update, user_id, text)
+            return
+
+        # Handle follow-up prompt input waiting state
+        if user_state.waiting_for_followup_prompt_input:
+            await self._handle_followup_prompt_input(update, user_id, text)
             return
 
         # Handle follow-up conversation state
@@ -260,29 +313,57 @@ class BotHandler:
                 self.reset_user_state(user_id)
                 return
 
-            # Start follow-up conversation
-            self.conversation_manager.start_followup_conversation(
-                user_id, improved_prompt
+            # Send instruction message first
+            await self._safe_reply(
+                update,
+                FOLLOWUP_PROMPT_INPUT_MESSAGE,
+                parse_mode="Markdown",
             )
 
-            # Reset token counters to start new accumulation session for follow-up only
-            # This ensures we only track tokens used during the follow-up conversation
-            self.conversation_manager.reset_token_totals(user_id)
+            # Send ForceReply with improved prompt wrapped in code blocks
+            await self._safe_reply(
+                update,
+                f"```\n{improved_prompt}\n```",
+                parse_mode="Markdown",
+                reply_markup=create_prompt_input_reply(improved_prompt),
+            )
 
-            # Update state
+            # Update state to wait for prompt input instead of starting conversation immediately
             self.state_manager.set_waiting_for_followup_choice(user_id, False)
-            self.state_manager.set_in_followup_conversation(user_id, True)
+            self.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
 
-            logger.info(f"followup_accepted | user_id={user_id}")
-
-            # Send initial request to LLM to start asking questions
-            await self._process_with_llm(update, user_id, "FOLLOWUP")
+            logger.info(f"followup_accepted_prompt_input | user_id={user_id}")
 
         else:
             # Invalid choice, show options again
             # This should not happen with proper keyboard, but handle gracefully
             logger.warning(f"invalid_followup_choice | user_id={user_id} | text={text}")
             # Keep the same state and don't respond - user should use buttons
+
+    async def _handle_followup_prompt_input(
+        self, update: Update, user_id: int, text: str
+    ):
+        """Handle user prompt input from ForceReply during follow-up flow."""
+        # The user has sent their prompt (modified or unmodified) from the input area
+        # This prompt will be used to start the follow-up conversation
+
+        logger.info(f"followup_prompt_input | user_id={user_id} | length={len(text)}")
+
+        # Start follow-up conversation with the received prompt
+        self.conversation_manager.start_followup_conversation(user_id, text)
+
+        # Reset token counters to start new accumulation session for follow-up only
+        # This ensures we only track tokens used during the follow-up conversation
+        self.conversation_manager.reset_token_totals(user_id)
+
+        # Update state transitions
+        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
+        self.state_manager.set_in_followup_conversation(user_id, True)
+
+        logger.info(f"followup_conversation_started | user_id={user_id}")
+
+        # Send initial request to LLM to start asking questions
+        await self._process_with_llm(update, user_id, "FOLLOWUP")
 
     async def _handle_followup_conversation(
         self, update: Update, user_id: int, text: str
@@ -941,63 +1022,81 @@ class BotHandler:
 
     async def _safe_reply(self, update: Update, text: str, **kwargs) -> bool:
         """Safely send a reply with error handling and length limits."""
+        try:
+            await self._send_message_with_retry(update, text, **kwargs)
+            return True
+        except (RetryError, Exception) as e:
+            # Handle both RetryError (when tenacity gives up) and other exceptions
+            if isinstance(e, RetryError):
+                logger.error(
+                    f"Failed to send message after all retries: {e.last_attempt.exception()}"
+                )
+            else:
+                logger.error(f"Failed to send message: {e}")
+            return False
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception(lambda e: _is_network_error(e)),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Network error sending message, retrying (attempt {retry_state.attempt_number}): {retry_state.outcome.exception()}"
+        ),
+        reraise=True,
+    )
+    async def _send_message_with_retry(self, update: Update, text: str, **kwargs):
+        """Send message with retry logic using tenacity."""
         MAX_MESSAGE_LENGTH = 4096
 
-        try:
-            if len(text) > MAX_MESSAGE_LENGTH:
-                # Log message splitting
-                user_id = update.effective_user.id
-                num_chunks = (len(text) + MAX_MESSAGE_LENGTH - 1) // MAX_MESSAGE_LENGTH
-                logger.info(
-                    f"message_split | user_id={user_id} | original_length={len(text)} | chunks={num_chunks}"
-                )
+        if len(text) > MAX_MESSAGE_LENGTH:
+            # Log message splitting
+            user_id = update.effective_user.id
+            num_chunks = (len(text) + MAX_MESSAGE_LENGTH - 1) // MAX_MESSAGE_LENGTH
+            logger.info(
+                f"message_split | user_id={user_id} | original_length={len(text)} | chunks={num_chunks}"
+            )
 
-                # Split long messages
-                for i in range(0, len(text), MAX_MESSAGE_LENGTH):
-                    chunk = text[i : i + MAX_MESSAGE_LENGTH]
-                    chunk_num = (i // MAX_MESSAGE_LENGTH) + 1
+            # Split long messages
+            for i in range(0, len(text), MAX_MESSAGE_LENGTH):
+                chunk = text[i : i + MAX_MESSAGE_LENGTH]
+                chunk_num = (i // MAX_MESSAGE_LENGTH) + 1
 
-                    try:
-                        await update.message.reply_text(chunk, **kwargs)
-                        logger.debug(
-                            f"message_chunk_sent | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
-                        )
-                    except Exception as e:
-                        # If it's a Markdown parsing error, try without parse_mode
-                        if (
-                            "parse entities" in str(e).lower()
-                            or "markdown" in str(e).lower()
-                        ):
-                            kwargs_no_parse = {
-                                k: v for k, v in kwargs.items() if k != "parse_mode"
-                            }
-                            await update.message.reply_text(chunk, **kwargs_no_parse)
-                            logger.info(
-                                f"message_chunk_sent_no_markdown | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
-                            )
-                        else:
-                            raise e
-
-                    # Only use special formatting and reply markup for first message
-                    kwargs.pop("parse_mode", None)
-                    kwargs.pop("reply_markup", None)
-            else:
-                await update.message.reply_text(text, **kwargs)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send message: {e}")
-
-            # If it's a Markdown parsing error, try without parse_mode
-            if "parse entities" in str(e).lower() or "markdown" in str(e).lower():
                 try:
-                    # Remove parse_mode and try again
+                    await update.message.reply_text(chunk, **kwargs)
+                    logger.debug(
+                        f"message_chunk_sent | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
+                    )
+                except Exception as e:
+                    # If it's a Markdown parsing error, try without parse_mode
+                    if (
+                        "parse entities" in str(e).lower()
+                        or "markdown" in str(e).lower()
+                    ):
+                        kwargs_no_parse = {
+                            k: v for k, v in kwargs.items() if k != "parse_mode"
+                        }
+                        await update.message.reply_text(chunk, **kwargs_no_parse)
+                        logger.info(
+                            f"message_chunk_sent_no_markdown | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
+                        )
+                    else:
+                        # Re-raise for tenacity to handle
+                        raise e
+
+                # Only use special formatting and reply markup for first message
+                kwargs.pop("parse_mode", None)
+                kwargs.pop("reply_markup", None)
+        else:
+            try:
+                await update.message.reply_text(text, **kwargs)
+            except Exception as e:
+                # If it's a Markdown parsing error, try without parse_mode
+                if "parse entities" in str(e).lower() or "markdown" in str(e).lower():
                     kwargs_no_parse = {
                         k: v for k, v in kwargs.items() if k != "parse_mode"
                     }
                     await update.message.reply_text(text, **kwargs_no_parse)
                     logger.info("Message sent successfully without Markdown parsing")
-                    return True
-                except Exception as e2:
-                    logger.error(f"Failed to send message even without Markdown: {e2}")
-
-            return False
+                else:
+                    # Re-raise for tenacity to handle
+                    raise e

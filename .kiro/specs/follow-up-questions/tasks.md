@@ -4,6 +4,14 @@
 
 All tasks for the follow-up questions feature have been successfully implemented and tested. The feature is fully functional and integrated into the bot.
 
+**Status**: All requirements from the requirements document have been implemented and are working correctly. The codebase analysis confirms that all functionality is in place and properly tested.
+
+**Recent Fix**: Task 22 was identified as incomplete during the review and has been properly implemented. The implementation was simplified based on user feedback to send only 2 messages instead of 3 when the user clicks YES:
+1. Instruction message (FOLLOWUP_PROMPT_INPUT_MESSAGE)
+2. Improved prompt wrapped in code blocks (```) combined with ForceReply for better UX
+
+This provides a cleaner user experience while still allowing easy copying of the improved prompt and modification through the ForceReply input area. All tests are now passing and the feature is fully functional.
+
 ### Completed Implementation
 
 - [x] 1. Extend StateManager with follow-up conversation states
@@ -118,6 +126,95 @@ The follow-up questions feature has been fully implemented with:
 - **Extensive test coverage** including unit and integration tests
 
 The feature is production-ready and provides users with an interactive way to refine their prompts through guided questions after receiving an initial improved prompt.
+
+## 🔧 ForceReply Input Enhancement Required
+
+Based on the new requirement to show improved prompts in the Telegram input area, the following tasks need to be implemented:
+
+- [x] 19. Add ForceReply functionality to messages module
+
+
+
+
+
+  - Import ForceReply from telegram library
+  - Add FOLLOWUP_PROMPT_INPUT_MESSAGE constant with Russian and English versions: "Поменяйте или добавьте любые детали промпта. Если всё верно, просто отправьте этот промпт мне:" / "Modify or add any details to the prompt. If everything is correct, just send this prompt to me:"
+  - Create create_prompt_input_reply function to generate ForceReply with improved prompt as placeholder
+  - Add unit tests for ForceReply creation with various prompt lengths
+  - _Requirements: 3.1, 3.2_
+
+- [x] 20. Add new state for follow-up prompt input waiting
+
+
+
+
+
+  - Add waiting_for_followup_prompt_input field to UserState dataclass
+  - Implement set_waiting_for_followup_prompt_input method in StateManager
+  - Update reset_user_state method to reset new state field
+  - Add unit tests for new state management
+  - _Requirements: 3.1, 3.3_
+
+- [x] 21. Implement follow-up prompt input handler in BotHandler
+
+
+
+
+
+
+
+
+
+  - Create _handle_followup_prompt_input method to process user's prompt input
+
+  - Handle both modified and unmodified prompts from input area
+  - Start follow-up conversation with received prompt
+  - Add proper state transitions from prompt input to conversation
+  - Write unit tests for prompt input handling
+  - _Requirements: 3.3, 3.4, 3.5_
+
+- [x] 22. Modify follow-up choice handler to use ForceReply
+
+
+
+
+
+  - Update _handle_followup_choice method to first send instruction message when user clicks ДА
+  - Send FOLLOWUP_PROMPT_INPUT_MESSAGE followed by improved prompt wrapped in code blocks (```) with ForceReply
+  - Combine code block and ForceReply in single message for better UX (2 messages total instead of 3)
+  - Set waiting_for_followup_prompt_input state instead of starting conversation immediately
+  - Update state transitions to include new prompt input phase
+  - Write integration tests for updated choice handling with instruction message and code blocks
+  - _Requirements: 3.1, 3.2, 3.3_
+
+- [x] 23. Update message routing for new prompt input state
+
+
+
+
+
+  - Add routing logic for waiting_for_followup_prompt_input state in handle_message method
+  - Ensure proper state checking order and precedence
+  - Maintain existing message routing for other states
+  - Write integration tests for message routing with new state
+  - _Requirements: 3.3_
+
+- [x] 24. Add comprehensive tests for ForceReply functionality
+
+
+
+
+
+
+
+
+
+  - Test ForceReply creation with various prompt lengths and formats
+  - Test complete flow from choice to prompt input to conversation start
+  - Test user modification of prompts in input area
+  - Test state transitions through all phases of enhanced follow-up flow
+  - Verify integration with existing follow-up conversation functionality
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
 ## 🔧 Token Usage Fixes Required
 

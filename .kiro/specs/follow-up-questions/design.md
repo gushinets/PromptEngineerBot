@@ -17,24 +17,28 @@ graph TD
     C --> D{User choice}
     D -->|НЕТ| E[Send RESET_CONFIRMATION]
     E --> F[Return to prompt input state]
-    D -->|ДА| G[Start follow-up conversation]
-    G --> H[Load follow-up system prompt]
-    H --> I[Add improved prompt as user message]
-    I --> J[Send to LLM]
-    J --> K[LLM asks questions]
-    K --> L[Show question + Generate button]
-    L --> M{User action}
-    M -->|Answer| N[Add to conversation]
-    N --> O[Send to LLM]
-    O --> P{LLM response}
-    P -->|More questions| K
-    P -->|Refined prompt| Q[Parse refined prompt]
-    M -->|Generate button| R[Send GENERATE_PROMPT signal]
-    R --> S[LLM generates refined prompt]
-    S --> Q
-    Q --> T[Send refined prompt to user]
-    T --> U[Send PROMPT_READY_FOLLOW_UP]
-    U --> V[Reset to prompt input state]
+    D -->|ДА| G[Send instruction message]
+    G --> H[Send improved prompt in code blocks for copying]
+    H --> I[Show improved prompt in input area with ForceReply]
+    I --> J[User sends prompt (modified or original)]
+    J --> K[Start follow-up conversation]
+    K --> L[Load follow-up system prompt]
+    L --> M[Add received prompt as user message]
+    M --> N[Send to LLM]
+    N --> O[LLM asks questions]
+    O --> P[Show question + Generate button]
+    P --> Q{User action}
+    Q -->|Answer| R[Add to conversation]
+    R --> S[Send to LLM]
+    S --> T{LLM response}
+    T -->|More questions| O
+    T -->|Refined prompt| U[Parse refined prompt]
+    Q -->|Generate button| V[Send GENERATE_PROMPT signal]
+    V --> W[LLM generates refined prompt]
+    W --> U
+    U --> X[Send refined prompt to user]
+    X --> Y[Send PROMPT_READY_FOLLOW_UP]
+    Y --> Z[Reset to prompt input state]
 ```
 
 ### State Management Integration
@@ -57,6 +61,7 @@ class UserState:
     last_interaction: Optional[str] = None
     # New fields for follow-up feature
     waiting_for_followup_choice: bool = False
+    waiting_for_followup_prompt_input: bool = False  # New state for prompt input
     in_followup_conversation: bool = False
     improved_prompt_cache: Optional[str] = None  # Store improved prompt for follow-up
 ```
@@ -64,6 +69,7 @@ class UserState:
 **New Methods:**
 ```python
 def set_waiting_for_followup_choice(self, user_id: int, waiting: bool)
+def set_waiting_for_followup_prompt_input(self, user_id: int, waiting: bool)
 def set_in_followup_conversation(self, user_id: int, active: bool)
 def set_improved_prompt_cache(self, user_id: int, prompt: str)
 def get_improved_prompt_cache(self, user_id: int) -> Optional[str]
@@ -74,6 +80,7 @@ def get_improved_prompt_cache(self, user_id: int) -> Optional[str]
 **New Methods:**
 ```python
 def start_followup_conversation(self, user_id: int, improved_prompt: str)
+    # Uses self.prompt_loader.followup_prompt to load system context
 def is_in_followup_conversation(self, user_id: int) -> bool
 def reset_to_followup_ready(self, user_id: int)
 ```
@@ -86,6 +93,12 @@ def reset_to_followup_ready(self, user_id: int)
 FOLLOWUP_OFFER_MESSAGE = _(
     "Ваш промпт уже готов к использованию, но мы можем сделать его ещё лучше. Готовы ответить на несколько вопросов?",
     "Your prompt is ready to use, but we can make it even better. Ready to answer a few questions?"
+)
+
+# Prompt input instruction message
+FOLLOWUP_PROMPT_INPUT_MESSAGE = _(
+    "Поменяйте или добавьте любые детали промпта. Если всё верно, просто отправьте этот промпт мне:",
+    "Modify or add any details to the prompt. If everything is correct, just send this prompt to me:"
 )
 
 # Button labels
@@ -103,11 +116,24 @@ FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
 )
 ```
 
+**New Telegram UI Components:**
+```python
+from telegram import ForceReply
+
+def create_prompt_input_reply(improved_prompt: str) -> ForceReply:
+    """Create ForceReply with improved prompt as placeholder text."""
+    return ForceReply(
+        input_field_placeholder=improved_prompt,
+        selective=False
+    )
+```
+
 ### 4. Bot Handler Extensions
 
 **New Handler Methods:**
 ```python
 async def _handle_followup_choice(self, update: Update, user_id: int, text: str)
+async def _handle_followup_prompt_input(self, update: Update, user_id: int, text: str)
 async def _handle_followup_conversation(self, update: Update, user_id: int, text: str)
 async def _process_followup_generation(self, update: Update, user_id: int)
 ```
@@ -126,8 +152,9 @@ class ConversationState(Enum):
     WAITING_FOR_PROMPT = "waiting_for_prompt"
     WAITING_FOR_METHOD = "waiting_for_method"
     IN_METHOD_CONVERSATION = "in_method_conversation"
-    WAITING_FOR_FOLLOWUP_CHOICE = "waiting_for_followup_choice"  # New
-    IN_FOLLOWUP_CONVERSATION = "in_followup_conversation"        # New
+    WAITING_FOR_FOLLOWUP_CHOICE = "waiting_for_followup_choice"        # New
+    WAITING_FOR_FOLLOWUP_PROMPT_INPUT = "waiting_for_followup_prompt_input"  # New
+    IN_FOLLOWUP_CONVERSATION = "in_followup_conversation"              # New
 ```
 
 ### Follow-up Response Parsing

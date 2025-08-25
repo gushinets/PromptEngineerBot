@@ -102,31 +102,54 @@ class TestFollowupIntegration:
         # Step 3: Handle ДА choice
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
 
-        # Verify state transition to follow-up conversation
+        # Verify state transition to prompt input waiting (ForceReply phase)
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_followup_choice is False
+        assert user_state.waiting_for_followup_prompt_input is True
+        assert user_state.in_followup_conversation is False
+
+        # Verify ForceReply was sent (two messages: instruction + ForceReply)
+        assert mock_update.message.reply_text.call_count == 2
+
+        # Verify ForceReply message contains the improved prompt
+        second_call = mock_update.message.reply_text.call_args_list[1]
+        assert improved_prompt in second_call[0][0]
+        from telegram import ForceReply
+
+        assert isinstance(second_call[1]["reply_markup"], ForceReply)
+
+        # Step 3.5: User provides input through ForceReply (modified prompt)
+        user_modified_prompt = (
+            "I want to create marketing copy for a new product launch"
+        )
+        mock_update.message.text = user_modified_prompt
+        await bot_handler._handle_followup_prompt_input(
+            mock_update, user_id, user_modified_prompt
+        )
+
+        # Now verify conversation has started
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_prompt_input is False
         assert user_state.in_followup_conversation is True
 
         # Verify initial LLM call was made
         assert bot_handler.llm_client.send_prompt.call_count == 1
 
         # Verify initial question was sent with correct keyboard
-        mock_update.message.reply_text.assert_called()
         call_args = mock_update.message.reply_text.call_args_list[-1]
         assert "What is the main goal" in call_args[0][0]
         assert call_args[1]["reply_markup"] == FOLLOWUP_CONVERSATION_KEYBOARD
 
         # Step 4: User provides answer to first question
-        mock_update.message.text = "I want to create marketing copy"
+        mock_update.message.text = "Small business owners"
         await bot_handler._handle_followup_conversation(
-            mock_update, user_id, "I want to create marketing copy"
+            mock_update, user_id, "Small business owners"
         )
 
         # Verify user response was added to conversation
         transcript = bot_handler.conversation_manager.get_transcript(user_id)
         assert any(
-            msg["content"] == "I want to create marketing copy"
-            and msg["role"] == "user"
+            msg["content"] == "Small business owners" and msg["role"] == "user"
             for msg in transcript
         )
 
@@ -134,9 +157,9 @@ class TestFollowupIntegration:
         assert bot_handler.llm_client.send_prompt.call_count == 2
 
         # Step 5: User provides answer to second question
-        mock_update.message.text = "Small business owners"
+        mock_update.message.text = "Professional and engaging tone"
         await bot_handler._handle_followup_conversation(
-            mock_update, user_id, "Small business owners"
+            mock_update, user_id, "Professional and engaging tone"
         )
 
         # Note: After the refined prompt is returned, the conversation gets reset
@@ -301,22 +324,33 @@ class TestFollowupIntegration:
 
         # Step 3: User accepts follow-up (ДА)
         mock_update.message.text = BTN_YES
-        bot_handler.llm_client.send_prompt.return_value = "What is your goal?"
 
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
 
-        # Verify follow-up conversation state
+        # Verify ForceReply prompt input state (not conversation yet)
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_prompt is False
         assert user_state.waiting_for_followup_choice is False
-        assert user_state.in_followup_conversation is True
+        assert user_state.waiting_for_followup_prompt_input is True
+        assert user_state.in_followup_conversation is False
         assert user_state.improved_prompt_cache == improved_prompt
 
-        # Verify conversation manager state
-        assert (
-            bot_handler.conversation_manager.is_in_followup_conversation(user_id)
-            is True
+        # Step 3.5: User provides input through ForceReply
+        user_prompt = "I want to create better marketing content"
+        mock_update.message.text = user_prompt
+        bot_handler.llm_client.send_prompt.return_value = "What is your goal?"
+
+        await bot_handler._handle_followup_prompt_input(
+            mock_update, user_id, user_prompt
         )
+
+        # Now verify follow-up conversation state
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_prompt is False
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.waiting_for_followup_prompt_input is False
+        assert user_state.in_followup_conversation is True
+        assert user_state.improved_prompt_cache == improved_prompt
 
         # Step 4: User provides answer
         mock_update.message.text = "My goal is to create better content"
@@ -460,12 +494,20 @@ class TestFollowupIntegration:
 
         # Step 6: User accepts follow-up and completes the flow
         mock_update.message.text = BTN_YES
+
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 6.5: User provides input through ForceReply
+        user_prompt = "Help me write professional business emails"
+        mock_update.message.text = user_prompt
         bot_handler.llm_client.send_prompt.side_effect = [
             "What type of emails do you write most often?",
             "<REFINED_PROMPT>You are an expert email writer specializing in business communications. Help me craft professional, engaging emails that achieve specific goals. When I provide an email request, analyze the purpose, audience, and desired outcome, then create a well-structured email with appropriate tone, clear subject line, and compelling content. Focus on clarity, professionalism, and actionable outcomes.</REFINED_PROMPT>",
         ]
 
-        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+        await bot_handler._handle_followup_prompt_input(
+            mock_update, user_id, user_prompt
+        )
 
         # Answer the follow-up question
         mock_update.message.text = "Business emails to clients and partners"

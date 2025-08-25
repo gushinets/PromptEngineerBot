@@ -5,7 +5,7 @@ This module contains all the static messages and templates used by the Telegram 
 for consistent messaging and easier maintenance.
 """
 
-from telegram import ReplyKeyboardMarkup
+from telegram import ForceReply, ReplyKeyboardMarkup
 
 # ===== Language Settings =====
 # Set to 'ru' for Russian or 'en' for English
@@ -185,6 +185,11 @@ FOLLOWUP_OFFER_MESSAGE = _(
     "✅Your prompt is ready to use, but we can make it even better. Ready to answer a few questions?",
 )
 
+FOLLOWUP_PROMPT_INPUT_MESSAGE = _(
+    "Поменяйте или добавьте любые детали промпта. Если всё верно, просто скопируйте и отправьте этот промпт мне:",
+    "Modify or add any details to the prompt. If everything is correct, just copy and send this prompt to me:",
+)
+
 # ===== Keyboard Layouts =====
 # Method selection keyboard
 SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
@@ -273,6 +278,22 @@ def format_improved_prompt_response(
         user_prompt=safe_user_prompt,
         improved_prompt=safe_improved_prompt,
     )
+
+
+def create_prompt_input_reply(improved_prompt: str) -> ForceReply:
+    """Create ForceReply with improved prompt as placeholder text.
+
+    This function creates a ForceReply object that displays the improved prompt
+    in the Telegram input field as placeholder text, allowing users to modify
+    or confirm the prompt before starting follow-up questions.
+
+    Args:
+        improved_prompt: The improved prompt to show as placeholder text
+
+    Returns:
+        ForceReply: Telegram ForceReply object with the prompt as placeholder
+    """
+    return ForceReply(input_field_placeholder=improved_prompt, selective=False)
 
 
 def _extract_tag_block(text: str, tag: str) -> tuple[str | None, int | None]:

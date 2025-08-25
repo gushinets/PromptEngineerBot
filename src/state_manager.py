@@ -10,6 +10,7 @@ class UserState:
         waiting_for_prompt (bool): Whether the bot is waiting for the user to enter a prompt.
         last_interaction (Optional[str]): The last message or action from the user.
         waiting_for_followup_choice (bool): Whether the bot is waiting for user to choose YES/NO for follow-up questions.
+        waiting_for_followup_prompt_input (bool): Whether the bot is waiting for user to input the prompt in ForceReply.
         in_followup_conversation (bool): Whether the user is currently in a follow-up question conversation.
         improved_prompt_cache (Optional[str]): Cached improved prompt for follow-up conversation context.
     """
@@ -19,6 +20,7 @@ class UserState:
     )
     last_interaction: Optional[str] = None
     waiting_for_followup_choice: bool = False
+    waiting_for_followup_prompt_input: bool = False
     in_followup_conversation: bool = False
     improved_prompt_cache: Optional[str] = None
 
@@ -73,6 +75,16 @@ class StateManager:
         """
         state = self.get_user_state(user_id)
         state.waiting_for_followup_choice = waiting
+
+    def set_waiting_for_followup_prompt_input(self, user_id: int, waiting: bool):
+        """
+        Set whether the bot is waiting for user to input the prompt in ForceReply.
+        Args:
+            user_id (int): The Telegram user ID.
+            waiting (bool): Whether waiting for follow-up prompt input.
+        """
+        state = self.get_user_state(user_id)
+        state.waiting_for_followup_prompt_input = waiting
 
     def set_in_followup_conversation(self, user_id: int, active: bool):
         """
