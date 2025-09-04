@@ -73,8 +73,14 @@ class BotConfig:
     audit_retention_days: int = 90
     audit_purge_enabled: bool = True
 
+    # Follow-up conversation settings
+    followup_timeout_seconds: int = 300  # 5 minutes
+
     # Localization settings
     language: str = "EN"  # EN or RU
+
+    # Email feature toggle
+    email_enabled: bool = True
 
     @staticmethod
     def _get_default_smtp_port() -> int:
@@ -170,8 +176,13 @@ class BotConfig:
             audit_retention_days=int(os.getenv("AUDIT_RETENTION_DAYS", 90)),
             audit_purge_enabled=os.getenv("AUDIT_PURGE_ENABLED", "true").lower()
             in ("true", "1", "yes"),
+            # Follow-up conversation settings
+            followup_timeout_seconds=int(os.getenv("FOLLOWUP_TIMEOUT_SECONDS", 300)),
             # Localization settings
             language=os.getenv("LANGUAGE", "EN").upper(),
+            # Email feature toggle
+            email_enabled=os.getenv("EMAIL_ENABLED", "true").lower()
+            in ("true", "1", "yes"),
         )
 
     def validate(self) -> None:
@@ -220,3 +231,7 @@ class BotConfig:
         # Validate audit settings
         if self.audit_retention_days <= 0:
             raise ValueError("AUDIT_RETENTION_DAYS must be positive")
+
+        # Validate follow-up settings
+        if self.followup_timeout_seconds <= 0:
+            raise ValueError("FOLLOWUP_TIMEOUT_SECONDS must be positive")

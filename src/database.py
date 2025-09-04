@@ -195,11 +195,21 @@ def mask_email(email: str) -> str:
         return email[:1] + "***" if email else "***"
 
     local, domain = email.split("@", 1)
-    masked_local = local[:1] + "***" if len(local) > 1 else "***"
+    # For single character local parts, mask completely for security
+    if len(local) == 1:
+        masked_local = "***"
+    else:
+        masked_local = local[:1] + "***" if len(local) >= 1 else "***"
 
     if "." in domain:
         domain_parts = domain.split(".")
-        masked_domain = domain_parts[0][:1] + "***." + domain_parts[-1]
+        # Handle international domains and IDN domains
+        first_part = domain_parts[0]
+        if len(first_part) > 0:
+            masked_first = first_part[:1] + "***"
+        else:
+            masked_first = "***"
+        masked_domain = masked_first + "." + domain_parts[-1]
     else:
         masked_domain = "***"
 

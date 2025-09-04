@@ -10,7 +10,7 @@ import logging
 import re
 import secrets
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 from argon2 import PasswordHasher
@@ -56,6 +56,28 @@ class AuthService:
             True if email format is valid, False otherwise
         """
         if not email:
+            return False
+
+        # Check for consecutive dots (not allowed)
+        if ".." in email:
+            return False
+
+        # Check for email injection attempts - more comprehensive
+        injection_chars = ["\n", "\r", "\t", "\x0a", "\x0d", "%0a", "%0d"]
+        if any(char in email for char in injection_chars):
+            return False
+
+        # Check for header injection patterns
+        injection_patterns = [
+            r"bcc\s*:",
+            r"cc\s*:",
+            r"to\s*:",
+            r"subject\s*:",
+            r"from\s*:",
+            r"reply-to\s*:",
+        ]
+        email_lower = email.lower()
+        if any(re.search(pattern, email_lower) for pattern in injection_patterns):
             return False
 
         # Basic email regex pattern
@@ -166,14 +188,6 @@ class AuthService:
         except Exception as e:
             logger.error(f"Error checking rate limits: {e}")
             return False, "rate_check_error"
-
-    def check_comprehensive_rate_limits(
-        self, telegram_id: int, email: str
-    ) -> Tuple[bool, str]:
-        """
-        Alias for check_rate_limits for backward compatibility.
-        """
-        return self.check_rate_limits(telegram_id, email)
 
     def send_otp(
         self, telegram_id: int, email: str, email_original: Optional[str] = None
@@ -354,13 +368,13 @@ class AuthService:
                 # OTP verification failed - check if this is the 3rd attempt
                 if attempts >= self.config.otp_max_attempts:
                     # Delete OTP after max attempts reached
-                    self.redis_client.delete_otp(telegram_id, "max_attempts_reached")
+                    self.redis_client.delete_otp(telegram_id, "attempt_limit_exceeded")
                     self._log_auth_event(
                         telegram_id,
                         otp_data.get("normalized_email"),
                         "OTP_FAILED",
                         False,
-                        "max_attempts_reached",
+                        "attempt_limit_exceeded",
                     )
                     return False, "attempt_limit_exceeded"
                 else:
@@ -403,7 +417,7 @@ class AuthService:
                 # Try to find existing user
                 user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
-                current_time = datetime.utcnow()
+                current_time = datetime.now(timezone.utc)
 
                 if user:
                     # Existing user - update authentication timestamps
@@ -422,7 +436,20 @@ class AuthService:
                     )
 
                 else:
-                    # New user - create with all required fields
+                    # New user - check for email conflicts first
+                    existing_email_user = (
+                        session.query(User).filter_by(email=email).first()
+                    )
+                    if (
+                        existing_email_user
+                        and existing_email_user.telegram_id != telegram_id
+                    ):
+                        logger.error(
+                            f"Email conflict: {mask_email(email)} already exists for different user"
+                        )
+                        return False
+
+                    # Create new user with all required fields
                     user = User(
                         telegram_id=telegram_id,
                         email=email,
@@ -520,7 +547,7 @@ class AuthService:
                     event_type=event_type,
                     success=success,
                     reason=reason,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                 )
                 session.add(auth_event)
                 session.commit()

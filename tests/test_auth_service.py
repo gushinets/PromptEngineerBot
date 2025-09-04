@@ -262,10 +262,11 @@ class TestAuthService:
         # Verify Redis operations were called with complete OTP context
         mock_redis_client.store_otp_with_original.assert_called_once()
         call_args = mock_redis_client.store_otp_with_original.call_args
-        assert call_args[1]["telegram_id"] == telegram_id
-        assert call_args[1]["email"] == expected_normalized  # Normalized
-        assert call_args[1]["email_original"] == email  # Original format
-        assert call_args[1]["ttl"] == 300
+        # Arguments are positional: (telegram_id, otp_hash, normalized_email, original_email, ttl)
+        assert call_args[0][0] == telegram_id  # telegram_id
+        assert call_args[0][2] == expected_normalized  # normalized_email
+        assert call_args[0][3] == email  # original_email
+        assert call_args[0][4] == 300  # ttl
 
         mock_redis_client.increment_rate_limits.assert_called_once_with(
             telegram_id, expected_normalized
@@ -426,7 +427,7 @@ class TestAuthService:
 
         # Should delete OTP key after >3 failed attempts with proper reason
         mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "max_attempts_reached"
+            telegram_id, "attempt_limit_exceeded"
         )
 
     @patch("src.auth_service.get_db_session")
@@ -588,7 +589,7 @@ class TestAuthService:
         # User was already verified before (has email_verified_at timestamp)
         from datetime import datetime
 
-        original_verified_at = datetime.utcnow()
+        original_verified_at = datetime.now(datetime.UTC)
         mock_user.email_verified_at = original_verified_at
 
         mock_session.query.return_value.filter_by.return_value.first.return_value = (
@@ -863,7 +864,7 @@ class TestAuthService:
 
         # Verify OTP key is deleted after >3 failed attempts with proper reason
         mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "max_attempts_reached"
+            telegram_id, "attempt_limit_exceeded"
         )
 
     def test_otp_key_cleanup_on_expiry(self, auth_service, mock_redis_client):
@@ -895,8 +896,17 @@ class TestAuthServiceGlobals:
 
     def test_init_auth_service(self):
         """Test auth service initialization."""
+        from src.config import BotConfig
+
+        mock_config = Mock()
+        mock_config.otp_ttl_seconds = 300
+        mock_config.otp_max_attempts = 3
+        mock_config.email_rate_limit_per_hour = 3
+        mock_config.user_rate_limit_per_hour = 5
+        mock_config.otp_spacing_seconds = 60
+
         with patch("src.auth_service.get_redis_client"):
-            service = init_auth_service()
+            service = init_auth_service(mock_config)
             assert service is not None
             assert isinstance(service, AuthService)
 
@@ -912,7 +922,16 @@ class TestAuthServiceGlobals:
 
     def test_get_auth_service_initialized(self):
         """Test getting auth service when initialized."""
+        from src.config import BotConfig
+
+        mock_config = Mock()
+        mock_config.otp_ttl_seconds = 300
+        mock_config.otp_max_attempts = 3
+        mock_config.email_rate_limit_per_hour = 3
+        mock_config.user_rate_limit_per_hour = 5
+        mock_config.otp_spacing_seconds = 60
+
         with patch("src.auth_service.get_redis_client"):
-            service = init_auth_service()
+            service = init_auth_service(mock_config)
             retrieved_service = get_auth_service()
             assert retrieved_service is service

@@ -26,9 +26,17 @@ from telegram.ext import (
     filters,
 )
 
+from .background_tasks import (
+    init_background_tasks,
+    start_background_tasks,
+    stop_background_tasks,
+)
 from .bot_handler import BotHandler
 from .config import BotConfig
+from .database import init_database
+from .graceful_degradation import init_degradation_manager
 from .gsheets_logging import build_google_sheets_handler_from_env
+from .health_checks import init_health_monitor
 from .llm_factory import LLMClientFactory
 from .messages import (
     ERROR_EMPTY_MESSAGE,
@@ -37,6 +45,7 @@ from .messages import (
     ERROR_RATE_LIMIT,
     ERROR_TOO_LONG,
 )
+from .redis_client import init_redis_client
 
 # Configure logging (keep internal logging to file/console unchanged)
 logging.basicConfig(
@@ -116,6 +125,8 @@ logger.info(f"Model: {config.model_name}")
 # Create LLM client
 llm_client = LLMClientFactory.create_client(config)
 
+# Email flow orchestrator will be initialized later in main() after all services are ready
+
 # Create bot handler
 bot_handler = BotHandler(config, llm_client, log_sheets)
 
@@ -140,7 +151,69 @@ async def main():
 
     logger.info("Starting bot with token: {}...".format(token[:5] + "..." + token[-5:]))
 
+    # Initialize graceful degradation manager
+    language = os.getenv("LANGUAGE", "EN")
+    degradation_manager = init_degradation_manager(language)
+    logger.info(f"Graceful degradation manager initialized with language: {language}")
+
+    # Initialize email feature components
+    health_monitor = None
+    background_scheduler = None
+
     try:
+        # Initialize database (if email feature is enabled)
+        if config.email_enabled:
+            logger.info("Initializing email feature components...")
+
+            # Initialize database
+            init_database(config)
+            logger.info("Database initialized successfully")
+
+            # Initialize Redis client
+            init_redis_client(config)
+            logger.info("Redis client initialized successfully")
+
+            # Initialize auth service
+            from .auth_service import init_auth_service
+
+            init_auth_service(config)
+            logger.info("Auth service initialized successfully")
+
+            # Initialize health monitoring
+            health_monitor = init_health_monitor(config)
+            logger.info("Health monitor initialized successfully")
+
+            # Start health monitoring
+            await health_monitor.start_monitoring(check_interval=30)
+            logger.info("Health monitoring started")
+
+            # Initialize and start background tasks
+            background_scheduler = init_background_tasks()
+            start_background_tasks()
+            logger.info("Background tasks started")
+
+            # Initialize email flow orchestrator after all services are ready
+            from .conversation_manager import ConversationManager
+            from .email_flow import init_email_flow_orchestrator
+            from .state_manager import StateManager
+
+            # Create required managers for email flow
+            conversation_manager = ConversationManager(config, llm_client)
+            state_manager = StateManager()
+
+            # Initialize email flow orchestrator
+            orchestrator = init_email_flow_orchestrator(
+                config, llm_client, conversation_manager, state_manager
+            )
+
+            # Set the orchestrator on the bot handler
+            bot_handler.set_email_flow_orchestrator(orchestrator)
+            logger.info("Email flow orchestrator initialized successfully")
+        else:
+            logger.info(
+                "Email feature disabled - skipping email component initialization"
+            )
+
         # Create the Application with connection pool settings
         # Increased timeouts to handle slow LLM responses and poor connections
         application = (
@@ -174,13 +247,39 @@ async def main():
 
     except asyncio.CancelledError:
         logger.info("Shutting down...")
+
+        # Stop background services
+        if health_monitor:
+            await health_monitor.stop_monitoring()
+            logger.info("Health monitoring stopped")
+
+        if background_scheduler:
+            stop_background_tasks()
+            logger.info("Background tasks stopped")
+
+        # Stop Telegram bot
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
+        logger.info("Bot shutdown complete")
         raise
     except Exception as e:
         logger.error(f"Failed to start bot: {str(e)}")
         logger.exception("Exception details:")
+
+        # Cleanup on error
+        if health_monitor:
+            try:
+                await health_monitor.stop_monitoring()
+            except Exception as cleanup_error:
+                logger.error(f"Error stopping health monitor: {cleanup_error}")
+
+        if background_scheduler:
+            try:
+                stop_background_tasks()
+            except Exception as cleanup_error:
+                logger.error(f"Error stopping background tasks: {cleanup_error}")
+
         raise
 
 

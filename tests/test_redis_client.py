@@ -428,10 +428,19 @@ class TestGlobalRedisClient:
 
     def test_init_redis(self):
         """Test Redis client initialization."""
-        client = init_redis("redis://localhost:6379")
+        # Import and reload to avoid global mocks
+        import importlib
 
-        assert isinstance(client, RedisClient)
-        assert client.redis_url == "redis://localhost:6379"
+        import src.redis_client
+
+        importlib.reload(src.redis_client)
+
+        # Only mock the underlying Redis connection
+        with patch("src.redis_client.redis.Redis"):
+            client = src.redis_client.init_redis("redis://localhost:6379")
+
+            assert isinstance(client, src.redis_client.RedisClient)
+            assert client.redis_url == "redis://localhost:6379"
 
     def test_get_redis_client(self):
         """Test getting Redis client."""

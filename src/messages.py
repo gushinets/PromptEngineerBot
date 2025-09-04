@@ -31,6 +31,9 @@ BTN_YES = _("✅ДА", "✅YES")
 BTN_NO = _("❌НЕТ", "❌NO")
 BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Generate Prompt")
 
+# Email delivery button
+BTN_EMAIL_DELIVERY = _("📧 Отправить 3 промпта на email", "📧 Send 3 prompts to email")
+
 # ===== Welcome and Help Messages =====
 WELCOME_MESSAGE = _(
     "🤖 Добро пожаловать в Prompt Engineering Bot!\n"
@@ -116,6 +119,68 @@ ERROR_FOLLOWUP_PARSING = _(
     "⚠️ Failed to process response. Using the original improved prompt.",
 )
 
+# Email authentication messages
+EMAIL_INPUT_MESSAGE = _(
+    "📧 Введите ваш email адрес для получения оптимизированных промптов:",
+    "📧 Please enter your email address to receive optimized prompts:",
+)
+
+ERROR_EMAIL_INVALID = _(
+    "❌ Неверный формат email адреса. Пожалуйста, введите корректный email (например: user@example.com):",
+    "❌ Invalid email format. Please enter a valid email address (e.g., user@example.com):",
+)
+
+EMAIL_OTP_SENT = _(
+    "📧 Код подтверждения отправлен на {email}.\n\n🔢 Введите 6-значный код из письма:",
+    "📧 Verification code sent to {email}.\n\n"
+    "🔢 Please enter the 6-digit code from the email:",
+)
+
+ERROR_EMAIL_RATE_LIMITED = _(
+    "⚠️ Слишком много попыток отправки кода. Попробуйте позже.",
+    "⚠️ Too many code sending attempts. Please try again later.",
+)
+
+ERROR_EMAIL_SEND_FAILED = _(
+    "❌ Не удалось отправить код подтверждения. Попробуйте позже или проверьте email адрес.",
+    "❌ Failed to send verification code. Please try again later or check your email address.",
+)
+
+ERROR_OTP_INVALID = _(
+    "❌ Неверный код. Попробуйте еще раз (осталось попыток: {attempts}):",
+    "❌ Invalid code. Please try again (attempts remaining: {attempts}):",
+)
+
+ERROR_OTP_EXPIRED = _(
+    "❌ Код истек. Пожалуйста, запросите новый код.",
+    "❌ Code has expired. Please request a new code.",
+)
+
+ERROR_OTP_ATTEMPTS_EXCEEDED = _(
+    "❌ Превышено количество попыток ввода кода. Пожалуйста, запросите новый код.",
+    "❌ Too many attempts. Please request a new code.",
+)
+
+OTP_VERIFICATION_SUCCESS = _(
+    "✅ Email подтвержден! Переходим к улучшению промпта...",
+    "✅ Email verified! Proceeding to prompt improvement...",
+)
+
+EMAIL_ALREADY_AUTHENTICATED = _(
+    "✅ Вы уже авторизованы! Отправляем промпты на ваш email {email}...",
+    "✅ You're already authenticated! Sending prompts to your email {email}...",
+)
+
+ERROR_REDIS_UNAVAILABLE = _(
+    "⚠️ Сервис временно недоступен. Пожалуйста, попробуйте позже.",
+    "⚠️ Service temporarily unavailable. Please try again later.",
+)
+
+ERROR_SMTP_UNAVAILABLE = _(
+    "⚠️ Не удается отправить email. Показываем результаты в чате:",
+    "⚠️ Unable to send email. Showing results in chat:",
+)
+
 # ===== Status Messages =====
 RESET_CONFIRMATION = _(
     "🔄 Диалог сброшен. Вы можете начать новую оптимизацию промпта.",
@@ -193,7 +258,7 @@ FOLLOWUP_PROMPT_INPUT_MESSAGE = _(
 # ===== Keyboard Layouts =====
 # Method selection keyboard
 SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
-    [[BTN_LYRA, BTN_CRAFT, BTN_GGL]], resize_keyboard=True
+    [[BTN_EMAIL_DELIVERY], [BTN_LYRA, BTN_CRAFT, BTN_GGL]], resize_keyboard=True
 )
 
 # Follow-up feature keyboards

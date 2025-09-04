@@ -13,6 +13,9 @@ class UserState:
         waiting_for_followup_prompt_input (bool): Whether the bot is waiting for user to input the prompt in ForceReply.
         in_followup_conversation (bool): Whether the user is currently in a follow-up question conversation.
         improved_prompt_cache (Optional[str]): Cached improved prompt for follow-up conversation context.
+        waiting_for_email_input (bool): Whether the bot is waiting for user to enter email address.
+        waiting_for_otp_input (bool): Whether the bot is waiting for user to enter OTP code.
+        email_flow_data (Optional[dict]): Data for email authentication flow (email, original_prompt, etc.).
     """
 
     waiting_for_prompt: bool = (
@@ -23,6 +26,9 @@ class UserState:
     waiting_for_followup_prompt_input: bool = False
     in_followup_conversation: bool = False
     improved_prompt_cache: Optional[str] = None
+    waiting_for_email_input: bool = False
+    waiting_for_otp_input: bool = False
+    email_flow_data: Optional[dict] = None
 
 
 class StateManager:
@@ -116,3 +122,44 @@ class StateManager:
         """
         state = self.get_user_state(user_id)
         return state.improved_prompt_cache
+
+    def set_waiting_for_email_input(self, user_id: int, waiting: bool):
+        """
+        Set whether the bot is waiting for user to enter email address.
+        Args:
+            user_id (int): The Telegram user ID.
+            waiting (bool): Whether waiting for email input.
+        """
+        state = self.get_user_state(user_id)
+        state.waiting_for_email_input = waiting
+
+    def set_waiting_for_otp_input(self, user_id: int, waiting: bool):
+        """
+        Set whether the bot is waiting for user to enter OTP code.
+        Args:
+            user_id (int): The Telegram user ID.
+            waiting (bool): Whether waiting for OTP input.
+        """
+        state = self.get_user_state(user_id)
+        state.waiting_for_otp_input = waiting
+
+    def set_email_flow_data(self, user_id: int, data: Optional[dict]):
+        """
+        Set email flow data for the user.
+        Args:
+            user_id (int): The Telegram user ID.
+            data (Optional[dict]): Email flow data or None to clear.
+        """
+        state = self.get_user_state(user_id)
+        state.email_flow_data = data
+
+    def get_email_flow_data(self, user_id: int) -> Optional[dict]:
+        """
+        Get email flow data for the user.
+        Args:
+            user_id (int): The Telegram user ID.
+        Returns:
+            Optional[dict]: Email flow data or None if not set.
+        """
+        state = self.get_user_state(user_id)
+        return state.email_flow_data

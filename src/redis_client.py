@@ -519,3 +519,16 @@ def get_redis_client() -> RedisClient:
     if redis_client is None:
         raise RuntimeError("Redis client not initialized. Call init_redis() first.")
     return redis_client
+
+
+def init_redis_client(config) -> RedisClient:
+    """
+    Initialize Redis client from configuration.
+
+    Args:
+        config: BotConfig instance with Redis settings
+
+    Returns:
+        RedisClient instance
+    """
+    return init_redis(config.redis_url, config.redis_max_connections)

@@ -3,6 +3,7 @@ Telegram bot message handlers and core logic.
 """
 
 import logging
+import re
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -16,9 +17,11 @@ from tenacity import (
 
 from .config import BotConfig
 from .conversation_manager import ConversationManager
+from .email_flow import get_email_flow_orchestrator
 from .llm_client_base import LLMClientBase
 from .messages import (
     BTN_CRAFT,
+    BTN_EMAIL_DELIVERY,
     BTN_GENERATE_PROMPT,
     BTN_GGL,
     BTN_LYRA,
@@ -26,10 +29,22 @@ from .messages import (
     BTN_NO,
     BTN_RESET,
     BTN_YES,
+    EMAIL_ALREADY_AUTHENTICATED,
+    EMAIL_INPUT_MESSAGE,
+    EMAIL_OTP_SENT,
+    ERROR_EMAIL_INVALID,
+    ERROR_EMAIL_RATE_LIMITED,
+    ERROR_EMAIL_SEND_FAILED,
+    ERROR_OTP_ATTEMPTS_EXCEEDED,
+    ERROR_OTP_EXPIRED,
+    ERROR_OTP_INVALID,
+    ERROR_REDIS_UNAVAILABLE,
+    ERROR_SMTP_UNAVAILABLE,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
     FOLLOWUP_PROMPT_INPUT_MESSAGE,
+    OTP_VERIFICATION_SUCCESS,
     PROMPT_READY_FOLLOW_UP,
     RESET_CONFIRMATION,
     SELECT_METHOD_KEYBOARD,
@@ -99,6 +114,17 @@ class BotHandler:
         )
         self.log_sheets = sheets_logger_func or (lambda event, payload: None)
 
+        # Initialize email flow orchestrator if available
+        try:
+            self.email_flow_orchestrator = get_email_flow_orchestrator()
+        except RuntimeError:
+            # Email flow orchestrator not initialized - will be set later if email feature is enabled
+            self.email_flow_orchestrator = None
+
+    def set_email_flow_orchestrator(self, orchestrator):
+        """Set the email flow orchestrator after initialization."""
+        self.email_flow_orchestrator = orchestrator
+
     def reset_user_state(self, user_id: int):
         """Reset the user's state and conversation history."""
         self.state_manager.set_waiting_for_prompt(user_id, True)
@@ -108,6 +134,10 @@ class BotHandler:
         self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_improved_prompt_cache(user_id, None)
+        # Reset email states
+        self.state_manager.set_waiting_for_email_input(user_id, False)
+        self.state_manager.set_waiting_for_otp_input(user_id, False)
+        self.state_manager.set_email_flow_data(user_id, None)
         self.conversation_manager.reset(user_id)
 
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,19 +170,70 @@ class BotHandler:
             await self.handle_start(update, context)
             return
 
+        # Handle email input waiting state
+        if user_state.waiting_for_email_input:
+            if self.email_flow_orchestrator:
+                await self.email_flow_orchestrator.handle_email_input(
+                    update, context, user_id, text
+                )
+            else:
+                await self._safe_reply(
+                    update, "❌ Email service not available. Please try again later."
+                )
+            return
+
+        # Handle OTP input waiting state
+        if user_state.waiting_for_otp_input:
+            if self.email_flow_orchestrator:
+                await self.email_flow_orchestrator.handle_otp_input(
+                    update, context, user_id, text
+                )
+            else:
+                await self._safe_reply(
+                    update, "❌ Email service not available. Please try again later."
+                )
+            return
+
         # Handle follow-up choice waiting state
         if user_state.waiting_for_followup_choice:
-            await self._handle_followup_choice(update, user_id, text)
+            # Check if this is part of an email flow
+            email_flow_data = user_state.email_flow_data
+            if email_flow_data and self.email_flow_orchestrator:
+                # Email flow follow-up
+                await self.email_flow_orchestrator.handle_followup_choice(
+                    update, context, user_id, text
+                )
+            else:
+                # Regular follow-up
+                await self._handle_followup_choice(update, user_id, text)
             return
 
         # Handle follow-up prompt input waiting state
         if user_state.waiting_for_followup_prompt_input:
-            await self._handle_followup_prompt_input(update, user_id, text)
+            # Check if this is part of an email flow
+            email_flow_data = user_state.email_flow_data
+            if email_flow_data and self.email_flow_orchestrator:
+                # Email flow follow-up
+                await self.email_flow_orchestrator.handle_followup_prompt_input(
+                    update, context, user_id, text
+                )
+            else:
+                # Regular follow-up
+                await self._handle_followup_prompt_input(update, user_id, text)
             return
 
         # Handle follow-up conversation state
         if user_state.in_followup_conversation:
-            await self._handle_followup_conversation(update, user_id, text)
+            # Check if this is part of an email flow
+            email_flow_data = user_state.email_flow_data
+            if email_flow_data and self.email_flow_orchestrator:
+                # Email flow follow-up
+                await self.email_flow_orchestrator.handle_followup_conversation(
+                    update, context, user_id, text
+                )
+            else:
+                # Regular follow-up
+                await self._handle_followup_conversation(update, user_id, text)
             return
 
         # Handle prompt input
@@ -162,7 +243,7 @@ class BotHandler:
 
         # Handle method selection
         if self.conversation_manager.is_waiting_for_method(user_id):
-            await self._handle_method_selection(update, user_id, text)
+            await self._handle_method_selection(update, context, user_id, text)
             return
 
         # Handle multi-turn conversation
@@ -192,8 +273,53 @@ class BotHandler:
             reply_markup=ReplyKeyboardMarkup(method_keyboard, resize_keyboard=True),
         )
 
-    async def _handle_method_selection(self, update: Update, user_id: int, text: str):
+    async def _handle_method_selection(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        user_id: int,
+        text: str,
+    ):
         """Handle optimization method selection."""
+        # Handle email delivery button
+        if text == BTN_EMAIL_DELIVERY:
+            if self.email_flow_orchestrator:
+                # Check health before starting email flow
+                try:
+                    from .health_checks import get_health_monitor
+
+                    health_monitor = get_health_monitor()
+
+                    # Check if Redis is healthy (required for email flow)
+                    if not health_monitor.is_service_healthy("redis"):
+                        await self._safe_reply(
+                            update,
+                            "📧 Email service temporarily unavailable. Please try again later.",
+                            reply_markup=ReplyKeyboardMarkup(
+                                [[BTN_RESET]], resize_keyboard=True
+                            ),
+                        )
+                        return
+
+                    # Check if SMTP is healthy, fallback to chat if not
+                    if not health_monitor.is_service_healthy("smtp"):
+                        # SMTP unhealthy, but we can still proceed with chat fallback
+                        # The email flow orchestrator will handle the fallback
+                        pass
+
+                except Exception:
+                    # Health monitor not available, proceed anyway
+                    pass
+
+                await self.email_flow_orchestrator.start_email_flow(
+                    update, context, user_id
+                )
+            else:
+                await self._safe_reply(
+                    update, "❌ Email service not available. Please try again later."
+                )
+            return
+
         method_handlers = {
             BTN_CRAFT: ("CRAFT", self.prompt_loader.craft_prompt),
             BTN_LYRA: (

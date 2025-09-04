@@ -9,19 +9,30 @@ class ConversationManager:
     """
 
     def __init__(
-        self, prompt_loader: PromptLoader = None, state_manager: StateManager = None
+        self, prompt_loader_or_state_manager=None, state_manager: StateManager = None
     ):
         """
         Initialize conversation storage for all users.
 
         Args:
-            prompt_loader: PromptLoader instance for loading system prompts
-            state_manager: StateManager instance for managing user states (required)
+            prompt_loader_or_state_manager: Either PromptLoader instance or StateManager instance
+            state_manager: StateManager instance (if first arg is PromptLoader)
         """
-        self.prompt_loader = prompt_loader or PromptLoader()
-        if state_manager is None:
+        # Handle flexible constructor arguments
+        if isinstance(prompt_loader_or_state_manager, StateManager):
+            # Called with ConversationManager(state_manager)
+            self.prompt_loader = PromptLoader()
+            self.state_manager = prompt_loader_or_state_manager
+        elif state_manager is not None:
+            # Called with ConversationManager(prompt_loader, state_manager)
+            self.prompt_loader = prompt_loader_or_state_manager or PromptLoader()
+            self.state_manager = state_manager
+        elif prompt_loader_or_state_manager is None:
+            # Called with ConversationManager() - need state_manager
             raise ValueError("StateManager is required for ConversationManager")
-        self.state_manager = state_manager
+        else:
+            # Called with ConversationManager(prompt_loader) - need state_manager
+            raise ValueError("StateManager is required for ConversationManager")
         self.transcripts = {}
         self.user_prompts = {}  # Store user prompt before method selection
         self.method_selection = {}  # Track if waiting for method selection

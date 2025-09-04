@@ -1,7 +1,8 @@
 """Pytest configuration and fixtures for the test suite."""
+
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 # Load environment variables from .env file
 load_dotenv()
 
+
 @pytest.fixture
 def mock_update():
     """Create a mock Update object."""
@@ -23,6 +25,7 @@ def mock_update():
     update.message.reply_text = AsyncMock(return_value=None)
     return update
 
+
 @pytest.fixture
 def mock_context():
     """Create a mock Context object."""
@@ -31,10 +34,11 @@ def mock_context():
     context.args = []
     return context
 
+
 @pytest.fixture
 def mock_application():
     """Create a mock Application object."""
-    with patch('src.main.Application.builder') as mock_builder:
+    with patch("src.main.Application.builder") as mock_builder:
         mock_app = MagicMock()
         mock_builder.return_value = MagicMock(
             token=MagicMock(return_value=MagicMock()),
@@ -43,7 +47,7 @@ def mock_application():
             read_timeout=MagicMock(return_value=MagicMock()),
             write_timeout=MagicMock(return_value=MagicMock()),
             get_updates_read_timeout=MagicMock(return_value=MagicMock()),
-            build=MagicMock(return_value=mock_app)
+            build=MagicMock(return_value=mock_app),
         )
         # Make application lifecycle methods awaitable
         mock_app.initialize = AsyncMock(return_value=None)
@@ -54,20 +58,17 @@ def mock_application():
         mock_app.updater.start_polling = AsyncMock(return_value=None)
         yield mock_app
 
-@pytest.fixture(autouse=True)
+
+@pytest.fixture
 def mock_llm_client():
     """Mock the LLM client to avoid real API calls during testing."""
-    from unittest.mock import MagicMock, AsyncMock
-    
+    from unittest.mock import AsyncMock, MagicMock
+
     # Create a mock LLM client
     mock_client = MagicMock()
     mock_client.send_prompt = AsyncMock(return_value="Mocked LLM response")
-    mock_client.get_last_usage = MagicMock(return_value={'prompt_tokens': 10, 'completion_tokens': 20, 'total_tokens': 30})
-    
-    # Mock the bot_handler instance in main.py
-    with patch('src.main.bot_handler') as mock_bot_handler:
-        mock_bot_handler.llm_client = mock_client
-        mock_bot_handler.handle_start = AsyncMock()
-        mock_bot_handler.handle_message = AsyncMock()
-        
-        yield mock_client
+    mock_client.get_last_usage = MagicMock(
+        return_value={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
+    )
+
+    return mock_client

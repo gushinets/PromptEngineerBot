@@ -1637,7 +1637,9 @@ class TestBotHandler:
 
         with patch.object(bot_handler, "_handle_method_selection") as mock_handle:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(mock_update, user_id, BTN_CRAFT)
+            mock_handle.assert_called_once_with(
+                mock_update, mock_context, user_id, BTN_CRAFT
+            )
 
     @pytest.mark.asyncio
     async def test_handle_message_routing_fallback_conversation_turn(
@@ -1711,7 +1713,9 @@ class TestBotHandler:
 
         with patch.object(bot_handler, "_handle_method_selection") as mock_method:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_method.assert_called_once_with(mock_update, user_id, BTN_CRAFT)
+            mock_method.assert_called_once_with(
+                mock_update, mock_context, user_id, BTN_CRAFT
+            )
 
         # Transition to follow-up choice
         mock_update.message.text = BTN_YES
