@@ -39,7 +39,7 @@ def temp_db():
         if hasattr(db_manager, "_engine") and db_manager._engine:
             db_manager._engine.dispose()
         if hasattr(db_manager, "_session_factory"):
-            db_manager._session_factory.close_all()
+            db_manager._session_factory.close_all_sessions()
     except Exception:
         pass
 

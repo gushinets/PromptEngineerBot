@@ -15,7 +15,9 @@ A professional Telegram bot that helps users optimize their prompts using differ
 - After introducing new package dependency, add it to the requirements.txt file
 - After adding new files to the project, change Dockerfile and docker-compose.yml to include the new files
 - Implementing new features add logging for important events
-- Don`t use "magic numbers". Move any number to a meaningfull variable and place it appropriately
+- For strings use single quotes instead of douvle quotes
+- DO NOT use "magic numbers". Move any number to a meaningfull variable and place it appropriately
+- DO NOT use deprecated methods
 - Update Readme.md where relevant
 
 ## SECURITY GUIDELINES

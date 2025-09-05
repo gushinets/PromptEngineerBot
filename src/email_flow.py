@@ -1197,16 +1197,10 @@ class EmailFlowOrchestrator:
                 f"optimization_methods_starting | user_id={mask_telegram_id(user_id)}"
             )
 
-            # Run all three optimizations
-            craft_result = await self._run_single_optimization(
-                "CRAFT", craft_transcript, user_id
-            )
-            lyra_result = await self._run_single_optimization(
-                "LYRA", lyra_transcript, user_id
-            )
-            ggl_result = await self._run_single_optimization(
-                "GGL", ggl_transcript, user_id
-            )
+            # Run all three optimizations using individual methods
+            craft_result = await self._run_craft_optimization(improved_prompt)
+            lyra_result = await self._run_lyra_optimization(improved_prompt)
+            ggl_result = await self._run_ggl_optimization(improved_prompt)
 
             # Check if all optimizations succeeded
             if not craft_result or not lyra_result or not ggl_result:
@@ -1325,6 +1319,75 @@ class EmailFlowOrchestrator:
                 exc_info=True,
             )
             return False
+
+    async def _run_craft_optimization(self, prompt: str) -> str:
+        """
+        Run CRAFT optimization method.
+
+        Args:
+            prompt: Prompt to optimize
+
+        Returns:
+            Optimized prompt using CRAFT method
+        """
+        try:
+            craft_system_prompt = self.conversation_manager.prompt_loader.craft_prompt
+            transcript = [
+                {"role": "system", "content": craft_system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+
+            response = await self.llm_client.send_prompt(transcript)
+            return response.strip() if response else ""
+        except Exception as e:
+            logger.error(f"Error in CRAFT optimization: {e}")
+            return ""
+
+    async def _run_lyra_optimization(self, prompt: str) -> str:
+        """
+        Run LYRA optimization method.
+
+        Args:
+            prompt: Prompt to optimize
+
+        Returns:
+            Optimized prompt using LYRA method
+        """
+        try:
+            lyra_system_prompt = self.conversation_manager.prompt_loader.lyra_prompt
+            transcript = [
+                {"role": "system", "content": lyra_system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+
+            response = await self.llm_client.send_prompt(transcript)
+            return response.strip() if response else ""
+        except Exception as e:
+            logger.error(f"Error in LYRA optimization: {e}")
+            return ""
+
+    async def _run_ggl_optimization(self, prompt: str) -> str:
+        """
+        Run GGL optimization method.
+
+        Args:
+            prompt: Prompt to optimize
+
+        Returns:
+            Optimized prompt using GGL method
+        """
+        try:
+            ggl_system_prompt = self.conversation_manager.prompt_loader.ggl_prompt
+            transcript = [
+                {"role": "system", "content": ggl_system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+
+            response = await self.llm_client.send_prompt(transcript)
+            return response.strip() if response else ""
+        except Exception as e:
+            logger.error(f"Error in GGL optimization: {e}")
+            return ""
 
     async def _send_fallback_prompts_to_chat(
         self, update: Update, optimization_results: dict

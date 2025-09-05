@@ -5,7 +5,7 @@ This module tests comprehensive audit event logging, data masking,
 PII protection, and audit event management.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -370,8 +370,10 @@ class TestAuditService:
         audit_service.log_otp_sent(telegram_id, email)
 
         # Test with future date range (should return 0)
-        future_start = datetime.now(datetime.UTC) + timedelta(days=1)
-        future_end = datetime.now(datetime.UTC) + timedelta(days=2)
+        from datetime import timezone
+
+        future_start = datetime.now(timezone.utc) + timedelta(days=1)
+        future_end = datetime.now(timezone.utc) + timedelta(days=2)
 
         counts = audit_service.get_event_counts(future_start, future_end)
 
@@ -389,7 +391,7 @@ class TestAuditService:
                 email=email,
                 event_type="OTP_SENT",
                 success=True,
-                created_at=datetime.now(datetime.UTC) - timedelta(days=100),
+                created_at=datetime.now(timezone.utc) - timedelta(days=100),
             )
             session.add(old_event)
             session.commit()

@@ -26,3 +26,6 @@ pytest-mock>=3.10.0
 httpx>=0.24.0
 respx>=0.20.0
 pytest-timeout>=2.1.0
+
+# Performance monitoring dependencies
+psutil>=5.9.0

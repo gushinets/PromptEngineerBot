@@ -587,9 +587,9 @@ class TestAuthService:
         mock_user = Mock()
 
         # User was already verified before (has email_verified_at timestamp)
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        original_verified_at = datetime.now(datetime.UTC)
+        original_verified_at = datetime.now(timezone.utc)
         mock_user.email_verified_at = original_verified_at
 
         mock_session.query.return_value.filter_by.return_value.first.return_value = (

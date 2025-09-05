@@ -33,7 +33,7 @@ from .background_tasks import (
 )
 from .bot_handler import BotHandler
 from .config import BotConfig
-from .database import init_database
+from .database import init_database_from_config
 from .graceful_degradation import init_degradation_manager
 from .gsheets_logging import build_google_sheets_handler_from_env
 from .health_checks import init_health_monitor
@@ -166,7 +166,7 @@ async def main():
             logger.info("Initializing email feature components...")
 
             # Initialize database
-            init_database(config)
+            init_database_from_config(config)
             logger.info("Database initialized successfully")
 
             # Initialize Redis client
@@ -191,6 +191,12 @@ async def main():
             background_scheduler = init_background_tasks()
             start_background_tasks()
             logger.info("Background tasks started")
+
+            # Initialize email service
+            from .email_service import init_email_service
+
+            init_email_service(config)
+            logger.info("Email service initialized successfully")
 
             # Initialize email flow orchestrator after all services are ready
             from .conversation_manager import ConversationManager

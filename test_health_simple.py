@@ -41,12 +41,12 @@ def test_service_health():
     """Test ServiceHealth creation."""
     print("Testing ServiceHealth...")
 
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     health = ServiceHealth(
         service="smtp",
         status=HealthStatus.HEALTHY,
-        last_check=datetime.now(datetime.UTC),
+        last_check=datetime.now(timezone.utc),
     )
 
     assert health.service == "smtp"
@@ -139,11 +139,11 @@ def test_health_summary():
     """Test health summary generation."""
     print("Testing health summary...")
 
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     monitor = HealthMonitor()
 
-    now = datetime.now(datetime.UTC)
+    now = datetime.now(timezone.utc)
 
     # Add service health data
     monitor._service_health["database"] = ServiceHealth(
