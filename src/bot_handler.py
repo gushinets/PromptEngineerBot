@@ -17,6 +17,7 @@ from tenacity import (
 
 from .config import BotConfig
 from .conversation_manager import ConversationManager
+from .dependencies import get_container
 from .email_flow import get_email_flow_orchestrator
 from .llm_client_base import LLMClientBase
 from .messages import (
@@ -107,11 +108,12 @@ class BotHandler:
     ):
         self.config = config
         self.llm_client = llm_client
-        self.state_manager = StateManager()
-        self.prompt_loader = PromptLoader()
-        self.conversation_manager = ConversationManager(
-            self.prompt_loader, self.state_manager
-        )
+
+        # Get shared instances from dependency container
+        container = get_container()
+        self.state_manager = container.get_state_manager()
+        self.prompt_loader = container.get_prompt_loader()
+        self.conversation_manager = container.get_conversation_manager()
         self.log_sheets = sheets_logger_func or (lambda event, payload: None)
 
         # Initialize email flow orchestrator if available

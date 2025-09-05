@@ -16,6 +16,7 @@ from .auth_service import get_auth_service
 from .config import BotConfig
 from .conversation_manager import ConversationManager
 from .database import mask_email, mask_telegram_id
+from .dependencies import get_container
 from .email_service import get_email_service
 from .graceful_degradation import (
     check_email_flow_readiness,
@@ -1536,8 +1537,6 @@ email_flow_orchestrator: Optional[EmailFlowOrchestrator] = None
 def init_email_flow_orchestrator(
     config: BotConfig,
     llm_client: LLMClientBase,
-    conversation_manager: ConversationManager,
-    state_manager: StateManager,
 ) -> EmailFlowOrchestrator:
     """
     Initialize global email flow orchestrator.
@@ -1545,13 +1544,17 @@ def init_email_flow_orchestrator(
     Args:
         config: Bot configuration
         llm_client: LLM client for optimization
-        conversation_manager: Conversation manager for follow-up questions
-        state_manager: State manager for user states
 
     Returns:
         EmailFlowOrchestrator instance
     """
     global email_flow_orchestrator
+
+    # Get shared instances from dependency container
+    container = get_container()
+    conversation_manager = container.get_conversation_manager()
+    state_manager = container.get_state_manager()
+
     email_flow_orchestrator = EmailFlowOrchestrator(
         config, llm_client, conversation_manager, state_manager
     )

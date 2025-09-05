@@ -207,12 +207,10 @@ async def main():
             # Initialize email flow orchestrator after all services are ready
             from .email_flow import init_email_flow_orchestrator
 
-            # Initialize email flow orchestrator using bot handler's managers
+            # Initialize email flow orchestrator using shared dependencies
             orchestrator = init_email_flow_orchestrator(
                 config,
                 llm_client,
-                bot_handler.conversation_manager,
-                bot_handler.state_manager,
             )
 
             # Set the orchestrator on the bot handler

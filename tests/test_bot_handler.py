@@ -16,6 +16,7 @@ from src.messages import (
     BTN_RESET,
     BTN_YES,
 )
+from tests.test_utils import create_mock_config, create_mock_llm_client
 
 
 class TestBotHandler:
@@ -24,24 +25,16 @@ class TestBotHandler:
     @pytest.fixture
     def mock_config(self):
         """Create a mock configuration."""
-        config = MagicMock(spec=BotConfig)
+        config = create_mock_config()
         config.bot_id = "test_bot"
         config.llm_backend = "TEST"
-        config.model_name = "test-model"
         return config
 
     @pytest.fixture
     def mock_llm_client(self):
         """Create a mock LLM client."""
-        client = MagicMock()
+        client = create_mock_llm_client()
         client.send_prompt = AsyncMock(return_value="Mocked LLM response")
-        client.get_last_usage = MagicMock(
-            return_value={
-                "prompt_tokens": 10,
-                "completion_tokens": 20,
-                "total_tokens": 30,
-            }
-        )
         return client
 
     @pytest.fixture
