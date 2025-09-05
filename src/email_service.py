@@ -267,6 +267,8 @@ class EmailService:
     async def _get_smtp_connection(self) -> AsyncGenerator[smtplib.SMTP, None]:
         """Get SMTP connection with connection pooling."""
         connection_key = f"{self.config.smtp_host}:{self.config.smtp_port}"
+        smtp = None
+        reusing_connection = False
 
         async with self._pool_lock:
             # Try to reuse existing connection
@@ -276,16 +278,17 @@ class EmailService:
                     # Test connection
                     smtp.noop()
                     logger.debug("SMTP_POOL: Reusing existing connection")
-                    yield smtp
-                    return
+                    reusing_connection = True
                 except Exception:
                     # Connection is stale, remove from pool
                     logger.debug("SMTP_POOL: Removing stale connection")
                     del self._connection_pool[connection_key]
+                    smtp = None
 
-            # Create new connection
-            smtp = await self._create_smtp_connection()
-            self._connection_pool[connection_key] = smtp
+            # Create new connection if needed
+            if smtp is None:
+                smtp = await self._create_smtp_connection()
+                self._connection_pool[connection_key] = smtp
 
         try:
             yield smtp

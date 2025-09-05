@@ -179,6 +179,12 @@ async def main():
             init_auth_service(config)
             logger.info("Auth service initialized successfully")
 
+            # Initialize audit service
+            from .audit_service import init_audit_service
+
+            init_audit_service()
+            logger.info("Audit service initialized successfully")
+
             # Initialize health monitoring
             health_monitor = init_health_monitor(config)
             logger.info("Health monitor initialized successfully")
@@ -199,17 +205,14 @@ async def main():
             logger.info("Email service initialized successfully")
 
             # Initialize email flow orchestrator after all services are ready
-            from .conversation_manager import ConversationManager
             from .email_flow import init_email_flow_orchestrator
-            from .state_manager import StateManager
 
-            # Create required managers for email flow
-            conversation_manager = ConversationManager(config, llm_client)
-            state_manager = StateManager()
-
-            # Initialize email flow orchestrator
+            # Initialize email flow orchestrator using bot handler's managers
             orchestrator = init_email_flow_orchestrator(
-                config, llm_client, conversation_manager, state_manager
+                config,
+                llm_client,
+                bot_handler.conversation_manager,
+                bot_handler.state_manager,
             )
 
             # Set the orchestrator on the bot handler

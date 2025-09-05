@@ -21,12 +21,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Create initial schema with unique constraints."""
-    # Create users table
+    # Create users table with inline unique constraints for SQLite compatibility
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("telegram_id", sa.BigInteger(), nullable=False),
-        sa.Column("email", sa.Text(), nullable=False),
+        sa.Column("telegram_id", sa.BigInteger(), nullable=False, unique=True),
+        sa.Column("email", sa.Text(), nullable=False, unique=True),
         sa.Column("email_original", sa.Text(), nullable=True),
         sa.Column("is_authenticated", sa.Boolean(), nullable=True),
         sa.Column("email_verified_at", sa.DateTime(timezone=True), nullable=True),
@@ -35,10 +35,6 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-
-    # Create unique constraints
-    op.create_unique_constraint("uq_users_telegram_id", "users", ["telegram_id"])
-    op.create_unique_constraint("uq_users_email", "users", ["email"])
 
     # Create indexes for performance
     op.create_index("ix_users_telegram_id", "users", ["telegram_id"], unique=False)
@@ -99,9 +95,5 @@ def downgrade() -> None:
     op.drop_index("ix_users_email", table_name="users")
     op.drop_index("ix_users_telegram_id", table_name="users")
 
-    # Drop unique constraints
-    op.drop_constraint("uq_users_email", "users", type_="unique")
-    op.drop_constraint("uq_users_telegram_id", "users", type_="unique")
-
-    # Drop users table
+    # Drop users table (unique constraints are dropped automatically)
     op.drop_table("users")

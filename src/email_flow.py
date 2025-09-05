@@ -124,7 +124,7 @@ class EmailFlowOrchestrator:
                 return False
 
             # Check service prerequisites using graceful degradation
-            can_proceed, error_message = await check_email_flow_readiness(user_id)
+            can_proceed, error_message = check_email_flow_readiness("RU")
             if not can_proceed:
                 await self._safe_reply(
                     update,
@@ -440,17 +440,15 @@ class EmailFlowOrchestrator:
             # Check service health using graceful degradation
             try:
                 degradation_manager = get_degradation_manager()
-                smtp_status = await degradation_manager.check_service_availability(
-                    "smtp"
+                from .graceful_degradation import ServiceType
+
+                smtp_available = degradation_manager.is_service_available(
+                    ServiceType.SMTP
                 )
 
-                from .graceful_degradation import ServiceStatus
-
-                if smtp_status != ServiceStatus.AVAILABLE:
+                if not smtp_available:
                     # SMTP unhealthy, get appropriate user message
-                    user_message = degradation_manager.get_user_message(
-                        "smtp_unavailable"
-                    )
+                    user_message = degradation_manager.get_user_message("RU")
                     await self._safe_reply(
                         update,
                         user_message,
@@ -459,7 +457,7 @@ class EmailFlowOrchestrator:
                         ),
                     )
                     logger.warning(
-                        f"email_delivery_fallback_smtp_unhealthy | user_id={mask_telegram_id(user_id)} | status={smtp_status.value}"
+                        f"email_delivery_fallback_smtp_unhealthy | user_id={mask_telegram_id(user_id)} | smtp_available={smtp_available}"
                     )
 
                     # Implement chat-only delivery of 3 optimized prompts
