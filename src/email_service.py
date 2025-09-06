@@ -485,11 +485,11 @@ class EmailService:
         self,
         to_email: str,
         original_prompt: str,
-        improved_prompt: str,
         craft_result: str,
         lyra_result: str,
         ggl_result: str,
         telegram_id: int,
+        improved_prompt: str = None,
     ) -> EmailDeliveryResult:
         """
         Send optimized prompts email with all three optimization results and idempotency protection.
@@ -497,11 +497,11 @@ class EmailService:
         Args:
             to_email: Recipient email address
             original_prompt: User's original prompt
-            improved_prompt: Improved prompt from follow-up questions
             craft_result: CRAFT optimization result
             lyra_result: LYRA optimization result
             ggl_result: GGL optimization result
             telegram_id: User's telegram ID for audit logging
+            improved_prompt: Improved prompt from follow-up questions (optional)
 
         Returns:
             EmailDeliveryResult with delivery status
@@ -512,26 +512,16 @@ class EmailService:
             )
 
             # Generate email content using templates
-            subject = self.templates.get_optimization_subject()
-            html_body = self.templates.get_optimization_html_body(
+            subject, html_body, plain_body = self.templates.compose_optimization_email(
                 original_prompt=original_prompt,
-                improved_prompt=improved_prompt,
                 craft_result=craft_result,
                 lyra_result=lyra_result,
                 ggl_result=ggl_result,
-            )
-            plain_body = self.templates.get_optimization_plain_body(
-                original_prompt=original_prompt,
                 improved_prompt=improved_prompt,
-                craft_result=craft_result,
-                lyra_result=lyra_result,
-                ggl_result=ggl_result,
             )
 
             # Check idempotency (prevent duplicate optimization emails)
-            content_preview = (
-                f"OPTIMIZATION:{original_prompt[:50]}:{improved_prompt[:50]}"
-            )
+            content_preview = f"OPTIMIZATION:{original_prompt[:50]}:{improved_prompt[:50] if improved_prompt else 'direct'}"
             email_hash = self._generate_email_hash(to_email, subject, content_preview)
             if await self._is_email_already_sent(email_hash):
                 logger.info(

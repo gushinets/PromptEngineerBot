@@ -175,9 +175,15 @@ class BotHandler:
         # Handle email input waiting state
         if user_state.waiting_for_email_input:
             if self.email_flow_orchestrator:
-                await self.email_flow_orchestrator.handle_email_input(
-                    update, context, user_id, text
-                )
+                try:
+                    await self.email_flow_orchestrator.handle_email_input(
+                        update, context, user_id, text
+                    )
+                except Exception as e:
+                    logger.error(f"Email input handling error for user {user_id}: {e}")
+                    await self._safe_reply(
+                        update, "❌ Email input error. Please try again later."
+                    )
             else:
                 await self._safe_reply(
                     update, "❌ Email service not available. Please try again later."
@@ -187,9 +193,15 @@ class BotHandler:
         # Handle OTP input waiting state
         if user_state.waiting_for_otp_input:
             if self.email_flow_orchestrator:
-                await self.email_flow_orchestrator.handle_otp_input(
-                    update, context, user_id, text
-                )
+                try:
+                    await self.email_flow_orchestrator.handle_otp_input(
+                        update, context, user_id, text
+                    )
+                except Exception as e:
+                    logger.error(f"OTP input handling error for user {user_id}: {e}")
+                    await self._safe_reply(
+                        update, "❌ OTP verification error. Please try again later."
+                    )
             else:
                 await self._safe_reply(
                     update, "❌ Email service not available. Please try again later."
@@ -296,26 +308,41 @@ class BotHandler:
                     if not health_monitor.is_service_healthy("redis"):
                         await self._safe_reply(
                             update,
-                            "📧 Email service temporarily unavailable. Please try again later.",
+                            ERROR_REDIS_UNAVAILABLE,
                             reply_markup=ReplyKeyboardMarkup(
                                 [[BTN_RESET]], resize_keyboard=True
                             ),
                         )
+                        logger.warning(
+                            f"email_flow_blocked_redis_unhealthy | user_id={user_id}"
+                        )
                         return
 
-                    # Check if SMTP is healthy, fallback to chat if not
+                    # Check if SMTP is healthy - warn but allow to proceed with chat fallback
                     if not health_monitor.is_service_healthy("smtp"):
+                        logger.warning(
+                            f"email_flow_smtp_unhealthy_proceeding_with_fallback | user_id={user_id}"
+                        )
                         # SMTP unhealthy, but we can still proceed with chat fallback
                         # The email flow orchestrator will handle the fallback
                         pass
 
-                except Exception:
-                    # Health monitor not available, proceed anyway
+                except Exception as e:
+                    # Health monitor not available, log warning but proceed
+                    logger.warning(
+                        f"health_monitor_unavailable_proceeding | user_id={user_id} | error={e}"
+                    )
                     pass
 
-                await self.email_flow_orchestrator.start_email_flow(
-                    update, context, user_id
-                )
+                try:
+                    await self.email_flow_orchestrator.start_email_flow(
+                        update, context, user_id
+                    )
+                except Exception as e:
+                    logger.error(f"Email flow error for user {user_id}: {e}")
+                    await self._safe_reply(
+                        update, "❌ Email service error. Please try again later."
+                    )
             else:
                 await self._safe_reply(
                     update, "❌ Email service not available. Please try again later."

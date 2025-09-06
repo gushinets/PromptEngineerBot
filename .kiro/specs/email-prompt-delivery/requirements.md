@@ -46,16 +46,16 @@ This feature introduces email-based authentication and prompt delivery functiona
 
 ### Requirement 4
 
-**User Story:** As a user, I want my initial prompt to be improved through follow-up questions before optimization, so that the final optimized prompts are based on the most detailed and refined version of my request.
+**User Story:** As a user, I want my original prompt to be sent directly to optimization methods without follow-up questions, so that I can quickly receive optimized versions without additional refinement steps.
 
 #### Acceptance Criteria
 
-1. WHEN user completes email verification and authentication THEN system SHALL initiate the existing follow-up questions system to gather more details about the user's prompt
-2. WHEN follow-up conversation starts THEN system SHALL reuse the existing follow-up questions implementation from the current bot features
-3. WHEN user provides answers to follow-up questions THEN system SHALL continue the conversation until sufficient detail is gathered or user chooses to generate the prompt
-4. WHEN follow-up conversation is complete THEN system SHALL generate an improved version of the original prompt incorporating all gathered details
-5. WHEN improved prompt is generated THEN system SHALL use this refined prompt as input for all three optimization methods (CRAFT, LYRA, GGL)
-6. IF follow-up process fails or times out THEN system SHALL fall back to using the original prompt for optimization
+1. WHEN user completes email verification and authentication THEN system SHALL skip the follow-up questions system and proceed directly to prompt optimization
+2. WHEN system begins optimization THEN system SHALL use the original user prompt as input for all three optimization methods (CRAFT, LYRA, GGL)
+3. WHEN sending prompts to LLM for optimization THEN system SHALL take the current system prompt for each method and append the following message exactly: "### ВАЖНО\nНи в коем случае не задавай ни одного уточняющего вопроса. Твоя задача улучшить промпт пользователя по имеющимся данным. Твой ответ должен содержать только улучшенный промпт и ничего больше"
+4. WHEN optimization methods are executed THEN each method SHALL receive the modified system prompt with the appended instruction
+5. WHEN optimization is complete THEN system SHALL proceed directly to email delivery with the three optimized results
+6. WHEN system processes the original prompt THEN system SHALL NOT initiate any follow-up questions or prompt refinement processes
 
 ### Requirement 5
 
@@ -64,9 +64,10 @@ This feature introduces email-based authentication and prompt delivery functiona
 #### Acceptance Criteria
 
 1. WHEN email sending succeeds THEN system SHALL notify success in chat.
-2. WHEN email sending fails THEN system SHALL post **only the three optimized prompts** in chat as fallback (the improved prompt is **not** shown in chat).
+2. WHEN email sending fails THEN system SHALL post only an error message in chat and SHALL NOT share any optimized prompts.
 3. WHEN email contains code blocks or technical content THEN email SHALL preserve formatting using appropriate HTML tags (e.g., `<pre><code>`).
-4. WHEN email is sent THEN email SHALL include both the original prompt and the follow-up improved prompt for user reference, as well as all three optimized prompts (CRAFT, LYRA, GGL).
+4. WHEN email is sent THEN email SHALL include the original prompt for user reference, as well as all three optimized prompts (CRAFT, LYRA, GGL).
+5. WHEN email is composed THEN email SHALL NOT include any follow-up improved prompt since no follow-up questions are asked.
 
 ### Requirement 6
 
@@ -96,7 +97,7 @@ This feature introduces email-based authentication and prompt delivery functiona
 4. WHEN email is formatted THEN email SHALL use proper HTML formatting for readability
 5. WHEN email is sent THEN email SHALL include a professional signature identifying the Prompt Engineering Bot
 6. WHEN email contains code blocks or technical content THEN email SHALL preserve formatting using appropriate HTML tags
-7. WHEN email is sent THEN email SHALL include both the original prompt and the follow-up improved prompt for user reference
+7. WHEN email is sent THEN email SHALL include only the original prompt for user reference (no follow-up improved prompt)
 
 ### Requirement 8
 

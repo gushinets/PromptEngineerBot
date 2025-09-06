@@ -77,13 +77,13 @@ graph TB
     subgraph "Existing Features"
         CM[conversation_manager.py]
         SM[state_manager.py]
-        FQ[Follow-up Questions<br/>Existing System]
+        OPT[Optimization Methods<br/>CRAFT, LYRA, GGL]
     end
     
     BH --> EF
     EF --> AS
     EF --> ES
-    EF --> FQ
+    EF --> OPT
     AS --> RC
     ES --> ET
     ES --> SMTP
@@ -103,7 +103,7 @@ graph TB
 
 1. **User Input** → Bot Handler → Auth Service
 2. **OTP Generation** → Redis Storage → Email Service
-3. **Verification** → Database Update → Follow-up Questions
+3. **Verification** → Database Update → Direct Optimization
 4. **Optimization** → Email Delivery → Audit Logging
 
 ## Components and Interfaces
@@ -170,7 +170,8 @@ graph TB
 
 #### File: `src/email_flow.py` (New)
 - Main email delivery workflow orchestration
-- Integration with existing follow-up questions system
+- Direct integration with optimization methods (CRAFT, LYRA, GGL)
+- System prompt modification for optimization methods
 - Coordination between auth, email, and optimization services
 - Error handling and fallback logic
 
@@ -275,9 +276,34 @@ flow:<tg_id> → JSON state (TTL 86400s)  # awaiting_email, awaiting_otp, send_i
 // Awaiting OTP verification  
 {"state": "awaiting_otp", "email": "user@example.com", "original_prompt": "..."}
 
+// Optimization in progress
+{"state": "optimizing", "email": "user@example.com", "original_prompt": "..."}
+
 // Email sending in progress
-{"state": "send_in_progress", "email": "user@example.com", "prompts": {...}}
+{"state": "send_in_progress", "email": "user@example.com", "optimized_prompts": {...}}
 ```
+
+## Optimization Method Integration
+
+### System Prompt Modification
+
+When sending prompts to LLM optimization methods (CRAFT, LYRA, GGL), the system must modify the system prompt to prevent follow-up questions:
+
+**Implementation Pattern:**
+```python
+# For each optimization method
+original_system_prompt = get_method_system_prompt(method_name)
+modified_system_prompt = original_system_prompt + "\n\n### ВАЖНО\nНи в коем случае не задавай ни одного уточняющего вопроса. Твоя задача улучшить промпт пользователя по имеющимся данным. Твой ответ должен содержать только улучшенный промпт и ничего больше"
+
+# Send to LLM with modified system prompt
+optimized_result = call_llm_method(method_name, user_prompt, modified_system_prompt)
+```
+
+**Key Requirements:**
+- The Russian instruction must be appended exactly as specified
+- Each method (CRAFT, LYRA, GGL) receives the same instruction
+- The modification happens at runtime, not in stored prompts
+- Original system prompts remain unchanged for other use cases
 
 ## Error Handling
 
@@ -299,11 +325,16 @@ flow:<tg_id> → JSON state (TTL 86400s)  # awaiting_email, awaiting_otp, send_i
 
 1. **SMTP Connection Failures**
    - Retry logic with exponential backoff
-   - Fallback to chat delivery
+   - Error message notification in chat (no prompt sharing)
 
 2. **Email Formatting Errors**
    - HTML sanitization
-   - Fallback to plain text
+   - Error message notification in chat (no prompt sharing)
+
+3. **Email Failure Handling**
+   - On any email delivery failure, only show error message in chat
+   - Do not share optimized prompts in chat as fallback
+   - Log failure details for debugging and monitoring
 
 ### Database Errors
 
@@ -418,9 +449,9 @@ class TestEmailService:
         - Test proper logging of duplicate attempts
         """
         
-    async def test_email_failure_strict_fallback():
-        """Test strict fallback when email delivery fails:
-        - Test ONLY 3 optimized prompts sent to chat (no improved prompt)
+    async def test_email_failure_error_only():
+        """Test error-only handling when email delivery fails:
+        - Test only error message sent to chat (no optimized prompts)
         - Test proper error logging and user notification
         - Test no retry attempts for failed email delivery
         """
@@ -530,7 +561,7 @@ class TestHealthChecks:
 ```python
 class TestEmailFlowIntegration:
     async def test_complete_email_auth_flow():
-        """Test complete flow: button → email → OTP → verification → follow-up → optimization → email delivery."""
+        """Test complete flow: button → email → OTP → verification → optimization → email delivery."""
         
     async def test_email_auth_with_existing_user():
         """Test flow for already authenticated user."""
@@ -538,22 +569,18 @@ class TestEmailFlowIntegration:
     async def test_email_auth_rate_limiting():
         """Test rate limiting integration across services."""
         
-    async def test_email_delivery_fallback():
-        """Test fallback to chat when email fails."""
+    async def test_email_delivery_failure_handling():
+        """Test error message display when email fails (no prompt sharing)."""
         
-    async def test_follow_up_integration():
-        """Test integration with existing follow-up questions system."""
-        
-    async def test_follow_up_timeout_handling():
-        """Test follow-up timeout proceeds with best-effort improved prompt:
-        - Test timeout after reasonable wait period
-        - Test system proceeds with best available improved prompt
-        - Test graceful degradation without user-facing errors
-        - Test proper logging of timeout scenario
+    async def test_system_prompt_modification():
+        """Test system prompt modification for optimization methods:
+        - Test Russian instruction appended to each method's system prompt
+        - Test original system prompts remain unchanged
+        - Test all three methods receive modified prompts
         """
         
     async def test_optimization_integration():
-        """Test integration with CRAFT/LYRA/GGL optimization."""
+        """Test integration with CRAFT/LYRA/GGL optimization with modified system prompts."""
 ```
 
 #### File: `tests/test_bot_handler_integration.py` (Extended)
@@ -824,10 +851,9 @@ logger.info(f"EMAIL_COMPOSE: Optimized prompts email prepared for {mask_email(em
 logger.info(f"EMAIL_SEND_SUCCESS: Email delivered to {mask_email(email)}")
 logger.error(f"EMAIL_SEND_FAILED: Email delivery failed for {mask_email(email)} - {error_type}")
 
-# Follow-up Integration
-logger.info(f"FOLLOWUP_START: Follow-up questions initiated for {mask_telegram_id(tg_id)}")
-logger.info(f"FOLLOWUP_COMPLETE: Improved prompt generated for {mask_telegram_id(tg_id)}")
+# Direct Optimization
 logger.info(f"OPTIMIZATION_START: Running 3 methods for {mask_telegram_id(tg_id)}")
+logger.info(f"SYSTEM_PROMPT_MODIFIED: Added Russian instruction to {method_name} for {mask_telegram_id(tg_id)}")
 logger.info(f"OPTIMIZATION_COMPLETE: All methods completed for {mask_telegram_id(tg_id)}")
 
 # Error Scenarios

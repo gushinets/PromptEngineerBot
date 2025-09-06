@@ -146,6 +146,16 @@ ERROR_EMAIL_SEND_FAILED = _(
     "❌ Failed to send verification code. Please try again later or check your email address.",
 )
 
+EMAIL_OPTIMIZATION_SUCCESS = _(
+    "✅ Оптимизированные промпты отправлены на {email}!",
+    "✅ Optimized prompts sent to {email}!",
+)
+
+ERROR_EMAIL_OPTIMIZATION_FAILED = _(
+    "❌ Не удалось отправить оптимизированные промпты на email. Попробуйте позже.",
+    "❌ Failed to send optimized prompts to email. Please try again later.",
+)
+
 ERROR_OTP_INVALID = _(
     "❌ Неверный код. Попробуйте еще раз (осталось попыток: {attempts}):",
     "❌ Invalid code. Please try again (attempts remaining: {attempts}):",

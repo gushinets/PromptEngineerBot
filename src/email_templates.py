@@ -297,20 +297,20 @@ class EmailTemplates:
     def get_optimization_html_body(
         self,
         original_prompt: str,
-        improved_prompt: str,
         craft_result: str,
         lyra_result: str,
         ggl_result: str,
+        improved_prompt: str = None,
     ) -> str:
         """
         Get optimized prompts email HTML body.
 
         Args:
             original_prompt: User's original prompt
-            improved_prompt: Improved prompt from follow-up questions
             craft_result: CRAFT optimization result
             lyra_result: LYRA optimization result
             ggl_result: GGL optimization result
+            improved_prompt: Improved prompt from follow-up questions (optional)
 
         Returns:
             HTML formatted email body
@@ -484,10 +484,14 @@ class EmailTemplates:
             <div class="prompt-content">{self._escape_html(original_prompt)}</div>
         </div>
         
-        <div class="prompt-section improved-prompt">
+        {
+            f'''<div class="prompt-section improved-prompt">
             <div class="prompt-label">{improved_label}</div>
             <div class="prompt-content">{self._escape_html(improved_prompt)}</div>
-        </div>
+        </div>'''
+            if improved_prompt
+            else ""
+        }
         
         <div class="prompt-section craft-prompt">
             <div class="prompt-label">{craft_label}</div>
@@ -520,20 +524,20 @@ class EmailTemplates:
     def get_optimization_plain_body(
         self,
         original_prompt: str,
-        improved_prompt: str,
         craft_result: str,
         lyra_result: str,
         ggl_result: str,
+        improved_prompt: str = None,
     ) -> str:
         """
         Get optimized prompts email plain text body.
 
         Args:
             original_prompt: User's original prompt
-            improved_prompt: Improved prompt from follow-up questions
             craft_result: CRAFT optimization result
             lyra_result: LYRA optimization result
             ggl_result: GGL optimization result
+            improved_prompt: Improved prompt from follow-up questions (optional)
 
         Returns:
             Plain text formatted email body
@@ -610,10 +614,16 @@ class EmailTemplates:
 {"=" * 50}
 {self._format_plain_code_block(original_prompt)}
 
-{"=" * 50}
+{
+            f'''{"=" * 50}
 {improved_label}
 {"=" * 50}
 {self._format_plain_code_block(improved_prompt)}
+
+'''
+            if improved_prompt
+            else ""
+        }
 
 {"=" * 50}
 {craft_label}
@@ -636,3 +646,34 @@ class EmailTemplates:
 
 {signature}
 """
+
+    def compose_optimization_email(
+        self,
+        original_prompt: str,
+        craft_result: str,
+        lyra_result: str,
+        ggl_result: str,
+        improved_prompt: str = None,
+    ) -> tuple[str, str, str]:
+        """
+        Compose comprehensive optimization email with all three methods.
+
+        Args:
+            original_prompt: User's original prompt
+            craft_result: CRAFT optimization result
+            lyra_result: LYRA optimization result
+            ggl_result: GGL optimization result
+            improved_prompt: Improved prompt from follow-up questions (optional)
+
+        Returns:
+            Tuple of (subject, html_body, plain_body)
+        """
+        subject = self.get_optimization_subject()
+        html_body = self.get_optimization_html_body(
+            original_prompt, craft_result, lyra_result, ggl_result, improved_prompt
+        )
+        plain_body = self.get_optimization_plain_body(
+            original_prompt, craft_result, lyra_result, ggl_result, improved_prompt
+        )
+
+        return subject, html_body, plain_body

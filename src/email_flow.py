@@ -31,8 +31,10 @@ from .messages import (
     BTN_YES,
     EMAIL_ALREADY_AUTHENTICATED,
     EMAIL_INPUT_MESSAGE,
+    EMAIL_OPTIMIZATION_SUCCESS,
     EMAIL_OTP_SENT,
     ERROR_EMAIL_INVALID,
+    ERROR_EMAIL_OPTIMIZATION_FAILED,
     ERROR_EMAIL_RATE_LIMITED,
     ERROR_EMAIL_SEND_FAILED,
     ERROR_OTP_ATTEMPTS_EXCEEDED,
@@ -427,7 +429,8 @@ class EmailFlowOrchestrator:
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int
     ) -> bool:
         """
-        Proceed to follow-up questions and email delivery for authenticated users.
+        Proceed directly to optimization and email delivery for authenticated users.
+        Skip follow-up questions as per requirements 4.1, 4.2.
 
         Args:
             update: Telegram update object
@@ -438,6 +441,35 @@ class EmailFlowOrchestrator:
             True if proceeded successfully, False otherwise
         """
         try:
+            # Get original prompt from email flow data
+            email_flow_data = self.state_manager.get_email_flow_data(user_id)
+            if not email_flow_data:
+                logger.error(
+                    f"No email flow data found for user {mask_telegram_id(user_id)}"
+                )
+                await self._safe_reply(
+                    update,
+                    "❌ Не удалось найти данные потока. Попробуйте начать заново.",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+                return False
+
+            original_prompt = email_flow_data.get("original_prompt")
+            if not original_prompt:
+                logger.error(
+                    f"No original prompt found in email flow data for user {mask_telegram_id(user_id)}"
+                )
+                await self._safe_reply(
+                    update,
+                    "❌ Не удалось найти исходный промпт. Попробуйте начать заново.",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+                return False
+
             # Check service health using graceful degradation
             try:
                 degradation_manager = get_degradation_manager()
@@ -448,21 +480,19 @@ class EmailFlowOrchestrator:
                 )
 
                 if not smtp_available:
-                    # SMTP unhealthy, get appropriate user message
+                    # SMTP unhealthy, show error message and don't share prompts
                     user_message = degradation_manager.get_user_message("RU")
                     await self._safe_reply(
                         update,
-                        user_message,
+                        user_message or ERROR_SMTP_UNAVAILABLE,
                         reply_markup=ReplyKeyboardMarkup(
                             [[BTN_RESET]], resize_keyboard=True
                         ),
                     )
                     logger.warning(
-                        f"email_delivery_fallback_smtp_unhealthy | user_id={mask_telegram_id(user_id)} | smtp_available={smtp_available}"
+                        f"email_delivery_blocked_smtp_unhealthy | user_id={mask_telegram_id(user_id)} | smtp_available={smtp_available}"
                     )
-
-                    # Implement chat-only delivery of 3 optimized prompts
-                    return await self._deliver_prompts_to_chat(update, context, user_id)
+                    return False
 
             except RuntimeError:
                 # Degradation manager not initialized, fall back to direct health check
@@ -475,21 +505,23 @@ class EmailFlowOrchestrator:
                         ),
                     )
                     logger.warning(
-                        f"email_delivery_fallback_smtp_unhealthy_direct | user_id={mask_telegram_id(user_id)}"
+                        f"email_delivery_blocked_smtp_unhealthy_direct | user_id={mask_telegram_id(user_id)}"
                     )
-                    return await self._deliver_prompts_to_chat(update, context, user_id)
+                    return False
 
-            # Start follow-up questions integration
-            return await self._start_followup_questions(update, context, user_id)
+            # Proceed directly to optimization and email delivery (skip follow-up questions)
+            return await self._run_direct_optimization_and_email_delivery(
+                update, context, user_id, original_prompt
+            )
 
         except Exception as e:
             logger.error(
-                f"Error proceeding to follow-up and delivery for user {mask_telegram_id(user_id)}: {e}",
+                f"Error proceeding to optimization and delivery for user {mask_telegram_id(user_id)}: {e}",
                 exc_info=True,
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при переходе к улучшению промпта. Попробуйте позже.",
+                "❌ Произошла ошибка при переходе к оптимизации промпта. Попробуйте позже.",
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             return False
@@ -758,7 +790,254 @@ class EmailFlowOrchestrator:
                 f"Error handling follow-up conversation for user {mask_telegram_id(user_id)}: {e}",
                 exc_info=True,
             )
-            return await self._handle_followup_error(update, context, user_id, e)
+            return False
+
+    async def _run_direct_optimization_and_email_delivery(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        user_id: int,
+        original_prompt: str,
+    ) -> bool:
+        """
+        Run direct optimization workflow without follow-up questions and deliver via email.
+        Implements requirements 4.1, 4.2, 4.3, 4.4, 4.5.
+
+        Args:
+            update: Telegram update object
+            context: Telegram context
+            user_id: User's Telegram ID
+            original_prompt: The original user prompt
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            logger.info(
+                f"direct_optimization_started | user_id={mask_telegram_id(user_id)}"
+            )
+
+            # Send processing message to user
+            await self._safe_reply(
+                update,
+                "🔄 Оптимизируем ваш промпт тремя методами и отправляем на email...",
+                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
+            )
+
+            # Run all three optimization methods with modified system prompts
+            optimization_results = (
+                await self._run_all_optimizations_with_modified_prompts(
+                    original_prompt, user_id
+                )
+            )
+
+            if not optimization_results:
+                logger.error(
+                    f"Failed to get optimization results for user {mask_telegram_id(user_id)}"
+                )
+                await self._safe_reply(
+                    update,
+                    "❌ Не удалось оптимизировать промпт. Попробуйте позже.",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+                return False
+
+            # Get user email from flow data
+            email_flow_data = self.state_manager.get_email_flow_data(user_id)
+            user_email = email_flow_data.get("email")
+            if not user_email:
+                logger.error(
+                    f"No email found in flow data for user {mask_telegram_id(user_id)}"
+                )
+                await self._safe_reply(
+                    update,
+                    "❌ Не удалось найти email адрес. Попробуйте начать заново.",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+                return False
+
+            # Send optimization results via email (no improved prompt for direct flow)
+            email_result = await self.email_service.send_optimized_prompts_email(
+                to_email=user_email,
+                original_prompt=original_prompt,
+                craft_result=optimization_results["CRAFT"],
+                lyra_result=optimization_results["LYRA"],
+                ggl_result=optimization_results["GGL"],
+                telegram_id=user_id,
+                improved_prompt=None,  # No improved prompt for direct optimization flow
+            )
+
+            if email_result.success:
+                # Email sent successfully
+                await self._safe_reply(
+                    update,
+                    EMAIL_OPTIMIZATION_SUCCESS.format(email=mask_email(user_email)),
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+                logger.info(
+                    f"email_delivery_success | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
+                )
+
+                # Reset user state
+                self._reset_user_state(user_id)
+                return True
+            else:
+                # Email delivery failed - show error message only (no prompt sharing)
+                logger.error(
+                    f"Email delivery failed for user {mask_telegram_id(user_id)}: {email_result.error}"
+                )
+                await self._safe_reply(
+                    update,
+                    ERROR_EMAIL_OPTIMIZATION_FAILED,
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
+                )
+
+                # Reset user state
+                self._reset_user_state(user_id)
+                return False
+
+        except Exception as e:
+            logger.error(
+                f"Error in direct optimization and email delivery for user {mask_telegram_id(user_id)}: {e}",
+                exc_info=True,
+            )
+            await self._safe_reply(
+                update,
+                "❌ Произошла ошибка при оптимизации и отправке email. Попробуйте позже.",
+                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
+            )
+            return False
+
+    async def _run_all_optimizations_with_modified_prompts(
+        self, original_prompt: str, user_id: int
+    ) -> Optional[dict]:
+        """
+        Run all three optimization methods (CRAFT, LYRA, GGL) with modified system prompts.
+        Implements requirements 4.3, 4.4.
+
+        Args:
+            original_prompt: The original user prompt
+            user_id: User's Telegram ID
+
+        Returns:
+            Dictionary with optimization results or None if failed
+        """
+        try:
+            # Get prompt loader from dependencies
+            container = get_container()
+            prompt_loader = container.get_prompt_loader()
+
+            # Russian instruction to append to system prompts (requirement 4.3)
+            no_followup_instruction = (
+                "\n\n### ВАЖНО\n"
+                "Ни в коем случае не задавай ни одного уточняющего вопроса. "
+                "Твоя задача улучшить промпт пользователя по имеющимся данным. "
+                "Твой ответ должен содержать только улучшенный промпт и ничего больше"
+            )
+
+            optimization_results = {}
+
+            # Define optimization methods
+            methods = [
+                ("CRAFT", prompt_loader.craft_prompt),
+                ("LYRA", prompt_loader.lyra_prompt),
+                ("GGL", prompt_loader.ggl_prompt),
+            ]
+
+            for method_name, base_system_prompt in methods:
+                try:
+                    logger.info(
+                        f"Running {method_name} optimization for user {mask_telegram_id(user_id)}"
+                    )
+
+                    # Modify system prompt by appending the no-followup instruction
+                    modified_system_prompt = (
+                        base_system_prompt + no_followup_instruction
+                    )
+
+                    # Create transcript with modified system prompt and user prompt
+                    transcript = [
+                        {"role": "system", "content": modified_system_prompt},
+                        {"role": "user", "content": original_prompt},
+                    ]
+
+                    # Send to LLM
+                    response = await self.llm_client.send_prompt(transcript)
+
+                    if response:
+                        optimization_results[method_name] = response.strip()
+                        logger.info(
+                            f"{method_name} optimization completed for user {mask_telegram_id(user_id)}"
+                        )
+                    else:
+                        logger.warning(
+                            f"{method_name} optimization returned empty response for user {mask_telegram_id(user_id)}"
+                        )
+                        optimization_results[method_name] = (
+                            f"Ошибка оптимизации методом {method_name}"
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        f"Error in {method_name} optimization for user {mask_telegram_id(user_id)}: {e}"
+                    )
+                    optimization_results[method_name] = (
+                        f"Ошибка оптимизации методом {method_name}"
+                    )
+
+            # Ensure we have at least one successful result
+            if not any(
+                result and not result.startswith("Ошибка")
+                for result in optimization_results.values()
+            ):
+                logger.error(
+                    f"All optimization methods failed for user {mask_telegram_id(user_id)}"
+                )
+                return None
+
+            logger.info(
+                f"Optimization completed for user {mask_telegram_id(user_id)} | methods={list(optimization_results.keys())}"
+            )
+            return optimization_results
+
+        except Exception as e:
+            logger.error(
+                f"Error running optimizations for user {mask_telegram_id(user_id)}: {e}",
+                exc_info=True,
+            )
+            return None
+
+    def _reset_user_state(self, user_id: int):
+        """Reset user state after email flow completion."""
+        self.state_manager.set_waiting_for_prompt(user_id, True)
+        self.state_manager.set_waiting_for_email_input(user_id, False)
+        self.state_manager.set_waiting_for_otp_input(user_id, False)
+        self.state_manager.set_waiting_for_followup_choice(user_id, False)
+        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
+        self.state_manager.set_in_followup_conversation(user_id, False)
+        self.state_manager.set_email_flow_data(user_id, None)
+        self.state_manager.set_improved_prompt_cache(user_id, None)
+        self.conversation_manager.reset(user_id)
+
+    async def _safe_reply(self, update: Update, text: str, **kwargs):
+        """Safely reply to user with error handling."""
+        try:
+            await update.message.reply_text(text, **kwargs)
+        except Exception as e:
+            logger.error(f"Error sending message: {e}")
+            # Try without special formatting as fallback
+            try:
+                await update.message.reply_text(text)
+            except Exception as e2:
+                logger.error(f"Error sending fallback message: {e2}")
 
     async def _get_improved_prompt(self, original_prompt: str, user_id: int) -> str:
         """
@@ -1118,7 +1397,7 @@ class EmailFlowOrchestrator:
                 # Email sent successfully
                 await self._safe_reply(
                     update,
-                    f"✅ Оптимизированные промпты отправлены на {mask_email(user_email)}!",
+                    EMAIL_OPTIMIZATION_SUCCESS.format(email=mask_email(user_email)),
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -1126,23 +1405,26 @@ class EmailFlowOrchestrator:
                 logger.info(
                     f"optimization_email_sent | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
                 )
+
+                # Reset states since we're done with email flow
+                self._reset_user_state(user_id)
+                return True
             else:
-                # Email failed, fallback to chat delivery
+                # Email delivery failed - show error message only (no prompt sharing)
+                logger.error(
+                    f"Email delivery failed for user {mask_telegram_id(user_id)}"
+                )
                 await self._safe_reply(
                     update,
-                    "📧 Отправка email временно недоступна. Результаты будут показаны в чате.",
+                    ERROR_EMAIL_OPTIMIZATION_FAILED,
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[BTN_RESET]], resize_keyboard=True
+                    ),
                 )
 
-                # Send the optimized prompts to chat
-                await self._send_fallback_prompts_to_chat(update, optimization_results)
-
-                logger.info(
-                    f"optimization_fallback_chat | user_id={mask_telegram_id(user_id)}"
-                )
-
-            # Reset states since we're done with email flow
-            self._reset_user_state(user_id)
-            return True
+                # Reset states since we're done with email flow
+                self._reset_user_state(user_id)
+                return False
 
         except Exception as e:
             logger.error(
@@ -1151,7 +1433,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при оптимизации и отправке. Попробуйте позже.",
+                "❌ Произошла ошибка при оптимизации и отправке email. Попробуйте позже.",
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             self._reset_user_state(user_id)

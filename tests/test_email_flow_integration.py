@@ -347,8 +347,9 @@ class TestEmailFlowIntegration:
         mock_context,
         mock_auth_service,
         mock_email_service,
+        mock_state_manager,
     ):
-        """Test flow for already authenticated user."""
+        """Test flow for already authenticated user - bypass OTP and proceed directly to optimization."""
         user_id = 12345
         email = "test@example.com"
         original_prompt = "Help me write better emails"
@@ -356,6 +357,13 @@ class TestEmailFlowIntegration:
         # Mock user as already authenticated
         mock_auth_service.is_user_authenticated.return_value = True
         mock_auth_service.get_user_email.return_value = email
+
+        # Mock email flow data setup
+        mock_state_manager.get_email_flow_data.return_value = {
+            "original_prompt": original_prompt,
+            "email": email,
+            "authenticated": True,
+        }
 
         # Start email flow - should skip authentication
         result = await email_flow_orchestrator.start_email_authentication(
@@ -367,8 +375,113 @@ class TestEmailFlowIntegration:
         mock_auth_service.send_otp.assert_not_called()
         mock_email_service.send_otp_email.assert_not_called()
 
+        # Verify user was notified they're already authenticated
+        mock_update.message.reply_text.assert_called()
+
+        # Verify the stored normalized email is used
+        mock_auth_service.get_user_email.assert_called_once_with(user_id)
+
+        # Verify email flow data was set with existing email
+        mock_state_manager.set_email_flow_data.assert_called()
+
         # Should proceed directly to follow-up questions (verify flow started)
         assert result is True
+
+    async def test_returning_user_complete_flow(
+        self,
+        email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_auth_service,
+        mock_email_service,
+        mock_state_manager,
+        mock_conversation_manager,
+    ):
+        """Integration test for the complete returning user path - skip OTP, proceed to optimization and delivery."""
+        user_id = 12345
+        stored_email = "user@example.com"  # Normalized email from database
+        original_prompt = "Write better marketing emails"
+
+        # Mock user as already authenticated with stored email
+        mock_auth_service.is_user_authenticated.return_value = True
+        mock_auth_service.get_user_email.return_value = stored_email
+
+        # Mock conversation manager to return the original prompt
+        mock_conversation_manager.get_user_prompt.return_value = original_prompt
+
+        # Mock improved prompt cache
+        improved_prompt = "Enhanced marketing email writing prompt"
+        mock_state_manager.get_improved_prompt_cache.return_value = improved_prompt
+
+        # Mock email flow data
+        mock_state_manager.get_email_flow_data.return_value = {
+            "original_prompt": original_prompt,
+            "email": stored_email,
+            "authenticated": True,
+        }
+
+        # Mock successful email delivery
+        mock_email_service.send_optimized_prompts_email.return_value.success = True
+
+        # Step 1: Start email flow (should skip OTP)
+        result = await email_flow_orchestrator.start_email_authentication(
+            mock_update, mock_context, user_id, original_prompt
+        )
+        assert result is True
+
+        # Verify authentication was checked
+        mock_auth_service.is_user_authenticated.assert_called_once_with(user_id)
+
+        # Verify stored email was retrieved
+        mock_auth_service.get_user_email.assert_called_once_with(user_id)
+
+        # Verify no OTP process was initiated
+        mock_auth_service.send_otp.assert_not_called()
+        mock_email_service.send_otp_email.assert_not_called()
+
+        # Step 2: Simulate follow-up questions (user declines)
+        result = await email_flow_orchestrator.handle_followup_conversation(
+            mock_update, mock_context, user_id, "NO"
+        )
+        assert result is True
+
+        # Step 3: Verify optimization and email delivery proceeds with stored email
+        with (
+            patch.object(
+                email_flow_orchestrator, "_run_craft_optimization"
+            ) as mock_craft,
+            patch.object(
+                email_flow_orchestrator, "_run_lyra_optimization"
+            ) as mock_lyra,
+            patch.object(email_flow_orchestrator, "_run_ggl_optimization") as mock_ggl,
+        ):
+            mock_craft.return_value = "CRAFT optimized result"
+            mock_lyra.return_value = "LYRA optimized result"
+            mock_ggl.return_value = "GGL optimized result"
+
+            result = await email_flow_orchestrator._run_optimization_and_email_delivery(
+                mock_update, mock_context, user_id, improved_prompt
+            )
+            assert result is True
+
+            # Verify all optimization methods were called
+            mock_craft.assert_called_once_with(improved_prompt)
+            mock_lyra.assert_called_once_with(improved_prompt)
+            mock_ggl.assert_called_once_with(improved_prompt)
+
+        # Verify email was sent to the stored (normalized) email address
+        mock_email_service.send_optimized_prompts_email.assert_called()
+
+        # Verify the complete returning user flow worked without OTP
+        assert all(
+            [
+                not mock_auth_service.send_otp.called,  # No OTP sent
+                not mock_email_service.send_otp_email.called,  # No OTP email sent
+                mock_auth_service.is_user_authenticated.called,  # Authentication checked
+                mock_auth_service.get_user_email.called,  # Stored email retrieved
+                mock_email_service.send_optimized_prompts_email.called,  # Final email sent
+            ]
+        )
 
     async def test_email_auth_rate_limiting(
         self,
@@ -396,14 +509,14 @@ class TestEmailFlowIntegration:
         # This test verifies the interface works
         assert result is True
 
-    async def test_email_delivery_fallback(
+    async def test_email_delivery_failure_error_only(
         self,
         email_flow_orchestrator,
         mock_update,
         mock_context,
         mock_email_service,
     ):
-        """Test fallback to chat when email fails."""
+        """Test error-only handling when email delivery fails (no prompt sharing)."""
         user_id = 12345
         refined_prompt = "Refined prompt"
 
@@ -430,15 +543,69 @@ class TestEmailFlowIntegration:
             result = await email_flow_orchestrator._run_optimization_and_email_delivery(
                 mock_update, mock_context, user_id, refined_prompt
             )
-            assert result is True
+            # Should return False when email delivery fails
+            assert result is False
 
-        # Verify fallback to chat delivery
-        assert mock_update.message.reply_text.call_count >= 3  # 3 optimized prompts
+        # Verify only error message is sent (no optimized prompts shared)
+        # Should be exactly 2 calls: processing message + error message
+        assert mock_update.message.reply_text.call_count == 2
 
-        # Verify all optimization methods were called
+        # Verify the error message is correct
+        error_call_args = mock_update.message.reply_text.call_args_list[-1]
+        from src.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+
+        assert ERROR_EMAIL_OPTIMIZATION_FAILED in error_call_args[0][0]
+
+        # Verify all optimization methods were called (optimization succeeds, email fails)
         mock_craft.assert_called_once()
         mock_lyra.assert_called_once()
         mock_ggl.assert_called_once()
+
+    async def test_direct_optimization_email_delivery_failure(
+        self,
+        email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_email_service,
+    ):
+        """Test error-only handling when direct optimization email delivery fails."""
+        user_id = 12345
+        original_prompt = "Original prompt"
+
+        # Mock email delivery failure
+        mock_email_service.send_optimized_prompts_email.return_value.success = False
+        mock_email_service.send_optimized_prompts_email.return_value.error = (
+            "SMTP connection failed"
+        )
+
+        # Mock optimization results for direct flow
+        with patch.object(
+            email_flow_orchestrator, "_run_all_optimizations_with_modified_prompts"
+        ) as mock_optimizations:
+            mock_optimizations.return_value = {
+                "CRAFT": "CRAFT direct result",
+                "LYRA": "LYRA direct result",
+                "GGL": "GGL direct result",
+            }
+
+            result = await email_flow_orchestrator._run_direct_optimization_and_email_delivery(
+                mock_update, mock_context, user_id, original_prompt
+            )
+            # Should return False when email delivery fails
+            assert result is False
+
+        # Verify only error message is sent (no optimized prompts shared)
+        # Should be exactly 2 calls: processing message + error message
+        assert mock_update.message.reply_text.call_count == 2
+
+        # Verify the error message is correct
+        error_call_args = mock_update.message.reply_text.call_args_list[-1]
+        from src.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+
+        assert ERROR_EMAIL_OPTIMIZATION_FAILED in error_call_args[0][0]
+
+        # Verify optimization was called
+        mock_optimizations.assert_called_once_with(original_prompt, user_id)
 
     async def test_follow_up_integration(
         self,

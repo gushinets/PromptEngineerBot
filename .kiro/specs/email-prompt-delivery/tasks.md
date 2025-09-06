@@ -154,6 +154,11 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 
 
+
+
+
+
+
   - Add "Send 3 prompts to email" button to method selection screen
   - Implement email input and OTP verification conversation flow
   - Integrate with existing conversation management system
@@ -189,7 +194,9 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 - [x] 4.4 Bypass OTP for already-authenticated users
 
 
-  - On "Send 3 prompts to email", if users.is_authenticated is true for this telegram_id, skip OTP and proceed to follow-up → optimization → delivery
+
+
+  - On "Send 3 prompts to email", if users.is_authenticated is true for this telegram_id, skip OTP and proceed directly to optimization → delivery
   - Make sure the flow still uses the stored (normalized) email
   - Integration tests for the "returning user" path
   - _Requirements: 1.4_
@@ -197,72 +204,90 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 - [x] 4.5 Gate the flow with health checks (bot-level)
 
 
+
+
   - Before starting email auth: require Redis healthy; otherwise show temporary-unavailable message and stop
-  - Before sending email: require SMTP healthy; otherwise fall back to chat-only delivery (3 prompts)
+  - Before sending email: require SMTP healthy; otherwise show error message in chat (no prompt sharing)
   - Tests covering unhealthy → healthy transitions and user messaging
   - _Design: Health check integration in bot handler_
 
-- [x] 5. Integrate follow-up questions system with email flow
+- [x] 5. Create direct optimization workflow
 
-  - Connect email authentication with existing follow-up questions
-  - Implement prompt improvement workflow
-  - Add timeout handling with graceful degradation
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+
+
+
+
+
+  - Skip follow-up questions and proceed directly to optimization
+  - Implement system prompt modification for optimization methods
+  - Add proper state management for direct optimization flow
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [x] 5.1 Create email flow orchestration
 
+
+
   - Implement `src/email_flow.py` as main workflow coordinator
-  - Integrate authentication, follow-up questions, and optimization
+  - Integrate authentication and direct optimization (skip follow-up questions)
   - Add proper state management throughout the flow
   - Test complete workflow integration
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [x] 5.2 Implement follow-up questions integration
+- [x] 5.2 Implement system prompt modification for optimization methods
 
 
-  - Connect authenticated users to existing follow-up questions system
-  - Ensure seamless transition from authentication to follow-up
-  - Maintain conversation context and user state
-  - Test follow-up questions integration and state management
-  - _Requirements: 4.2, 4.3, 4.4_
 
-- [x] 5.3 Add timeout handling and graceful degradation
 
-  - Implement timeout detection for follow-up questions
-  - Add fallback to best-effort improved prompt on timeout
-  - Ensure no user-facing errors during timeout scenarios
-  - Test timeout handling and graceful degradation
-  - _Requirements: 4.6_
+  - Add Russian instruction to system prompts for CRAFT, LYRA, GGL methods
+  - Append exact text: "### ВАЖНО\nНи в коем случае не задавай ни одного уточняющего вопроса. Твоя задача улучшить промпт пользователя по имеющимся данным. Твой ответ должен содержать только улучшенный промпт и ничего больше"
+  - Ensure original system prompts remain unchanged for other use cases
+  - Test system prompt modification for all three methods
+  - _Requirements: 4.3, 4.4_
+
+- [x] 5.3 Add direct optimization flow without follow-up questions
+
+
+
+  - Remove follow-up questions integration from email flow
+  - Use original user prompt directly for optimization
+  - Ensure seamless transition from authentication to optimization
+  - Test direct optimization flow and state management
+  - _Requirements: 4.1, 4.2_
 
 - [x] 6. Implement prompt optimization and email delivery
 
-  - Run all three optimization methods (CRAFT, LYRA, GGL) on improved prompt
+  - Run all three optimization methods (CRAFT, LYRA, GGL) on original prompt with modified system prompts
   - Compose and send comprehensive email with all results
-  - Add proper error handling and chat fallback
-  - _Requirements: 4.5, 5.1, 5.2, 5.3, 5.4, 7.7_
+  - Add proper error handling with error-only chat messages
+  - _Requirements: 4.3, 4.4, 4.5, 5.1, 5.2, 5.4, 7.7_
 
-- [x] 6.1 Create prompt optimization coordination
+
+- [x] 6.1 Create prompt optimization coordination with system prompt modification
 
   - Integrate with existing CRAFT, LYRA, GGL optimization methods
-  - Run all three methods on the improved prompt from follow-up
+  - Apply system prompt modification to each method before execution
+  - Run all three methods on the original user prompt (no follow-up improvement)
   - Collect and format results for email delivery
-  - Test optimization integration and result collection
-  - _Requirements: 4.5_
+  - Test optimization integration with modified system prompts
+  - _Requirements: 4.3, 4.4, 4.5_
 
 - [x] 6.2 Implement comprehensive email composition
 
-  - Create email content with original prompt, improved prompt, and all optimizations
+  - Create email content with original prompt and all three optimizations
   - Add clear labeling for each method (CRAFT, LYRA, GGL)
   - Include professional signature and proper formatting
+  - Remove any reference to follow-up improved prompts
   - Test email composition with various prompt types and content
   - _Requirements: 5.4, 7.2, 7.3, 7.5, 7.7_
 
-- [x] 6.3 Add email delivery with chat fallback
+
+
+- [x] 6.3 Add email delivery with error-only chat handling
 
   - Send composed email to authenticated user
-  - Implement strict fallback: only 3 optimized prompts in chat on email failure
+  - On email failure: show only error message in chat (no optimized prompts)
   - Add success/failure notifications to user
-  - Test email delivery success and failure scenarios
+  - Test email delivery success and error-only failure scenarios
   - _Requirements: 5.1, 5.2_
 
 - [x] 6.4 Ensure a clear, localized subject line for optimization emails
@@ -358,8 +383,9 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
   - Implement `tests/test_email_flow_integration.py` for complete workflow testing
   - Create `tests/test_bot_handler_integration.py` for UI integration
-  - Add tests for follow-up questions integration and timeout scenarios
-  - Test complete user journeys from button click to email delivery
+  - Add tests for system prompt modification and direct optimization flow
+  - Test complete user journeys from button click to email delivery (no follow-up questions)
+  - Test error-only handling when email delivery fails
   - _Requirements: All integration requirements_
 
 - [x] 9.3 Add performance and security tests
@@ -409,7 +435,7 @@ graph TD
     A --> C[3. Email Service]
     B --> D[4. Bot Handler]
     C --> D
-    D --> E[5. Follow-up Integration]
+    D --> E[5. Direct Optimization]
     E --> F[6. Optimization & Delivery]
     A --> G[7. Audit & Metrics]
     G --> H[8. Health Monitoring]
@@ -438,7 +464,7 @@ Each task is considered complete when:
 ## Risk Mitigation
 
 - **Redis Dependency**: Implement graceful degradation when Redis is unavailable
-- **SMTP Reliability**: Always provide chat fallback for email delivery failures
+- **SMTP Reliability**: Show error messages in chat when email delivery fails (no prompt sharing)
 - **Rate Limiting**: Comprehensive testing to prevent bypass attempts
 - **Data Security**: Multiple layers of PII protection and audit trails
 - **Performance**: Load testing and optimization at each integration point
