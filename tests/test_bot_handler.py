@@ -268,7 +268,7 @@ class TestBotHandler:
         # Verify error message was sent
         mock_update.message.reply_text.assert_called()
         args, _ = mock_update.message.reply_text.call_args
-        assert "Ошибка" in args[0]
+        assert "Произошла ошибка" in args[0]
 
     @pytest.mark.asyncio
     async def test_process_with_llm_improved_prompt(

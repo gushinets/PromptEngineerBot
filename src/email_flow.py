@@ -33,20 +33,39 @@ from .messages import (
     EMAIL_INPUT_MESSAGE,
     EMAIL_OPTIMIZATION_SUCCESS,
     EMAIL_OTP_SENT,
+    ERROR_EMAIL_ADDRESS_NOT_FOUND,
+    ERROR_EMAIL_FLOW_START_FAILED,
     ERROR_EMAIL_INVALID,
     ERROR_EMAIL_OPTIMIZATION_FAILED,
+    ERROR_EMAIL_OPTIMIZATION_PROCESSING,
+    ERROR_EMAIL_PROCESSING_FAILED,
     ERROR_EMAIL_RATE_LIMITED,
     ERROR_EMAIL_SEND_FAILED,
+    ERROR_FLOW_DATA_NOT_FOUND,
+    ERROR_FLOW_PROMPT_NOT_FOUND,
+    ERROR_OPTIMIZATION_EXECUTION_FAILED,
+    ERROR_OPTIMIZATION_TRANSITION_FAILED,
+    ERROR_ORIGINAL_PROMPT_NOT_FOUND,
     ERROR_OTP_ATTEMPTS_EXCEEDED,
+    ERROR_OTP_CODE_VALIDATION,
     ERROR_OTP_EXPIRED,
     ERROR_OTP_INVALID,
+    ERROR_OTP_VERIFICATION_PROCESSING,
+    ERROR_PROMPT_OPTIMIZATION_FAILED,
     ERROR_REDIS_UNAVAILABLE,
     ERROR_SMTP_UNAVAILABLE,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
     FOLLOWUP_PROMPT_INPUT_MESSAGE,
+    INFO_ALL_METHODS_OPTIMIZATION,
+    INFO_EMAIL_OPTIMIZATION_PROCESSING,
+    METHOD_RESULT_MESSAGE_TEMPLATE,
+    NO_FOLLOWUP_INSTRUCTION,
+    OPTIMIZATION_ERROR_PREFIX,
+    OPTIMIZATION_ERROR_TEMPLATE,
     OTP_VERIFICATION_SUCCESS,
+    SUCCESS_ALL_PROMPTS_SENT_TO_CHAT,
     create_prompt_input_reply,
     parse_followup_response,
 )
@@ -119,7 +138,7 @@ class EmailFlowOrchestrator:
             if not original_prompt:
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось найти исходный промпт. Пожалуйста, начните заново.",
+                    ERROR_ORIGINAL_PROMPT_NOT_FOUND,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -199,7 +218,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при запуске email-потока. Попробуйте позже.",
+                ERROR_EMAIL_FLOW_START_FAILED,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             return False
@@ -309,7 +328,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при обработке email. Попробуйте позже.",
+                ERROR_EMAIL_PROCESSING_FAILED,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             return False
@@ -351,7 +370,7 @@ class EmailFlowOrchestrator:
             if not (text.strip().isdigit() and len(text.strip()) == 6):
                 await self._safe_reply(
                     update,
-                    "❌ Код должен состоять из 6 цифр. Попробуйте еще раз:",
+                    ERROR_OTP_CODE_VALIDATION,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -420,7 +439,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при проверке кода. Попробуйте позже.",
+                ERROR_OTP_VERIFICATION_PROCESSING,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             return False
@@ -449,7 +468,7 @@ class EmailFlowOrchestrator:
                 )
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось найти данные потока. Попробуйте начать заново.",
+                    ERROR_FLOW_DATA_NOT_FOUND,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -463,7 +482,7 @@ class EmailFlowOrchestrator:
                 )
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось найти исходный промпт. Попробуйте начать заново.",
+                    ERROR_FLOW_PROMPT_NOT_FOUND,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -521,7 +540,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при переходе к оптимизации промпта. Попробуйте позже.",
+                ERROR_OPTIMIZATION_TRANSITION_FAILED,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             return False
@@ -820,7 +839,7 @@ class EmailFlowOrchestrator:
             # Send processing message to user
             await self._safe_reply(
                 update,
-                "🔄 Оптимизируем ваш промпт тремя методами и отправляем на email...",
+                INFO_EMAIL_OPTIMIZATION_PROCESSING,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
 
@@ -837,7 +856,7 @@ class EmailFlowOrchestrator:
                 )
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось оптимизировать промпт. Попробуйте позже.",
+                    ERROR_PROMPT_OPTIMIZATION_FAILED,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -853,7 +872,7 @@ class EmailFlowOrchestrator:
                 )
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось найти email адрес. Попробуйте начать заново.",
+                    ERROR_EMAIL_ADDRESS_NOT_FOUND,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -911,7 +930,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при оптимизации и отправке email. Попробуйте позже.",
+                ERROR_EMAIL_OPTIMIZATION_PROCESSING,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             return False
@@ -936,12 +955,7 @@ class EmailFlowOrchestrator:
             prompt_loader = container.get_prompt_loader()
 
             # Russian instruction to append to system prompts (requirement 4.3)
-            no_followup_instruction = (
-                "\n\n### ВАЖНО\n"
-                "Ни в коем случае не задавай ни одного уточняющего вопроса. "
-                "Твоя задача улучшить промпт пользователя по имеющимся данным. "
-                "Твой ответ должен содержать только улучшенный промпт и ничего больше"
-            )
+            no_followup_instruction = NO_FOLLOWUP_INSTRUCTION
 
             optimization_results = {}
 
@@ -982,7 +996,7 @@ class EmailFlowOrchestrator:
                             f"{method_name} optimization returned empty response for user {mask_telegram_id(user_id)}"
                         )
                         optimization_results[method_name] = (
-                            f"Ошибка оптимизации методом {method_name}"
+                            OPTIMIZATION_ERROR_TEMPLATE.format(method_name=method_name)
                         )
 
                 except Exception as e:
@@ -990,12 +1004,12 @@ class EmailFlowOrchestrator:
                         f"Error in {method_name} optimization for user {mask_telegram_id(user_id)}: {e}"
                     )
                     optimization_results[method_name] = (
-                        f"Ошибка оптимизации методом {method_name}"
+                        OPTIMIZATION_ERROR_TEMPLATE.format(method_name=method_name)
                     )
 
             # Ensure we have at least one successful result
             if not any(
-                result and not result.startswith("Ошибка")
+                result and not result.startswith(OPTIMIZATION_ERROR_PREFIX)
                 for result in optimization_results.values()
             ):
                 logger.error(
@@ -1349,7 +1363,7 @@ class EmailFlowOrchestrator:
             # Show processing message to user
             await self._safe_reply(
                 update,
-                "🔄 Запускаем оптимизацию промпта всеми тремя методами...",
+                INFO_ALL_METHODS_OPTIMIZATION,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
 
@@ -1364,7 +1378,7 @@ class EmailFlowOrchestrator:
                 )
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось выполнить оптимизацию промпта. Попробуйте позже.",
+                    ERROR_OPTIMIZATION_EXECUTION_FAILED,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -1433,7 +1447,7 @@ class EmailFlowOrchestrator:
             )
             await self._safe_reply(
                 update,
-                "❌ Произошла ошибка при оптимизации и отправке email. Попробуйте позже.",
+                ERROR_EMAIL_OPTIMIZATION_PROCESSING,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             self._reset_user_state(user_id)
@@ -1690,8 +1704,8 @@ class EmailFlowOrchestrator:
 
             for method_name, prompt in methods:
                 if prompt:
-                    message = (
-                        f"🔹 **{method_name} оптимизированный промпт:**\n\n{prompt}"
+                    message = METHOD_RESULT_MESSAGE_TEMPLATE.format(
+                        method_name=method_name, prompt=prompt
                     )
                     await self._safe_reply(
                         update,
@@ -1702,7 +1716,7 @@ class EmailFlowOrchestrator:
             # Send final message with reset button
             await self._safe_reply(
                 update,
-                "✅ Все оптимизированные промпты отправлены в чат!",
+                SUCCESS_ALL_PROMPTS_SENT_TO_CHAT,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
 
@@ -1755,7 +1769,7 @@ class EmailFlowOrchestrator:
                 )
                 await self._safe_reply(
                     update,
-                    "❌ Не удалось выполнить оптимизацию промпта. Попробуйте позже.",
+                    ERROR_OPTIMIZATION_EXECUTION_FAILED,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),

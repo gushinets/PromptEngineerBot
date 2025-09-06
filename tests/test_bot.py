@@ -172,7 +172,11 @@ class TestTimeoutHandling:
         for call in calls:
             args, _ = call
             text = str(args[0])
-            if ("Ошибка" in text) or ("Error" in text) or ("timeout" in text.lower()):
+            if (
+                ("ошибка" in text.lower())
+                or ("Error" in text)
+                or ("timeout" in text.lower())
+            ):
                 error_found = True
                 break
 

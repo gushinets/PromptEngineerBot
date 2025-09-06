@@ -33,23 +33,43 @@ from .messages import (
     EMAIL_ALREADY_AUTHENTICATED,
     EMAIL_INPUT_MESSAGE,
     EMAIL_OTP_SENT,
+    ERROR_EMAIL_INPUT_FAILED,
     ERROR_EMAIL_INVALID,
     ERROR_EMAIL_RATE_LIMITED,
     ERROR_EMAIL_SEND_FAILED,
+    ERROR_EMAIL_SERVICE_ERROR,
+    ERROR_EMAIL_SERVICE_UNAVAILABLE,
+    ERROR_GENERIC,
     ERROR_OTP_ATTEMPTS_EXCEEDED,
     ERROR_OTP_EXPIRED,
     ERROR_OTP_INVALID,
+    ERROR_OTP_VERIFICATION_FAILED,
+    ERROR_PROMPT_GENERATION_FAILED,
+    ERROR_PROMPT_RETRIEVAL_FALLBACK,
     ERROR_REDIS_UNAVAILABLE,
     ERROR_SMTP_UNAVAILABLE,
+    ERROR_STATE_CORRUPTED_RESTART,
+    ERROR_STATE_RECOVERY_FAILED,
+    ERROR_STATE_RECOVERY_SUCCESS,
+    FOLLOWUP_API_ERROR_FALLBACK,
+    FOLLOWUP_API_ERROR_RESTART,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
+    FOLLOWUP_GENERIC_ERROR_RESTART,
+    FOLLOWUP_NETWORK_FALLBACK,
+    FOLLOWUP_NETWORK_RESTART,
     FOLLOWUP_OFFER_MESSAGE,
     FOLLOWUP_PROMPT_INPUT_MESSAGE,
+    FOLLOWUP_RATE_LIMIT_FALLBACK,
+    FOLLOWUP_RATE_LIMIT_RESTART,
+    FOLLOWUP_TIMEOUT_FALLBACK,
+    FOLLOWUP_TIMEOUT_RESTART,
     OTP_VERIFICATION_SUCCESS,
     PROMPT_READY_FOLLOW_UP,
     RESET_CONFIRMATION,
     SELECT_METHOD_KEYBOARD,
     SELECT_METHOD_MESSAGE,
+    SYSTEM_FOLLOWUP_PROMPT_INDICATOR,
     WELCOME_MESSAGE,
     create_prompt_input_reply,
     get_processing_message,
@@ -181,13 +201,9 @@ class BotHandler:
                     )
                 except Exception as e:
                     logger.error(f"Email input handling error for user {user_id}: {e}")
-                    await self._safe_reply(
-                        update, "❌ Email input error. Please try again later."
-                    )
+                    await self._safe_reply(update, ERROR_EMAIL_INPUT_FAILED)
             else:
-                await self._safe_reply(
-                    update, "❌ Email service not available. Please try again later."
-                )
+                await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
             return
 
         # Handle OTP input waiting state
@@ -199,13 +215,9 @@ class BotHandler:
                     )
                 except Exception as e:
                     logger.error(f"OTP input handling error for user {user_id}: {e}")
-                    await self._safe_reply(
-                        update, "❌ OTP verification error. Please try again later."
-                    )
+                    await self._safe_reply(update, ERROR_OTP_VERIFICATION_FAILED)
             else:
-                await self._safe_reply(
-                    update, "❌ Email service not available. Please try again later."
-                )
+                await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
             return
 
         # Handle follow-up choice waiting state
@@ -340,13 +352,9 @@ class BotHandler:
                     )
                 except Exception as e:
                     logger.error(f"Email flow error for user {user_id}: {e}")
-                    await self._safe_reply(
-                        update, "❌ Email service error. Please try again later."
-                    )
+                    await self._safe_reply(update, ERROR_EMAIL_SERVICE_ERROR)
             else:
-                await self._safe_reply(
-                    update, "❌ Email service not available. Please try again later."
-                )
+                await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
             return
 
         method_handlers = {
@@ -721,7 +729,7 @@ class BotHandler:
         if improved_prompt:
             await self._safe_reply(
                 update,
-                "Время ожидания истекло. Используем исходный улучшенный промпт:",
+                FOLLOWUP_TIMEOUT_FALLBACK,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
@@ -729,7 +737,7 @@ class BotHandler:
             await self._fallback_to_prompt_input(
                 update,
                 user_id,
-                "Время ожидания истекло. Попробуйте начать с нового промпта.",
+                FOLLOWUP_TIMEOUT_RESTART,
             )
 
     async def _handle_followup_network_error(
@@ -744,13 +752,13 @@ class BotHandler:
         if improved_prompt:
             await self._safe_reply(
                 update,
-                "Проблемы с сетью. Используем исходный улучшенный промпт:",
+                FOLLOWUP_NETWORK_FALLBACK,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
             await self._fallback_to_prompt_input(
-                update, user_id, "Проблемы с сетью. Попробуйте начать с нового промпта."
+                update, user_id, FOLLOWUP_NETWORK_RESTART
             )
 
     async def _handle_followup_rate_limit(
@@ -765,13 +773,13 @@ class BotHandler:
         if improved_prompt:
             await self._safe_reply(
                 update,
-                "Превышен лимит запросов. Используем исходный улучшенный промпт:",
+                FOLLOWUP_RATE_LIMIT_FALLBACK,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
             await self._fallback_to_prompt_input(
-                update, user_id, "Превышен лимит запросов. Попробуйте позже."
+                update, user_id, FOLLOWUP_RATE_LIMIT_RESTART
             )
 
     async def _handle_followup_api_error(
@@ -786,13 +794,13 @@ class BotHandler:
         if improved_prompt:
             await self._safe_reply(
                 update,
-                "Ошибка API. Используем исходный улучшенный промпт:",
+                FOLLOWUP_API_ERROR_FALLBACK,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
             await self._fallback_to_prompt_input(
-                update, user_id, "Ошибка API. Попробуйте начать с нового промпта."
+                update, user_id, FOLLOWUP_API_ERROR_RESTART
             )
 
     async def _handle_followup_generic_error(
@@ -808,7 +816,7 @@ class BotHandler:
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
             await self._fallback_to_prompt_input(
-                update, user_id, "Произошла ошибка. Попробуйте начать с нового промпта."
+                update, user_id, FOLLOWUP_GENERIC_ERROR_RESTART
             )
 
     async def _handle_missing_refined_prompt(self, update: Update, user_id: int):
@@ -819,7 +827,7 @@ class BotHandler:
         if improved_prompt:
             await self._safe_reply(
                 update,
-                "Не удалось получить улучшенный промпт. Используем исходный:",
+                ERROR_PROMPT_RETRIEVAL_FALLBACK,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
@@ -827,7 +835,7 @@ class BotHandler:
             await self._fallback_to_prompt_input(
                 update,
                 user_id,
-                "Не удалось сгенерировать улучшенный промпт. Попробуйте начать заново.",
+                ERROR_PROMPT_GENERATION_FAILED,
             )
 
     async def _fallback_to_prompt_input(
@@ -893,7 +901,7 @@ class BotHandler:
 
             # Should contain follow-up system prompt indicators
             system_content = transcript[0].get("content", "").lower()
-            if "промпт-инжинирингу" not in system_content:
+            if SYSTEM_FOLLOWUP_PROMPT_INDICATOR not in system_content:
                 return False
 
             # Second message should be user message (improved prompt)
@@ -924,7 +932,7 @@ class BotHandler:
                 # We have a cached prompt, offer it to the user
                 await self._safe_reply(
                     update,
-                    "Восстанавливаем состояние диалога. Используем ваш улучшенный промпт:",
+                    ERROR_STATE_RECOVERY_SUCCESS,
                     reply_markup=ReplyKeyboardMarkup(
                         [[BTN_RESET]], resize_keyboard=True
                     ),
@@ -937,7 +945,7 @@ class BotHandler:
                 await self._fallback_to_prompt_input(
                     update,
                     user_id,
-                    "Состояние диалога повреждено. Начните с нового промпта.",
+                    ERROR_STATE_CORRUPTED_RESTART,
                 )
 
         except Exception as e:
@@ -948,7 +956,7 @@ class BotHandler:
             await self._fallback_to_prompt_input(
                 update,
                 user_id,
-                "Не удалось восстановить состояние. Начните с нового промпта.",
+                ERROR_STATE_RECOVERY_FAILED,
             )
 
     def _parse_followup_response_with_fallback(
@@ -1129,10 +1137,9 @@ class BotHandler:
                 f"error | stage={method_name} | user_id={user_id} | error={str(e)}"
             )
 
-            error_msg = f"Ошибка: {e}"
             await self._safe_reply(
                 update,
-                error_msg,
+                ERROR_GENERIC,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
 

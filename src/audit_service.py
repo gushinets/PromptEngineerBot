@@ -390,7 +390,7 @@ class AuditService:
 
                 return deleted_count
 
-        except SQLAlchemyError as e:
+        except (SQLAlchemyError, Exception) as e:
             self.logger.error(f"Failed to purge old audit events: {e}")
             return 0
 

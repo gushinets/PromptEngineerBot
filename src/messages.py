@@ -68,6 +68,27 @@ ERROR_GENERIC = _(
     "❌ An error occurred. Please try again later.",
 )
 
+# Email service error messages
+ERROR_EMAIL_INPUT_FAILED = _(
+    "❌ Ошибка ввода email. Попробуйте позже.",
+    "❌ Email input error. Please try again later.",
+)
+
+ERROR_EMAIL_SERVICE_UNAVAILABLE = _(
+    "❌ Сервис email недоступен. Попробуйте позже.",
+    "❌ Email service not available. Please try again later.",
+)
+
+ERROR_OTP_VERIFICATION_FAILED = _(
+    "❌ Ошибка проверки OTP. Попробуйте позже.",
+    "❌ OTP verification error. Please try again later.",
+)
+
+ERROR_EMAIL_SERVICE_ERROR = _(
+    "❌ Ошибка сервиса email. Попробуйте позже.",
+    "❌ Email service error. Please try again later.",
+)
+
 ERROR_EMPTY_MESSAGE = _(
     "❌ Пожалуйста, введите промпт для анализа.",
     "❌ Please provide a message or prompt to analyze.",
@@ -99,6 +120,52 @@ ERROR_FOLLOWUP_TIMEOUT = _(
     "⏱️ Timeout occurred during follow-up questions. Using the original improved prompt.",
 )
 
+# Follow-up timeout and fallback messages
+FOLLOWUP_TIMEOUT_FALLBACK = _(
+    "Время ожидания истекло. Используем исходный улучшенный промпт:",
+    "Timeout occurred. Using the original improved prompt:",
+)
+
+FOLLOWUP_TIMEOUT_RESTART = _(
+    "Время ожидания истекло. Попробуйте начать с нового промпта.",
+    "Timeout occurred. Please try starting with a new prompt.",
+)
+
+FOLLOWUP_NETWORK_FALLBACK = _(
+    "Проблемы с сетью. Используем исходный улучшенный промпт:",
+    "Network issues. Using the original improved prompt:",
+)
+
+FOLLOWUP_NETWORK_RESTART = _(
+    "Проблемы с сетью. Попробуйте начать с нового промпта.",
+    "Network issues. Please try starting with a new prompt.",
+)
+
+FOLLOWUP_RATE_LIMIT_FALLBACK = _(
+    "Превышен лимит запросов. Используем исходный улучшенный промпт:",
+    "Rate limit exceeded. Using the original improved prompt:",
+)
+
+FOLLOWUP_RATE_LIMIT_RESTART = _(
+    "Превышен лимит запросов. Попробуйте позже.",
+    "Rate limit exceeded. Please try again later.",
+)
+
+FOLLOWUP_API_ERROR_FALLBACK = _(
+    "Ошибка API. Используем исходный улучшенный промпт:",
+    "API error. Using the original improved prompt:",
+)
+
+FOLLOWUP_API_ERROR_RESTART = _(
+    "Ошибка API. Попробуйте начать с нового промпта.",
+    "API error. Please try starting with a new prompt.",
+)
+
+FOLLOWUP_GENERIC_ERROR_RESTART = _(
+    "Произошла ошибка. Попробуйте начать с нового промпта.",
+    "An error occurred. Please try starting with a new prompt.",
+)
+
 ERROR_FOLLOWUP_NETWORK = _(
     "🌐 Проблемы с сетью во время уточняющих вопросов. Используем исходный улучшенный промпт.",
     "🌐 Network issues during follow-up questions. Using the original improved prompt.",
@@ -117,6 +184,32 @@ ERROR_FOLLOWUP_STATE_CORRUPTED = _(
 ERROR_FOLLOWUP_PARSING = _(
     "⚠️ Не удалось обработать ответ. Используем исходный улучшенный промпт.",
     "⚠️ Failed to process response. Using the original improved prompt.",
+)
+
+# State recovery error messages
+ERROR_PROMPT_RETRIEVAL_FALLBACK = _(
+    "Не удалось получить улучшенный промпт. Используем исходный:",
+    "Failed to retrieve improved prompt. Using the original:",
+)
+
+ERROR_PROMPT_GENERATION_FAILED = _(
+    "Не удалось сгенерировать улучшенный промпт. Попробуйте начать заново.",
+    "Failed to generate improved prompt. Please try starting over.",
+)
+
+ERROR_STATE_RECOVERY_SUCCESS = _(
+    "Восстанавливаем состояние диалога. Используем ваш улучшенный промпт:",
+    "Recovering conversation state. Using your improved prompt:",
+)
+
+ERROR_STATE_CORRUPTED_RESTART = _(
+    "Состояние диалога повреждено. Начните с нового промпта.",
+    "Conversation state corrupted. Start with a new prompt.",
+)
+
+ERROR_STATE_RECOVERY_FAILED = _(
+    "Не удалось восстановить состояние. Начните с нового промпта.",
+    "Failed to recover state. Start with a new prompt.",
 )
 
 # Email authentication messages
@@ -191,10 +284,82 @@ ERROR_SMTP_UNAVAILABLE = _(
     "⚠️ Unable to send email. Showing results in chat:",
 )
 
+# Email flow specific error messages
+ERROR_ORIGINAL_PROMPT_NOT_FOUND = _(
+    "❌ Не удалось найти исходный промпт. Пожалуйста, начните заново.",
+    "❌ Failed to find original prompt. Please start over.",
+)
+
+ERROR_EMAIL_FLOW_START_FAILED = _(
+    "❌ Произошла ошибка при запуске email-потока. Попробуйте позже.",
+    "❌ An error occurred while starting email flow. Please try again later.",
+)
+
+ERROR_EMAIL_PROCESSING_FAILED = _(
+    "❌ Произошла ошибка при обработке email. Попробуйте позже.",
+    "❌ An error occurred while processing email. Please try again later.",
+)
+
+ERROR_OTP_CODE_VALIDATION = _(
+    "❌ Код должен состоять из 6 цифр. Попробуйте еще раз:",
+    "❌ Code must consist of 6 digits. Please try again:",
+)
+
+ERROR_OTP_VERIFICATION_PROCESSING = _(
+    "❌ Произошла ошибка при проверке кода. Попробуйте позже.",
+    "❌ An error occurred while verifying the code. Please try again later.",
+)
+
+ERROR_FLOW_DATA_NOT_FOUND = _(
+    "❌ Не удалось найти данные потока. Попробуйте начать заново.",
+    "❌ Failed to find flow data. Please start over.",
+)
+
+ERROR_FLOW_PROMPT_NOT_FOUND = _(
+    "❌ Не удалось найти исходный промпт. Попробуйте начать заново.",
+    "❌ Failed to find original prompt. Please start over.",
+)
+
+ERROR_OPTIMIZATION_TRANSITION_FAILED = _(
+    "❌ Произошла ошибка при переходе к оптимизации промпта. Попробуйте позже.",
+    "❌ An error occurred while transitioning to prompt optimization. Please try again later.",
+)
+
+ERROR_PROMPT_OPTIMIZATION_FAILED = _(
+    "❌ Не удалось оптимизировать промпт. Попробуйте позже.",
+    "❌ Failed to optimize prompt. Please try again later.",
+)
+
+ERROR_EMAIL_ADDRESS_NOT_FOUND = _(
+    "❌ Не удалось найти email адрес. Попробуйте начать заново.",
+    "❌ Failed to find email address. Please start over.",
+)
+
+ERROR_EMAIL_OPTIMIZATION_PROCESSING = _(
+    "❌ Произошла ошибка при оптимизации и отправке email. Попробуйте позже.",
+    "❌ An error occurred during optimization and email sending. Please try again later.",
+)
+
+ERROR_OPTIMIZATION_EXECUTION_FAILED = _(
+    "❌ Не удалось выполнить оптимизацию промпта. Попробуйте позже.",
+    "❌ Failed to execute prompt optimization. Please try again later.",
+)
+
 # ===== Status Messages =====
 RESET_CONFIRMATION = _(
     "🔄 Диалог сброшен. Вы можете начать новую оптимизацию промпта.",
     "🔄 Conversation has been reset. You can start a new prompt optimization.",
+)
+
+# Processing status messages
+INFO_EMAIL_OPTIMIZATION_PROCESSING = _(
+    "🔄 Оптимизируем ваш промпт тремя методами и отправляем на email...",
+    "🔄 Optimizing your prompt with three methods and sending to email...",
+)
+
+INFO_ALL_METHODS_OPTIMIZATION = _(
+    "🔄 Запускаем оптимизацию промпта всеми тремя методами...",
+    "🔄 Starting prompt optimization with all three methods...",
 )
 
 SELECT_METHOD_MESSAGE = _(
@@ -243,6 +408,54 @@ GENERATING_RESPONSE = _(
 # ===== Success Messages =====
 RESPONSE_READY = _(
     "✅ Вот ваш оптимизированный промпт:", "✅ Here's your optimized prompt:"
+)
+
+SUCCESS_ALL_PROMPTS_SENT_TO_CHAT = _(
+    "✅ Все оптимизированные промпты отправлены в чат!",
+    "✅ All optimized prompts sent to chat!",
+)
+
+# ===== Template Messages =====
+# Optimization method result template
+OPTIMIZATION_METHOD_RESULT_TEMPLATE = _(
+    "🔹 **{method_name} оптимизированный промпт:**\n\n{prompt}",
+    "🔹 **{method_name} optimized prompt:**\n\n{prompt}",
+)
+
+# Optimization error template
+OPTIMIZATION_ERROR_TEMPLATE = _(
+    "Ошибка оптимизации методом {method_name}",
+    "Optimization error with {method_name} method",
+)
+
+# No follow-up instruction for system prompts
+NO_FOLLOWUP_INSTRUCTION = _(
+    "\n\n### ВАЖНО\n"
+    "Ни в коем случае не задавай ни одного уточняющего вопроса. "
+    "Твоя задача улучшить промпт пользователя по имеющимся данным. "
+    "Твой ответ должен содержать только улучшенный промпт и ничего больше",
+    "\n\n### IMPORTANT\n"
+    "Under no circumstances ask any clarifying questions. "
+    "Your task is to improve the user's prompt based on available data. "
+    "Your response should contain only the improved prompt and nothing else",
+)
+
+# System validation strings (internal use, not user-facing)
+SYSTEM_FOLLOWUP_PROMPT_INDICATOR = _(
+    "промпт-инжинирингу",
+    "prompt-engineering",
+)
+
+# Optimization error prefix for result validation
+OPTIMIZATION_ERROR_PREFIX = _(
+    "Ошибка оптимизации методом",
+    "Optimization error with method",
+)
+
+# Method result message template
+METHOD_RESULT_MESSAGE_TEMPLATE = _(
+    "🔹 **{method_name} оптимизированный промпт:**\n\n{prompt}",
+    "🔹 **{method_name} optimized prompt:**\n\n{prompt}",
 )
 
 METHODOLOGY_SELECTED = _(

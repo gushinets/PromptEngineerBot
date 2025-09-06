@@ -254,7 +254,7 @@ class TestBotHandlerHealthGating:
 
         # Verify error message was sent
         mock_update.message.reply_text.assert_called_once_with(
-            "❌ Email service not available. Please try again later."
+            "❌ Сервис email недоступен. Попробуйте позже."
         )
 
 

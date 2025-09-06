@@ -450,13 +450,22 @@ class TestAuditServiceGlobal:
 class TestDataMasking:
     """Test data masking and PII protection."""
 
-    @patch("src.audit_service.logger")
-    def test_data_masking_in_logs(self, mock_logger, audit_service, test_database):
+    @patch("logging.getLogger")
+    def test_data_masking_in_logs(self, mock_get_logger, audit_service, test_database):
         """Test that sensitive data is properly masked in logs."""
         telegram_id = 123456789
         email = "test@example.com"
 
-        audit_service.log_otp_sent(telegram_id, email)
+        # Set up the mock logger
+        mock_logger = mock_get_logger.return_value
+
+        # Replace the audit service logger with our mock
+        audit_service.logger = mock_logger
+
+        result = audit_service.log_otp_sent(telegram_id, email)
+
+        # Verify the method returned True (success)
+        assert result is True
 
         # Verify logger was called with masked data
         mock_logger.info.assert_called()

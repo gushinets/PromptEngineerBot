@@ -152,30 +152,43 @@ class TestEmailFailureAuditLogging:
 
     @patch("src.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
+    @patch("src.email_service.EmailTemplates")
     async def test_optimization_email_failure_logs_provider_error(
-        self, mock_send, mock_get_audit
+        self, mock_templates_class, mock_send, mock_get_audit
     ):
         """Test that optimization email failures log provider error info to audit."""
         # Setup mocks
         mock_audit = Mock()
         mock_get_audit.return_value = mock_audit
 
+        # Mock email templates
+        mock_templates = Mock()
+        mock_templates.compose_optimization_email.return_value = (
+            "Test Subject",
+            "<html>Test HTML</html>",
+            "Test Plain Text",
+        )
+        mock_templates_class.return_value = mock_templates
+
         # Mock email sending failure
         mock_send.return_value = EmailDeliveryResult(
             success=False, error="Authentication failed: Invalid credentials"
         )
 
-        email_service = create_email_service()
+        # Create email service with properly mocked templates
+        mock_config = create_mock_config()
+        email_service = EmailService(mock_config)
+        email_service.templates = mock_templates
 
         # Call method
         result = await email_service.send_optimized_prompts_email(
             "test@example.com",
             "original prompt",
-            "improved prompt",
             "craft result",
             "lyra result",
             "ggl result",
             123456789,
+            "improved prompt",
         )
 
         # Verify audit logging was called with extracted error reason

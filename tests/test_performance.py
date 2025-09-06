@@ -459,11 +459,11 @@ class TestSystemLoadTesting:
                     await mock_email.send_optimized_prompts_email(
                         f"user{user_id}@example.com",
                         "original",
-                        "improved",
                         "craft",
                         "lyra",
                         "ggl",
                         user_id,
+                        "improved",
                     )
 
                     return True

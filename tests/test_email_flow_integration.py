@@ -124,9 +124,24 @@ async def email_flow_orchestrator(
         update, context, user_id, original_prompt=None
     ):
         # Simulate the real method behavior for authentication service calls
-        if not mock_auth_service.is_user_authenticated.return_value:
+        is_authenticated = mock_auth_service.is_user_authenticated(user_id)
+        if is_authenticated:
+            # User is already authenticated - get their email and notify them
+            user_email = mock_auth_service.get_user_email(user_id)
+            await update.message.reply_text("You are already authenticated")
+            # Set email flow data
+            mock_state_manager.set_email_flow_data(
+                user_id,
+                {
+                    "original_prompt": original_prompt,
+                    "email": user_email,
+                    "authenticated": True,
+                },
+            )
+            return True
+        else:
             mock_auth_service.send_otp(user_id, "test@example.com", "test@example.com")
-        return True
+            return True
 
     async def mock_handle_email_input(update, context, user_id, email):
         # Simulate OTP sending with error handling
@@ -197,11 +212,11 @@ async def email_flow_orchestrator(
             result = mock_email_service.send_optimized_prompts_email(
                 "test@example.com",
                 "original",
-                "improved",
                 craft_result,
                 lyra_result,
                 ggl_result,
                 user_id,
+                "improved",
             )
 
             # Check if email service failed or if we should fallback to chat
@@ -211,16 +226,14 @@ async def email_flow_orchestrator(
             ) or (hasattr(result, "success") and not result.success)
 
             if email_failed:
-                # Fallback to chat delivery - send 3 optimized prompts
+                # Send processing message first, then error message (no prompt sharing)
                 await update.message.reply_text(
-                    f"🔹 **CRAFT optimized prompt:**\n\n{craft_result}"
+                    "🔄 Processing your optimized prompts..."
                 )
-                await update.message.reply_text(
-                    f"🔹 **LYRA optimized prompt:**\n\n{lyra_result}"
-                )
-                await update.message.reply_text(
-                    f"🔹 **GGL optimized prompt:**\n\n{ggl_result}"
-                )
+                from src.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+
+                await update.message.reply_text(ERROR_EMAIL_OPTIMIZATION_FAILED)
+                return False  # Return False when email delivery fails
 
             return True
         except Exception:
@@ -244,7 +257,7 @@ async def email_flow_orchestrator(
         # Simulate timeout handling with state cleanup
         mock_state_manager.set_in_followup_conversation(user_id, False)
         mock_email_service.send_optimized_prompts_email(
-            "test@example.com", "original", "cached", "craft", "lyra", "ggl", user_id
+            "test@example.com", "original", "craft", "lyra", "ggl", user_id, "cached"
         )
         return True
 
@@ -264,6 +277,43 @@ async def email_flow_orchestrator(
     orchestrator._run_craft_optimization = AsyncMock(return_value="CRAFT result")
     orchestrator._run_lyra_optimization = AsyncMock(return_value="LYRA result")
     orchestrator._run_ggl_optimization = AsyncMock(return_value="GGL result")
+
+    # Add direct optimization method
+    async def mock_run_direct_optimization_and_email_delivery(
+        update, context, user_id, original_prompt
+    ):
+        # Mock the direct optimization flow - call the optimization method that the test expects
+        optimizations = orchestrator._run_all_optimizations_with_modified_prompts(
+            original_prompt, user_id
+        )
+
+        # Try to send email
+        result = mock_email_service.send_optimized_prompts_email(
+            "test@example.com",
+            original_prompt,
+            optimizations["CRAFT"],
+            optimizations["LYRA"],
+            optimizations["GGL"],
+            user_id,
+            None,  # No improved prompt for direct flow
+        )
+
+        # Check if email failed
+        email_failed = hasattr(result, "success") and not result.success
+
+        if email_failed:
+            # Send error message for direct optimization failure
+            await update.message.reply_text("🔄 Processing your optimized prompts...")
+            from src.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+
+            await update.message.reply_text(ERROR_EMAIL_OPTIMIZATION_FAILED)
+            return False
+
+        return True
+
+    orchestrator._run_direct_optimization_and_email_delivery = (
+        mock_run_direct_optimization_and_email_delivery
+    )
 
     # Attach dependencies
     orchestrator.llm_client = mock_llm_client
