@@ -285,25 +285,29 @@ flow:<tg_id> → JSON state (TTL 86400s)  # awaiting_email, awaiting_otp, send_i
 
 ## Optimization Method Integration
 
-### System Prompt Modification
+### Email-Specific System Prompts
 
-When sending prompts to LLM optimization methods (CRAFT, LYRA, GGL), the system must modify the system prompt to prevent follow-up questions:
+When sending prompts to LLM optimization methods (CRAFT, LYRA, GGL) for email delivery, the system uses dedicated email-specific prompt files that already contain instructions to prevent follow-up questions:
 
 **Implementation Pattern:**
 ```python
-# For each optimization method
-original_system_prompt = get_method_system_prompt(method_name)
-modified_system_prompt = original_system_prompt + "\n\n### ВАЖНО\nНи в коем случае не задавай ни одного уточняющего вопроса. Твоя задача улучшить промпт пользователя по имеющимся данным. Твой ответ должен содержать только улучшенный промпт и ничего больше"
+# For each optimization method, load email-specific prompt
+email_prompts = {
+    "CRAFT": load_prompt_file("src/prompts/CRAFT_email_prompt.txt"),
+    "LYRA": load_prompt_file("src/prompts/LYRA_email_prompt.txt"), 
+    "GGL": load_prompt_file("src/prompts/GGL_email_prompt.txt")
+}
 
-# Send to LLM with modified system prompt
-optimized_result = call_llm_method(method_name, user_prompt, modified_system_prompt)
+# Send to LLM with email-specific system prompt (no modification needed)
+optimized_result = call_llm_method(method_name, user_prompt, email_prompts[method_name])
 ```
 
 **Key Requirements:**
-- The Russian instruction must be appended exactly as specified
-- Each method (CRAFT, LYRA, GGL) receives the same instruction
-- The modification happens at runtime, not in stored prompts
-- Original system prompts remain unchanged for other use cases
+- Each method uses a dedicated email-specific prompt file
+- Email prompts already contain instructions to avoid follow-up questions
+- No runtime modification or string appending is needed
+- Original system prompts (for regular optimization) remain unchanged
+- PromptLoader loads both regular and email-specific versions of prompts
 
 ## Error Handling
 

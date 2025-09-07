@@ -61,7 +61,6 @@ from .messages import (
     INFO_ALL_METHODS_OPTIMIZATION,
     INFO_EMAIL_OPTIMIZATION_PROCESSING,
     METHOD_RESULT_MESSAGE_TEMPLATE,
-    NO_FOLLOWUP_INSTRUCTION,
     OPTIMIZATION_ERROR_PREFIX,
     OPTIMIZATION_ERROR_TEMPLATE,
     OTP_VERIFICATION_SUCCESS,
@@ -954,32 +953,24 @@ class EmailFlowOrchestrator:
             container = get_container()
             prompt_loader = container.get_prompt_loader()
 
-            # Russian instruction to append to system prompts (requirement 4.3)
-            no_followup_instruction = NO_FOLLOWUP_INSTRUCTION
-
             optimization_results = {}
 
-            # Define optimization methods
+            # Define optimization methods with email-specific prompts
             methods = [
-                ("CRAFT", prompt_loader.craft_prompt),
-                ("LYRA", prompt_loader.lyra_prompt),
-                ("GGL", prompt_loader.ggl_prompt),
+                ("CRAFT", prompt_loader.craft_email_prompt),
+                ("LYRA", prompt_loader.lyra_email_prompt),
+                ("GGL", prompt_loader.ggl_email_prompt),
             ]
 
-            for method_name, base_system_prompt in methods:
+            for method_name, email_system_prompt in methods:
                 try:
                     logger.info(
                         f"Running {method_name} optimization for user {mask_telegram_id(user_id)}"
                     )
 
-                    # Modify system prompt by appending the no-followup instruction
-                    modified_system_prompt = (
-                        base_system_prompt + no_followup_instruction
-                    )
-
-                    # Create transcript with modified system prompt and user prompt
+                    # Create transcript with email-specific system prompt and user prompt
                     transcript = [
-                        {"role": "system", "content": modified_system_prompt},
+                        {"role": "system", "content": email_system_prompt},
                         {"role": "user", "content": original_prompt},
                     ]
 

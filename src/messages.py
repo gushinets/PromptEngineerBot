@@ -428,17 +428,6 @@ OPTIMIZATION_ERROR_TEMPLATE = _(
     "Optimization error with {method_name} method",
 )
 
-# No follow-up instruction for system prompts
-NO_FOLLOWUP_INSTRUCTION = _(
-    "\n\n### ВАЖНО\n"
-    "Ни в коем случае не задавай ни одного уточняющего вопроса. "
-    "Твоя задача улучшить промпт пользователя по имеющимся данным. "
-    "Твой ответ должен содержать только улучшенный промпт и ничего больше",
-    "\n\n### IMPORTANT\n"
-    "Under no circumstances ask any clarifying questions. "
-    "Your task is to improve the user's prompt based on available data. "
-    "Your response should contain only the improved prompt and nothing else",
-)
 
 # System validation strings (internal use, not user-facing)
 SYSTEM_FOLLOWUP_PROMPT_INDICATOR = _(

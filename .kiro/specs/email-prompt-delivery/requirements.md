@@ -52,10 +52,11 @@ This feature introduces email-based authentication and prompt delivery functiona
 
 1. WHEN user completes email verification and authentication THEN system SHALL skip the follow-up questions system and proceed directly to prompt optimization
 2. WHEN system begins optimization THEN system SHALL use the original user prompt as input for all three optimization methods (CRAFT, LYRA, GGL)
-3. WHEN sending prompts to LLM for optimization THEN system SHALL take the current system prompt for each method and append the following message exactly: "### ВАЖНО\nНи в коем случае не задавай ни одного уточняющего вопроса. Твоя задача улучшить промпт пользователя по имеющимся данным. Твой ответ должен содержать только улучшенный промпт и ничего больше"
-4. WHEN optimization methods are executed THEN each method SHALL receive the modified system prompt with the appended instruction
+3. WHEN sending prompts to LLM for optimization THEN system SHALL load modified versions of optimization prompts from files: `src/prompts/CRAFT_email_prompt.txt`, `src/prompts/LYRA_email_prompt.txt`, `src/prompts/GGL_email_prompt.txt` and send each one as a system prompt for each optimization method accordingly
+4. WHEN optimization methods are executed THEN each method SHALL receive the email-specific system prompt that already contains instructions to avoid follow-up questions
 5. WHEN optimization is complete THEN system SHALL proceed directly to email delivery with the three optimized results
 6. WHEN system processes the original prompt THEN system SHALL NOT initiate any follow-up questions or prompt refinement processes
+7. WHEN system loads email optimization prompts THEN system SHALL NOT append any constant string to the system prompts as they already contain the necessary instructions
 
 ### Requirement 5
 

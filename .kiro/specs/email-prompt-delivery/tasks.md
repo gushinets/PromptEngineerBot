@@ -233,16 +233,16 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - Test complete workflow integration
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [x] 5.2 Implement system prompt modification for optimization methods
+- [x] 5.2 Implement email-specific prompt loading for optimization methods
 
 
 
 
-  - Add Russian instruction to system prompts for CRAFT, LYRA, GGL methods
-  - Append exact text: "### ВАЖНО\nНи в коем случае не задавай ни одного уточняющего вопроса. Твоя задача улучшить промпт пользователя по имеющимся данным. Твой ответ должен содержать только улучшенный промпт и ничего больше"
-  - Ensure original system prompts remain unchanged for other use cases
-  - Test system prompt modification for all three methods
-  - _Requirements: 4.3, 4.4_
+  - Modify PromptLoader to load email-specific prompt files: CRAFT_email_prompt.txt, LYRA_email_prompt.txt, GGL_email_prompt.txt
+  - Remove constant string appending from email flow - use email prompts directly
+  - Ensure original system prompts remain unchanged for regular optimization use cases
+  - Test email-specific prompt loading for all three methods
+  - _Requirements: 4.3, 4.4, 4.7_
 
 - [x] 5.3 Add direct optimization flow without follow-up questions
 
@@ -262,14 +262,14 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - _Requirements: 4.3, 4.4, 4.5, 5.1, 5.2, 5.4, 7.7_
 
 
-- [x] 6.1 Create prompt optimization coordination with system prompt modification
+- [x] 6.1 Create prompt optimization coordination with email-specific prompts
 
   - Integrate with existing CRAFT, LYRA, GGL optimization methods
-  - Apply system prompt modification to each method before execution
+  - Use email-specific prompts directly (no runtime modification needed)
   - Run all three methods on the original user prompt (no follow-up improvement)
   - Collect and format results for email delivery
-  - Test optimization integration with modified system prompts
-  - _Requirements: 4.3, 4.4, 4.5_
+  - Test optimization integration with email-specific prompts
+  - _Requirements: 4.3, 4.4, 4.5, 4.7_
 
 - [x] 6.2 Implement comprehensive email composition
 
@@ -419,7 +419,18 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - Test deployment configuration in staging environment
   - _Requirements: Deployment considerations from design_
 
-- [x] 10.3 Perform final validation and testing
+- [x] 10.3 Modify email prompt delivery to use dedicated email prompt files
+
+
+
+
+  - Remove NO_FOLLOWUP_INSTRUCTION constant string appending from email_flow.py
+  - Update PromptLoader to load email-specific prompt files (CRAFT_email_prompt.txt, LYRA_email_prompt.txt, GGL_email_prompt.txt)
+  - Modify email flow to use email-specific prompts directly without runtime modification
+  - Update tests to validate email-specific prompt loading and usage
+  - _Requirements: 4.3, 4.7_
+
+- [x] 10.4 Perform final validation and testing
 
   - Run complete test suite with >90% coverage validation
   - Perform end-to-end testing with real SMTP service (in staging)

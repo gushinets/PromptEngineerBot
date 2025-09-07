@@ -39,6 +39,9 @@ class TestPromptLoader:
             "LYRA_prompt.txt": "LYRA prompt content",
             "GGL_prompt.txt": "GGL prompt content",
             "Follow_up_questions_prompt.txt": "Follow-up prompt content",
+            "CRAFT_email_prompt.txt": "CRAFT email prompt content",
+            "LYRA_email_prompt.txt": "LYRA email prompt content",
+            "GGL_email_prompt.txt": "GGL email prompt content",
         }
 
         def mock_open_func(filepath, *args, **kwargs):
@@ -54,6 +57,9 @@ class TestPromptLoader:
             assert loader._prompts["lyra"] == "LYRA prompt content"
             assert loader._prompts["ggl"] == "GGL prompt content"
             assert loader._prompts["followup"] == "Follow-up prompt content"
+            assert loader._prompts["craft_email"] == "CRAFT email prompt content"
+            assert loader._prompts["lyra_email"] == "LYRA email prompt content"
+            assert loader._prompts["ggl_email"] == "GGL email prompt content"
 
     def test_load_prompts_missing_file(self):
         """Test loading prompts when a file is missing."""
@@ -120,6 +126,30 @@ class TestPromptLoader:
 
             assert loader.followup_prompt == "Follow-up content"
 
+    def test_craft_email_prompt_property(self):
+        """Test craft_email_prompt property."""
+        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+            loader = PromptLoader()
+            loader._prompts = {"craft_email": "CRAFT email content"}
+
+            assert loader.craft_email_prompt == "CRAFT email content"
+
+    def test_lyra_email_prompt_property(self):
+        """Test lyra_email_prompt property."""
+        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+            loader = PromptLoader()
+            loader._prompts = {"lyra_email": "LYRA email content"}
+
+            assert loader.lyra_email_prompt == "LYRA email content"
+
+    def test_ggl_email_prompt_property(self):
+        """Test ggl_email_prompt property."""
+        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+            loader = PromptLoader()
+            loader._prompts = {"ggl_email": "GGL email content"}
+
+            assert loader.ggl_email_prompt == "GGL email content"
+
     def test_get_prompt_success(self):
         """Test get_prompt method with valid method name."""
         with patch("src.prompt_loader.PromptLoader._load_prompts"):
@@ -146,6 +176,9 @@ class TestPromptLoader:
             "LYRA_prompt.txt": "\t\tLYRA prompt content\t\t",
             "GGL_prompt.txt": "GGL prompt content",
             "Follow_up_questions_prompt.txt": "  Follow-up prompt content  ",
+            "CRAFT_email_prompt.txt": "  CRAFT email prompt content  ",
+            "LYRA_email_prompt.txt": "\t\tLYRA email prompt content\t\t",
+            "GGL_email_prompt.txt": "GGL email prompt content",
         }
 
         def mock_open_func(filepath, *args, **kwargs):
@@ -161,3 +194,6 @@ class TestPromptLoader:
             assert loader._prompts["lyra"] == "LYRA prompt content"
             assert loader._prompts["ggl"] == "GGL prompt content"
             assert loader._prompts["followup"] == "Follow-up prompt content"
+            assert loader._prompts["craft_email"] == "CRAFT email prompt content"
+            assert loader._prompts["lyra_email"] == "LYRA email prompt content"
+            assert loader._prompts["ggl_email"] == "GGL email prompt content"

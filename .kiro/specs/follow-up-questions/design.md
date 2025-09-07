@@ -17,11 +17,8 @@ graph TD
     C --> D{User choice}
     D -->|НЕТ| E[Send RESET_CONFIRMATION]
     E --> F[Return to prompt input state]
-    D -->|ДА| G[Send instruction message]
-    G --> H[Send improved prompt in code blocks for copying]
-    H --> I[Show improved prompt in input area with ForceReply]
-    I --> J[User sends prompt (modified or original)]
-    J --> K[Start follow-up conversation]
+    D -->|ДА| G[Start follow-up conversation immediately]
+    G --> K[Start follow-up conversation]
     K --> L[Load follow-up system prompt]
     L --> M[Add received prompt as user message]
     M --> N[Send to LLM]

@@ -25,6 +25,9 @@ class PromptLoader:
             "lyra": "LYRA_prompt.txt",
             "ggl": "GGL_prompt.txt",
             "followup": "Follow_up_questions_prompt.txt",
+            "craft_email": "CRAFT_email_prompt.txt",
+            "lyra_email": "LYRA_email_prompt.txt",
+            "ggl_email": "GGL_email_prompt.txt",
         }
 
         logger = logging.getLogger(__name__)
@@ -111,12 +114,27 @@ class PromptLoader:
         """Get the follow-up questions prompt."""
         return self._prompts["followup"]
 
+    @property
+    def craft_email_prompt(self) -> str:
+        """Get the CRAFT email optimization prompt."""
+        return self._prompts["craft_email"]
+
+    @property
+    def lyra_email_prompt(self) -> str:
+        """Get the LYRA email optimization prompt."""
+        return self._prompts["lyra_email"]
+
+    @property
+    def ggl_email_prompt(self) -> str:
+        """Get the GGL email optimization prompt."""
+        return self._prompts["ggl_email"]
+
     def get_prompt(self, method: str) -> str:
         """
         Get a prompt by method name.
 
         Args:
-            method: Method name ('craft', 'lyra', 'ggl', 'followup')
+            method: Method name ('craft', 'lyra', 'ggl', 'followup', 'craft_email', 'lyra_email', 'ggl_email')
 
         Returns:
             The prompt text
