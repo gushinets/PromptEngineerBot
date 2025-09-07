@@ -654,8 +654,8 @@ class TestTokenUsageFixes:
         assert tokens_before_followup["total_tokens"] == 0
 
         # Mock the LLM processing to avoid actual LLM calls
-        original_process_with_llm = bot_handler._process_with_llm
-        bot_handler._process_with_llm = AsyncMock()
+        original_process_followup_llm = bot_handler._process_followup_llm_request
+        bot_handler._process_followup_llm_request = AsyncMock()
 
         # Handle ДА choice
         mock_update.effective_user.id = user_id
@@ -667,11 +667,10 @@ class TestTokenUsageFixes:
         tokens_after_accept = bot_handler.conversation_manager.get_token_totals(user_id)
         assert tokens_after_accept["total_tokens"] == 0
 
-        # Verify state is properly set for ForceReply prompt input (not conversation yet)
+        # Verify state is properly set for follow-up conversation (direct transition)
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert not user_state.waiting_for_followup_choice
-        assert user_state.waiting_for_followup_prompt_input
-        assert not user_state.in_followup_conversation
+        assert user_state.in_followup_conversation
 
         # Restore original method
-        bot_handler._process_with_llm = original_process_with_llm
+        bot_handler._process_followup_llm_request = original_process_followup_llm

@@ -429,7 +429,7 @@ class TestBotHandler:
     async def test_handle_followup_choice_yes(
         self, bot_handler, mock_update, mock_context
     ):
-        """Test handling ДА choice in follow-up questions with ForceReply."""
+        """Test handling ДА choice in follow-up questions with simplified flow."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = BTN_YES
         cached_prompt = "This is the cached improved prompt"
@@ -439,38 +439,24 @@ class TestBotHandler:
         bot_handler.state_manager.set_improved_prompt_cache(user_id, cached_prompt)
         bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
 
+        # Mock LLM response for initial follow-up question
+        bot_handler.llm_client.send_prompt.return_value = "What is your main goal?"
+
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
 
-        # Verify two messages were sent: instruction message and ForceReply
-        assert mock_update.message.reply_text.call_count == 2
+        # Verify LLM was called to get initial question
+        bot_handler.llm_client.send_prompt.assert_called_once()
 
-        # Verify first message is instruction message
-        first_call_args, first_call_kwargs = (
-            mock_update.message.reply_text.call_args_list[0]
-        )
-        from src.messages import FOLLOWUP_PROMPT_INPUT_MESSAGE
+        # Verify initial question was sent
+        assert mock_update.message.reply_text.call_count >= 1
 
-        assert FOLLOWUP_PROMPT_INPUT_MESSAGE in first_call_args[0]
-
-        # Verify second message contains the cached prompt and ForceReply
-        second_call_args, second_call_kwargs = (
-            mock_update.message.reply_text.call_args_list[1]
-        )
-        assert cached_prompt in second_call_args[0]
-        assert "reply_markup" in second_call_kwargs
-        # Verify it's a ForceReply object
-        from telegram import ForceReply
-
-        assert isinstance(second_call_kwargs["reply_markup"], ForceReply)
-
-        # Verify state transitions - should be waiting for prompt input, not in conversation
+        # Verify state transitions directly to conversation (simplified flow)
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_followup_choice is False
-        assert user_state.waiting_for_followup_prompt_input is True
-        assert user_state.in_followup_conversation is False
-
-        # Verify LLM was NOT called yet (conversation hasn't started)
-        bot_handler.llm_client.send_prompt.assert_not_called()
+        assert user_state.in_followup_conversation is True
+        assert (
+            user_state.improved_prompt_cache == cached_prompt
+        )  # Cache preserved for follow-up
 
     @pytest.mark.asyncio
     async def test_handle_followup_choice_yes_no_cache(
@@ -519,54 +505,6 @@ class TestBotHandler:
         assert user_state.improved_prompt_cache == "Cached prompt"
 
     @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test handling prompt input from ForceReply during follow-up flow."""
-        user_id = mock_update.effective_user.id
-        user_prompt = "Modified prompt from user"
-        mock_update.message.text = user_prompt
-
-        # Set up follow-up prompt input waiting state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-        bot_handler.state_manager.set_improved_prompt_cache(user_id, "Original prompt")
-
-        await bot_handler._handle_followup_prompt_input(
-            mock_update, user_id, user_prompt
-        )
-
-        # Verify conversation was started with the user's prompt
-        transcript = bot_handler.conversation_manager.get_transcript(user_id)
-        assert len(transcript) >= 2  # System prompt + user prompt
-        assert any(
-            msg["content"] == user_prompt and msg["role"] == "user"
-            for msg in transcript
-        )
-
-        # Verify state transitions
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
-        assert user_state.in_followup_conversation is True
-
-        # Verify LLM was called to start asking questions
-        bot_handler.llm_client.send_prompt.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_handle_message_followup_prompt_input_routing(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test that handle_message routes to followup prompt input handler correctly."""
-        user_id = mock_update.effective_user.id
-        user_prompt = "User's modified prompt"
-        mock_update.message.text = user_prompt
-
-        # Set up follow-up prompt input waiting state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(bot_handler, "_handle_followup_prompt_input") as mock_handle:
-            await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(mock_update, user_id, user_prompt)
-
     @pytest.mark.asyncio
     async def test_handle_message_followup_choice_routing(
         self, bot_handler, mock_update, mock_context
@@ -589,7 +527,6 @@ class TestBotHandler:
 
         # Set up follow-up state
         bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
 
@@ -599,7 +536,6 @@ class TestBotHandler:
         # Verify all follow-up fields are reset
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_followup_choice is False
-        assert user_state.waiting_for_followup_prompt_input is False
         assert user_state.in_followup_conversation is False
         assert user_state.improved_prompt_cache is None
         assert user_state.waiting_for_prompt is True
@@ -1720,20 +1656,9 @@ class TestBotHandler:
             await bot_handler.handle_message(mock_update, mock_context)
             mock_choice.assert_called_once_with(mock_update, user_id, BTN_YES)
 
-        # Transition to follow-up prompt input
-        mock_update.message.text = "Modified prompt from input area"
-        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(bot_handler, "_handle_followup_prompt_input") as mock_input:
-            await bot_handler.handle_message(mock_update, mock_context)
-            mock_input.assert_called_once_with(
-                mock_update, user_id, "Modified prompt from input area"
-            )
-
-        # Transition to follow-up conversation
+        # Transition directly to follow-up conversation (simplified flow)
         mock_update.message.text = "My answer"
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
 
         with patch.object(bot_handler, "_handle_followup_conversation") as mock_conv:
@@ -1780,30 +1705,13 @@ class TestBotHandler:
 
         await bot_handler.handle_message(mock_update, mock_context)
 
-        # Verify state transitioned to waiting for prompt input (new behavior)
+        # Verify state transitioned directly to follow-up conversation (simplified flow)
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_followup_choice is False
-        assert user_state.waiting_for_followup_prompt_input is True
-        assert user_state.in_followup_conversation is False
-
-        # Verify ForceReply was sent (two messages: instruction + ForceReply)
-        assert mock_update.message.reply_text.call_count == 2
-
-        # Reset mock for next step
-        mock_update.message.reply_text.reset_mock()
-
-        # Step 3: User sends their prompt (modified or unmodified)
-        mock_update.message.text = improved_prompt  # User sends the prompt as-is
-        bot_handler.llm_client.send_prompt.return_value = (
-            "What is your target audience?"
-        )
-
-        await bot_handler.handle_message(mock_update, mock_context)
-
-        # Verify state transitioned to follow-up conversation
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
         assert user_state.in_followup_conversation is True
+
+        # Verify LLM response was sent (direct conversation start)
+        assert mock_update.message.reply_text.call_count == 1
 
         # Step 4: User answers follow-up questions
         mock_update.message.text = "My target audience is developers"
@@ -2112,267 +2020,3 @@ class TestBotHandler:
 
         # Verify refined prompt was extracted and sent
         mock_update.message.reply_text.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_basic(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test basic follow-up prompt input handling."""
-        user_id = mock_update.effective_user.id
-        prompt_text = "This is my modified prompt"
-        mock_update.message.text = prompt_text
-
-        # Set up follow-up prompt input waiting state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
-
-        # Mock the conversation manager methods
-        with (
-            patch.object(
-                bot_handler.conversation_manager, "start_followup_conversation"
-            ) as mock_start,
-            patch.object(
-                bot_handler.conversation_manager, "reset_token_totals"
-            ) as mock_reset_tokens,
-        ):
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, prompt_text
-            )
-
-            # Verify conversation was started with the received prompt
-            mock_start.assert_called_once_with(user_id, prompt_text)
-
-            # Verify token counters were reset
-            mock_reset_tokens.assert_called_once_with(user_id)
-
-        # Verify state transitions
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
-        assert user_state.in_followup_conversation is True
-
-        # Verify LLM was called to start asking questions
-        bot_handler.llm_client.send_prompt.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_unmodified_prompt(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test handling unmodified prompt from input area."""
-        user_id = mock_update.effective_user.id
-        original_prompt = "Original improved prompt"
-        mock_update.message.text = original_prompt
-
-        # Set up state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(
-            bot_handler.conversation_manager, "start_followup_conversation"
-        ) as mock_start:
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, original_prompt
-            )
-
-            # Should still work with unmodified prompt
-            mock_start.assert_called_once_with(user_id, original_prompt)
-
-        # Verify state transitions
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
-        assert user_state.in_followup_conversation is True
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_modified_prompt(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test handling modified prompt from input area."""
-        user_id = mock_update.effective_user.id
-        modified_prompt = "Original prompt with additional details and context"
-        mock_update.message.text = modified_prompt
-
-        # Set up state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(
-            bot_handler.conversation_manager, "start_followup_conversation"
-        ) as mock_start:
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, modified_prompt
-            )
-
-            # Should work with modified prompt
-            mock_start.assert_called_once_with(user_id, modified_prompt)
-
-        # Verify state transitions
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
-        assert user_state.in_followup_conversation is True
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_empty_prompt(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test handling empty prompt from input area."""
-        user_id = mock_update.effective_user.id
-        empty_prompt = ""
-        mock_update.message.text = empty_prompt
-
-        # Set up state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(
-            bot_handler.conversation_manager, "start_followup_conversation"
-        ) as mock_start:
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, empty_prompt
-            )
-
-            # Should still call start_followup_conversation even with empty prompt
-            mock_start.assert_called_once_with(user_id, empty_prompt)
-
-        # Verify state transitions
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
-        assert user_state.in_followup_conversation is True
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_long_prompt(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test handling very long prompt from input area."""
-        user_id = mock_update.effective_user.id
-        long_prompt = "This is a very long prompt " * 100  # Create a long prompt
-        mock_update.message.text = long_prompt
-
-        # Set up state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(
-            bot_handler.conversation_manager, "start_followup_conversation"
-        ) as mock_start:
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, long_prompt
-            )
-
-            # Should handle long prompts correctly
-            mock_start.assert_called_once_with(user_id, long_prompt)
-
-        # Verify state transitions
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
-        assert user_state.in_followup_conversation is True
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_token_reset(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test that token counters are properly reset for follow-up session."""
-        user_id = mock_update.effective_user.id
-        prompt_text = "Test prompt"
-        mock_update.message.text = prompt_text
-
-        # Set up state and existing token usage
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-        bot_handler.conversation_manager.token_totals[user_id] = {
-            "prompt_tokens": 100,
-            "completion_tokens": 200,
-            "total_tokens": 300,
-        }
-
-        with patch.object(
-            bot_handler.conversation_manager, "reset_token_totals"
-        ) as mock_reset_tokens:
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, prompt_text
-            )
-
-            # Verify token counters were reset
-            mock_reset_tokens.assert_called_once_with(user_id)
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_llm_processing(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test that LLM processing is initiated correctly."""
-        user_id = mock_update.effective_user.id
-        prompt_text = "Test prompt for LLM"
-        mock_update.message.text = prompt_text
-
-        # Set up state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        # Mock LLM response
-        bot_handler.llm_client.send_prompt.return_value = "What is your main goal?"
-
-        await bot_handler._handle_followup_prompt_input(
-            mock_update, user_id, prompt_text
-        )
-
-        # Verify LLM was called with FOLLOWUP method
-        bot_handler.llm_client.send_prompt.assert_called_once()
-
-        # Verify response was sent to user
-        mock_update.message.reply_text.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_handle_message_routes_to_followup_prompt_input(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test that handle_message routes correctly to followup prompt input handler."""
-        user_id = mock_update.effective_user.id
-        prompt_text = "Routed prompt text"
-        mock_update.message.text = prompt_text
-
-        # Set up follow-up prompt input waiting state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch.object(bot_handler, "_handle_followup_prompt_input") as mock_handle:
-            await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(mock_update, user_id, prompt_text)
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_state_precedence(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test that followup prompt input state has correct precedence in routing."""
-        user_id = mock_update.effective_user.id
-        prompt_text = "Test precedence"
-        mock_update.message.text = prompt_text
-
-        # Set up multiple states to test precedence
-        bot_handler.state_manager.set_waiting_for_prompt(user_id, True)
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-        bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
-
-        with patch.object(bot_handler, "_handle_followup_prompt_input") as mock_handle:
-            await bot_handler.handle_message(mock_update, mock_context)
-            # Should route to followup prompt input, not other handlers
-            mock_handle.assert_called_once_with(mock_update, user_id, prompt_text)
-
-    @pytest.mark.asyncio
-    async def test_handle_followup_prompt_input_logging(
-        self, bot_handler, mock_update, mock_context
-    ):
-        """Test that appropriate logging occurs during followup prompt input."""
-        user_id = mock_update.effective_user.id
-        prompt_text = "Test logging prompt"
-        mock_update.message.text = prompt_text
-
-        # Set up state
-        bot_handler.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
-
-        with patch("src.bot_handler.logger") as mock_logger:
-            await bot_handler._handle_followup_prompt_input(
-                mock_update, user_id, prompt_text
-            )
-
-            # Verify logging occurred
-            assert (
-                mock_logger.info.call_count >= 2
-            )  # Should log input and conversation start
-
-            # Check for specific log messages
-            log_calls = [call[0][0] for call in mock_logger.info.call_args_list]
-            assert any("followup_prompt_input" in log_call for log_call in log_calls)
-            assert any(
-                "followup_conversation_started" in log_call for log_call in log_calls
-            )

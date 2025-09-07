@@ -127,92 +127,47 @@ The follow-up questions feature has been fully implemented with:
 
 The feature is production-ready and provides users with an interactive way to refine their prompts through guided questions after receiving an initial improved prompt.
 
-## 🔧 ForceReply Input Enhancement Required
+## 🔧 Simplified Follow-up Flow Required
 
-Based on the new requirement to show improved prompts in the Telegram input area, the following tasks need to be implemented:
+Based on the new requirement to remove the prompt input step and jump straight into follow-up questions, the following tasks need to be implemented:
 
-- [x] 19. Add ForceReply functionality to messages module
+- [x] 25. Remove ForceReply functionality and prompt input state
 
-
-
-
-
-  - Import ForceReply from telegram library
-  - Add FOLLOWUP_PROMPT_INPUT_MESSAGE constant with Russian and English versions: "Поменяйте или добавьте любые детали промпта. Если всё верно, просто отправьте этот промпт мне:" / "Modify or add any details to the prompt. If everything is correct, just send this prompt to me:"
-  - Create create_prompt_input_reply function to generate ForceReply with improved prompt as placeholder
-  - Add unit tests for ForceReply creation with various prompt lengths
-  - _Requirements: 3.1, 3.2_
-
-- [x] 20. Add new state for follow-up prompt input waiting
+  - Remove FOLLOWUP_PROMPT_INPUT_MESSAGE constant from messages module
+  - Remove create_prompt_input_reply function
+  - Remove waiting_for_followup_prompt_input field from UserState dataclass
+  - Remove set_waiting_for_followup_prompt_input method from StateManager
+  - Remove _handle_followup_prompt_input method from BotHandler
+  - Clean up related unit tests for removed functionality
+  - _Requirements: 3.1_
 
 
+- [x] 26. Simplify follow-up choice handler
 
-
-
-  - Add waiting_for_followup_prompt_input field to UserState dataclass
-  - Implement set_waiting_for_followup_prompt_input method in StateManager
-  - Update reset_user_state method to reset new state field
-  - Add unit tests for new state management
-  - _Requirements: 3.1, 3.3_
-
-- [x] 21. Implement follow-up prompt input handler in BotHandler
-
-
-
-
-
-
-
-
-
-  - Create _handle_followup_prompt_input method to process user's prompt input
-
-  - Handle both modified and unmodified prompts from input area
-  - Start follow-up conversation with received prompt
-  - Add proper state transitions from prompt input to conversation
-  - Write unit tests for prompt input handling
-  - _Requirements: 3.3, 3.4, 3.5_
-
-- [x] 22. Modify follow-up choice handler to use ForceReply
-
-
-
-
-
-  - Update _handle_followup_choice method to first send instruction message when user clicks ДА
-  - Send FOLLOWUP_PROMPT_INPUT_MESSAGE followed by improved prompt wrapped in code blocks (```) with ForceReply
-  - Combine code block and ForceReply in single message for better UX (2 messages total instead of 3)
-  - Set waiting_for_followup_prompt_input state instead of starting conversation immediately
-  - Update state transitions to include new prompt input phase
-  - Write integration tests for updated choice handling with instruction message and code blocks
+  - Update _handle_followup_choice method to start follow-up conversation immediately when user clicks ДА
+  - Remove instruction message and ForceReply logic
+  - Use cached improved prompt directly for follow-up conversation context
+  - Update state transitions to go directly from choice to conversation
+  - Write integration tests for simplified choice handling
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [x] 23. Update message routing for new prompt input state
+- [x] 27. Update message routing to remove prompt input state
 
-
-
-
-
-  - Add routing logic for waiting_for_followup_prompt_input state in handle_message method
-  - Ensure proper state checking order and precedence
+  - Remove routing logic for waiting_for_followup_prompt_input state in handle_message method
+  - Ensure proper state checking order and precedence for remaining states
   - Maintain existing message routing for other states
-  - Write integration tests for message routing with new state
-  - _Requirements: 3.3_
+  - Write integration tests for updated message routing
+  - _Requirements: 3.1_
 
-- [x] 24. Add comprehensive tests for ForceReply functionality
-
-
+- [x] 28. Add comprehensive tests for simplified flow
 
 
 
 
-
-
-
-  - Test ForceReply creation with various prompt lengths and formats
-  - Test complete flow from choice to prompt input to conversation start
-  - Test user modification of prompts in input area
-  - Test state transitions through all phases of enhanced follow-up flow
+  - Test immediate conversation start when user clicks ДА
+  - Test that cached improved prompt is used as conversation context
+  - Test complete flow from choice to conversation start without intermediate steps
+  - Test state transitions through simplified follow-up flow
   - Verify integration with existing follow-up conversation functionality
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 

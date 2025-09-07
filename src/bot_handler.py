@@ -59,7 +59,6 @@ from .messages import (
     FOLLOWUP_NETWORK_FALLBACK,
     FOLLOWUP_NETWORK_RESTART,
     FOLLOWUP_OFFER_MESSAGE,
-    FOLLOWUP_PROMPT_INPUT_MESSAGE,
     FOLLOWUP_RATE_LIMIT_FALLBACK,
     FOLLOWUP_RATE_LIMIT_RESTART,
     FOLLOWUP_TIMEOUT_FALLBACK,
@@ -71,7 +70,6 @@ from .messages import (
     SELECT_METHOD_MESSAGE,
     SYSTEM_FOLLOWUP_PROMPT_INDICATOR,
     WELCOME_MESSAGE,
-    create_prompt_input_reply,
     get_processing_message,
     parse_followup_response,
     parse_llm_response,
@@ -153,7 +151,6 @@ class BotHandler:
         self.state_manager.set_last_interaction(user_id, None)
         # Reset follow-up states
         self.state_manager.set_waiting_for_followup_choice(user_id, False)
-        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_improved_prompt_cache(user_id, None)
         # Reset email states
@@ -232,20 +229,6 @@ class BotHandler:
             else:
                 # Regular follow-up
                 await self._handle_followup_choice(update, user_id, text)
-            return
-
-        # Handle follow-up prompt input waiting state
-        if user_state.waiting_for_followup_prompt_input:
-            # Check if this is part of an email flow
-            email_flow_data = user_state.email_flow_data
-            if email_flow_data and self.email_flow_orchestrator:
-                # Email flow follow-up
-                await self.email_flow_orchestrator.handle_followup_prompt_input(
-                    update, context, user_id, text
-                )
-            else:
-                # Regular follow-up
-                await self._handle_followup_prompt_input(update, user_id, text)
             return
 
         # Handle follow-up conversation state
@@ -476,57 +459,28 @@ class BotHandler:
                 self.reset_user_state(user_id)
                 return
 
-            # Send instruction message first
-            await self._safe_reply(
-                update,
-                FOLLOWUP_PROMPT_INPUT_MESSAGE,
-                parse_mode="Markdown",
-            )
-
-            # Send ForceReply with improved prompt wrapped in code blocks
-            await self._safe_reply(
-                update,
-                f"```\n{improved_prompt}\n```",
-                parse_mode="Markdown",
-                reply_markup=create_prompt_input_reply(improved_prompt),
-            )
-
-            # Update state to wait for prompt input instead of starting conversation immediately
+            # Start follow-up conversation immediately
+            # Update state transitions to go directly from choice to conversation
             self.state_manager.set_waiting_for_followup_choice(user_id, False)
-            self.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
 
-            logger.info(f"followup_accepted_prompt_input | user_id={user_id}")
+            # Start follow-up conversation using cached improved prompt
+            self.conversation_manager.start_followup_conversation(
+                user_id, improved_prompt
+            )
+
+            logger.info(f"followup_accepted | user_id={user_id}")
+
+            # Send initial request to LLM to get first question
+            try:
+                await self._process_followup_llm_request(update, user_id)
+            except Exception as e:
+                await self._handle_followup_error(update, user_id, e, "conversation")
 
         else:
             # Invalid choice, show options again
             # This should not happen with proper keyboard, but handle gracefully
             logger.warning(f"invalid_followup_choice | user_id={user_id} | text={text}")
             # Keep the same state and don't respond - user should use buttons
-
-    async def _handle_followup_prompt_input(
-        self, update: Update, user_id: int, text: str
-    ):
-        """Handle user prompt input from ForceReply during follow-up flow."""
-        # The user has sent their prompt (modified or unmodified) from the input area
-        # This prompt will be used to start the follow-up conversation
-
-        logger.info(f"followup_prompt_input | user_id={user_id} | length={len(text)}")
-
-        # Start follow-up conversation with the received prompt
-        self.conversation_manager.start_followup_conversation(user_id, text)
-
-        # Reset token counters to start new accumulation session for follow-up only
-        # This ensures we only track tokens used during the follow-up conversation
-        self.conversation_manager.reset_token_totals(user_id)
-
-        # Update state transitions
-        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
-        self.state_manager.set_in_followup_conversation(user_id, True)
-
-        logger.info(f"followup_conversation_started | user_id={user_id}")
-
-        # Send initial request to LLM to start asking questions
-        await self._process_with_llm(update, user_id, "FOLLOWUP")
 
     async def _handle_followup_conversation(
         self, update: Update, user_id: int, text: str

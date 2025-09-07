@@ -57,15 +57,14 @@ from .messages import (
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
-    FOLLOWUP_PROMPT_INPUT_MESSAGE,
     INFO_ALL_METHODS_OPTIMIZATION,
     INFO_EMAIL_OPTIMIZATION_PROCESSING,
     METHOD_RESULT_MESSAGE_TEMPLATE,
     OPTIMIZATION_ERROR_PREFIX,
     OPTIMIZATION_ERROR_TEMPLATE,
     OTP_VERIFICATION_SUCCESS,
+    RESET_CONFIRMATION,
     SUCCESS_ALL_PROMPTS_SENT_TO_CHAT,
-    create_prompt_input_reply,
     parse_followup_response,
 )
 from .redis_client import get_redis_client
@@ -674,26 +673,18 @@ class EmailFlowOrchestrator:
                     improved_prompt = email_flow_data.get("original_prompt", "")
 
                 # Send instruction message first
+                # TODO: This will be implemented in task 26 - simplified follow-up choice handler
+                # For now, just reset to avoid broken state
                 await self._safe_reply(
                     update,
-                    FOLLOWUP_PROMPT_INPUT_MESSAGE,
+                    RESET_CONFIRMATION,
                     parse_mode="Markdown",
+                    reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True),
                 )
-
-                # Send ForceReply with improved prompt wrapped in code blocks
-                await self._safe_reply(
-                    update,
-                    f"```\n{improved_prompt}\n```",
-                    parse_mode="Markdown",
-                    reply_markup=create_prompt_input_reply(improved_prompt),
-                )
-
-                # Update state to wait for prompt input
-                self.state_manager.set_waiting_for_followup_choice(user_id, False)
-                self.state_manager.set_waiting_for_followup_prompt_input(user_id, True)
+                self._reset_user_state(user_id)
 
                 logger.info(
-                    f"followup_accepted_prompt_input | user_id={mask_telegram_id(user_id)}"
+                    f"followup_accepted_reset | user_id={mask_telegram_id(user_id)}"
                 )
                 return True
 
@@ -742,7 +733,6 @@ class EmailFlowOrchestrator:
             self.conversation_manager.reset_token_totals(user_id)
 
             # Update state transitions
-            self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
             self.state_manager.set_in_followup_conversation(user_id, True)
 
             # Store timeout start time for graceful degradation
@@ -1026,7 +1016,6 @@ class EmailFlowOrchestrator:
         self.state_manager.set_waiting_for_email_input(user_id, False)
         self.state_manager.set_waiting_for_otp_input(user_id, False)
         self.state_manager.set_waiting_for_followup_choice(user_id, False)
-        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_email_flow_data(user_id, None)
         self.state_manager.set_improved_prompt_cache(user_id, None)
@@ -1793,7 +1782,6 @@ class EmailFlowOrchestrator:
         self.state_manager.set_waiting_for_email_input(user_id, False)
         self.state_manager.set_waiting_for_otp_input(user_id, False)
         self.state_manager.set_waiting_for_followup_choice(user_id, False)
-        self.state_manager.set_waiting_for_followup_prompt_input(user_id, False)
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_improved_prompt_cache(user_id, None)
         self.state_manager.set_email_flow_data(user_id, None)

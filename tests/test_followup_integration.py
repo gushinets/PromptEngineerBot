@@ -17,6 +17,7 @@ from src.messages import (
     FOLLOWUP_OFFER_MESSAGE,
     PROMPT_READY_FOLLOW_UP,
     RESET_CONFIRMATION,
+    SYSTEM_FOLLOWUP_PROMPT_INDICATOR,
 )
 
 
@@ -102,34 +103,9 @@ class TestFollowupIntegration:
         # Step 3: Handle ДА choice
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
 
-        # Verify state transition to prompt input waiting (ForceReply phase)
+        # Verify state transition directly to conversation (simplified flow)
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_followup_choice is False
-        assert user_state.waiting_for_followup_prompt_input is True
-        assert user_state.in_followup_conversation is False
-
-        # Verify ForceReply was sent (two messages: instruction + ForceReply)
-        assert mock_update.message.reply_text.call_count == 2
-
-        # Verify ForceReply message contains the improved prompt
-        second_call = mock_update.message.reply_text.call_args_list[1]
-        assert improved_prompt in second_call[0][0]
-        from telegram import ForceReply
-
-        assert isinstance(second_call[1]["reply_markup"], ForceReply)
-
-        # Step 3.5: User provides input through ForceReply (modified prompt)
-        user_modified_prompt = (
-            "I want to create marketing copy for a new product launch"
-        )
-        mock_update.message.text = user_modified_prompt
-        await bot_handler._handle_followup_prompt_input(
-            mock_update, user_id, user_modified_prompt
-        )
-
-        # Now verify conversation has started
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_followup_prompt_input is False
         assert user_state.in_followup_conversation is True
 
         # Verify initial LLM call was made
@@ -325,30 +301,15 @@ class TestFollowupIntegration:
         # Step 3: User accepts follow-up (ДА)
         mock_update.message.text = BTN_YES
 
+        # Mock LLM response for initial question
+        bot_handler.llm_client.send_prompt.return_value = "What is your main goal?"
+
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
 
-        # Verify ForceReply prompt input state (not conversation yet)
+        # Verify simplified flow - conversation starts immediately after YES choice
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_prompt is False
         assert user_state.waiting_for_followup_choice is False
-        assert user_state.waiting_for_followup_prompt_input is True
-        assert user_state.in_followup_conversation is False
-        assert user_state.improved_prompt_cache == improved_prompt
-
-        # Step 3.5: User provides input through ForceReply
-        user_prompt = "I want to create better marketing content"
-        mock_update.message.text = user_prompt
-        bot_handler.llm_client.send_prompt.return_value = "What is your goal?"
-
-        await bot_handler._handle_followup_prompt_input(
-            mock_update, user_id, user_prompt
-        )
-
-        # Now verify follow-up conversation state
-        user_state = bot_handler.state_manager.get_user_state(user_id)
-        assert user_state.waiting_for_prompt is False
-        assert user_state.waiting_for_followup_choice is False
-        assert user_state.waiting_for_followup_prompt_input is False
         assert user_state.in_followup_conversation is True
         assert user_state.improved_prompt_cache == improved_prompt
 
@@ -495,19 +456,14 @@ class TestFollowupIntegration:
         # Step 6: User accepts follow-up and completes the flow
         mock_update.message.text = BTN_YES
 
-        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
-
-        # Step 6.5: User provides input through ForceReply
-        user_prompt = "Help me write professional business emails"
-        mock_update.message.text = user_prompt
+        # Set up the LLM responses for the follow-up conversation
+        # Reset the side_effect since we already used return_value above
         bot_handler.llm_client.send_prompt.side_effect = [
             "What type of emails do you write most often?",
             "<REFINED_PROMPT>You are an expert email writer specializing in business communications. Help me craft professional, engaging emails that achieve specific goals. When I provide an email request, analyze the purpose, audience, and desired outcome, then create a well-structured email with appropriate tone, clear subject line, and compelling content. Focus on clarity, professionalism, and actionable outcomes.</REFINED_PROMPT>",
         ]
 
-        await bot_handler._handle_followup_prompt_input(
-            mock_update, user_id, user_prompt
-        )
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
 
         # Answer the follow-up question
         mock_update.message.text = "Business emails to clients and partners"
@@ -571,6 +527,106 @@ class TestFollowupIntegration:
         with patch.object(bot_handler, "handle_start") as mock_handle_start:
             await bot_handler.handle_message(mock_update, mock_context)
             mock_handle_start.assert_called_once_with(mock_update, mock_context)
+
+    @pytest.mark.asyncio
+    async def test_message_routing_without_prompt_input_state(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test that message routing works correctly without waiting_for_followup_prompt_input state."""
+        user_id = mock_update.effective_user.id
+
+        # Test 1: Verify routing order and precedence for remaining states
+        # Reset all states first
+        bot_handler.reset_user_state(user_id)
+
+        # Test email input state has higher precedence than follow-up states
+        bot_handler.state_manager.set_waiting_for_email_input(user_id, True)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        mock_update.message.text = "test@example.com"
+
+        # Mock email flow orchestrator
+        with patch.object(bot_handler, "email_flow_orchestrator") as mock_email_flow:
+            mock_email_flow.handle_email_input = AsyncMock()
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_email_flow.handle_email_input.assert_called_once()
+
+        # Test 2: OTP input state has higher precedence than follow-up states
+        bot_handler.reset_user_state(user_id)
+        bot_handler.state_manager.set_waiting_for_otp_input(user_id, True)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        mock_update.message.text = "123456"
+
+        with patch.object(bot_handler, "email_flow_orchestrator") as mock_email_flow:
+            mock_email_flow.handle_otp_input = AsyncMock()
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_email_flow.handle_otp_input.assert_called_once()
+
+        # Test 3: Follow-up choice state routing works correctly
+        bot_handler.reset_user_state(user_id)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
+
+        mock_update.message.text = BTN_YES
+
+        with patch.object(bot_handler, "_handle_followup_choice") as mock_handle_choice:
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_handle_choice.assert_called_once_with(mock_update, user_id, BTN_YES)
+
+        # Test 4: Follow-up conversation state routing works correctly
+        bot_handler.reset_user_state(user_id)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, True)
+
+        mock_update.message.text = "My response"
+
+        with patch.object(
+            bot_handler, "_handle_followup_conversation"
+        ) as mock_handle_conv:
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_handle_conv.assert_called_once_with(
+                mock_update, user_id, "My response"
+            )
+
+        # Test 5: Prompt input state routing works correctly
+        bot_handler.reset_user_state(user_id)
+        # waiting_for_prompt should be True by default after reset
+
+        mock_update.message.text = "New prompt to optimize"
+
+        with patch.object(bot_handler, "_handle_prompt_input") as mock_handle_prompt:
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_handle_prompt.assert_called_once_with(
+                mock_update, user_id, "New prompt to optimize"
+            )
+
+        # Test 6: Method selection state routing works correctly
+        bot_handler.reset_user_state(user_id)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
+
+        mock_update.message.text = "CRAFT"
+
+        with patch.object(
+            bot_handler, "_handle_method_selection"
+        ) as mock_handle_method:
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_handle_method.assert_called_once_with(
+                mock_update, mock_context, user_id, "CRAFT"
+            )
+
+        # Test 7: Multi-turn conversation routing works correctly (fallback)
+        bot_handler.reset_user_state(user_id)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, False)
+
+        mock_update.message.text = "Continue conversation"
+
+        with patch.object(bot_handler, "_handle_conversation_turn") as mock_handle_turn:
+            await bot_handler.handle_message(mock_update, mock_context)
+            mock_handle_turn.assert_called_once_with(
+                mock_update, user_id, "Continue conversation"
+            )
 
     @pytest.mark.asyncio
     async def test_error_recovery_and_fallback_mechanisms(
@@ -655,6 +711,129 @@ class TestFollowupIntegration:
         assert user_state.in_followup_conversation is False
 
     @pytest.mark.asyncio
+    async def test_simplified_followup_choice_handler(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test simplified follow-up choice handler that starts conversation immediately."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up follow-up choice waiting state
+        improved_prompt = "This is an improved prompt for testing"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+
+        # Step 2: Mock LLM response for initial follow-up question
+        initial_question = "What is the main purpose of your prompt?"
+        bot_handler.llm_client.send_prompt.return_value = initial_question
+
+        # Step 3: User clicks ДА button
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 4: Verify state transitions directly from choice to conversation
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is True
+        assert user_state.improved_prompt_cache == improved_prompt
+
+        # Step 5: Verify LLM was called to get initial question
+        bot_handler.llm_client.send_prompt.assert_called_once()
+
+        # Step 6: Verify initial question was sent with correct keyboard
+        reply_calls = mock_update.message.reply_text.call_args_list
+        question_sent = False
+        for call in reply_calls:
+            if initial_question in call[0][0]:
+                question_sent = True
+                assert call[1]["reply_markup"] == FOLLOWUP_CONVERSATION_KEYBOARD
+                break
+
+        assert question_sent, "Initial follow-up question was not sent to user"
+
+        # Step 7: Verify conversation context was set up correctly
+        transcript = bot_handler.conversation_manager.get_transcript(user_id)
+
+        # Should have system prompt, improved prompt as user message, and LLM response
+        assert len(transcript) >= 3
+        assert transcript[0]["role"] == "system"
+        assert transcript[1]["role"] == "user"
+        assert transcript[1]["content"] == improved_prompt
+        assert transcript[2]["role"] == "assistant"
+        assert transcript[2]["content"] == initial_question
+
+    @pytest.mark.asyncio
+    async def test_simplified_choice_handler_uses_cached_prompt_directly(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test that simplified choice handler uses cached improved prompt directly."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up follow-up choice waiting state with specific cached prompt
+        cached_prompt = "You are an expert content creator. Help users write engaging social media posts that drive engagement and conversions."
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, cached_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        # Step 2: Mock LLM response
+        bot_handler.llm_client.send_prompt.return_value = (
+            "What type of social media content do you want to create?"
+        )
+
+        # Step 3: User accepts follow-up
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 4: Verify the cached prompt was used directly in conversation context
+        transcript = bot_handler.conversation_manager.get_transcript(user_id)
+
+        # Find the user message that should contain the cached prompt
+        user_message_found = False
+        for message in transcript:
+            if message["role"] == "user" and message["content"] == cached_prompt:
+                user_message_found = True
+                break
+
+        assert user_message_found, (
+            "Cached improved prompt was not used directly in conversation context"
+        )
+
+        # Step 5: Verify state is correctly set
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.in_followup_conversation is True
+        assert user_state.improved_prompt_cache == cached_prompt
+
+    @pytest.mark.asyncio
+    async def test_simplified_choice_handler_error_handling(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test error handling in simplified choice handler."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up follow-up choice waiting state
+        improved_prompt = "Test improved prompt"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        # Step 2: Mock LLM error
+        bot_handler.llm_client.send_prompt.side_effect = Exception("Network timeout")
+
+        # Step 3: User accepts follow-up
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 4: Verify error was handled gracefully
+        # The error handling should have been called and fallback should be used
+        reply_calls = mock_update.message.reply_text.call_args_list
+
+        # Should have received some error handling response
+        assert len(reply_calls) > 0
+
+        # Verify state was handled appropriately (either reset or fallback used)
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        # State should either be reset to prompt input or conversation should be completed with fallback
+        assert user_state.waiting_for_followup_choice is False
+
+    @pytest.mark.asyncio
     async def test_concurrent_user_followup_isolation(
         self, bot_handler, mock_config, mock_llm_client
     ):
@@ -734,3 +913,415 @@ class TestFollowupIntegration:
         assert user2_state.waiting_for_prompt is True
         assert user2_state.in_followup_conversation is False
         assert user2_state.improved_prompt_cache is None
+
+    @pytest.mark.asyncio
+    async def test_immediate_conversation_start_on_yes_choice(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test that follow-up conversation starts immediately when user clicks ДА."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up follow-up choice waiting state
+        improved_prompt = "Test improved prompt for immediate start"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+
+        # Mock LLM response for initial question
+        bot_handler.llm_client.send_prompt.return_value = (
+            "What is your main goal with this prompt?"
+        )
+
+        # Step 2: User clicks ДА button
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 3: Verify immediate state transition to conversation
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is True
+        assert user_state.waiting_for_prompt is False
+
+        # Step 4: Verify LLM was called immediately (no intermediate steps)
+        bot_handler.llm_client.send_prompt.assert_called_once()
+
+        # Step 5: Verify initial question was sent with conversation keyboard
+        call_args = mock_update.message.reply_text.call_args_list[-1]
+        assert "What is your main goal" in call_args[0][0]
+        assert call_args[1]["reply_markup"] == FOLLOWUP_CONVERSATION_KEYBOARD
+
+        # Step 6: Verify conversation was started with correct context
+        transcript = bot_handler.conversation_manager.get_transcript(user_id)
+        assert len(transcript) >= 2  # System prompt + user context
+
+        # Find the system message with followup prompt indicator
+        system_message_found = False
+        user_context_found = False
+
+        for message in transcript:
+            if (
+                message["role"] == "system"
+                and SYSTEM_FOLLOWUP_PROMPT_INDICATOR in message["content"]
+            ):
+                system_message_found = True
+            if message["role"] == "user" and improved_prompt in message["content"]:
+                user_context_found = True
+
+        assert system_message_found, "System followup prompt not found in conversation"
+        assert user_context_found, "Improved prompt not found as user context"
+
+    @pytest.mark.asyncio
+    async def test_cached_improved_prompt_used_as_context(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test that cached improved prompt is used as conversation context."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up specific improved prompt in cache
+        improved_prompt = "You are an expert content creator. Help users write engaging social media posts that drive engagement and conversions."
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        # Mock LLM response
+        bot_handler.llm_client.send_prompt.return_value = (
+            "What type of social media platform are you targeting?"
+        )
+
+        # Step 2: User accepts follow-up
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 3: Verify the exact improved prompt was used in conversation context
+        transcript = bot_handler.conversation_manager.get_transcript(user_id)
+
+        # Find the user message containing the improved prompt
+        improved_prompt_in_context = False
+        for message in transcript:
+            if (
+                message["role"] == "user"
+                and "expert content creator" in message["content"]
+                and "social media posts" in message["content"]
+                and "drive engagement and conversions" in message["content"]
+            ):
+                improved_prompt_in_context = True
+                break
+
+        assert improved_prompt_in_context, (
+            "Cached improved prompt was not properly used as conversation context"
+        )
+
+        # Step 4: Verify LLM received the context with the improved prompt
+        llm_call_args = bot_handler.llm_client.send_prompt.call_args[0]
+        conversation_messages = llm_call_args[0]
+
+        # Check that the improved prompt is in the conversation sent to LLM
+        improved_prompt_sent_to_llm = False
+        for message in conversation_messages:
+            if message.get("role") == "user" and improved_prompt in message.get(
+                "content", ""
+            ):
+                improved_prompt_sent_to_llm = True
+                break
+
+        assert improved_prompt_sent_to_llm, (
+            "Improved prompt was not sent to LLM as part of conversation context"
+        )
+
+    @pytest.mark.asyncio
+    async def test_complete_flow_without_intermediate_steps(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test complete flow from choice to conversation start without intermediate steps."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up initial state
+        improved_prompt = "Test prompt for direct flow"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+
+        # Track all reply calls to verify no intermediate messages
+        initial_reply_count = len(mock_update.message.reply_text.call_args_list)
+
+        # Mock LLM response
+        bot_handler.llm_client.send_prompt.return_value = (
+            "What specific outcome do you want to achieve?"
+        )
+
+        # Step 2: User clicks ДА
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 3: Verify no intermediate prompt input step occurred
+        # The simplified flow should go directly from choice to conversation
+        reply_calls = mock_update.message.reply_text.call_args_list[
+            initial_reply_count:
+        ]
+
+        # Should only have one reply - the initial LLM question
+        assert len(reply_calls) == 1, f"Expected 1 reply call, got {len(reply_calls)}"
+
+        # Verify it's the LLM question, not an instruction message
+        question_call = reply_calls[0]
+        assert "What specific outcome" in question_call[0][0]
+        assert question_call[1]["reply_markup"] == FOLLOWUP_CONVERSATION_KEYBOARD
+
+        # Step 4: Verify state went directly to conversation
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is True
+        # Verify no intermediate states were set
+        assert (
+            not hasattr(user_state, "waiting_for_followup_prompt_input")
+            or not user_state.waiting_for_followup_prompt_input
+        )
+
+        # Step 5: Verify conversation is immediately ready for user responses
+        mock_update.message.text = "I want to increase user engagement"
+        bot_handler.llm_client.send_prompt.return_value = (
+            "<REFINED_PROMPT>Your refined prompt here</REFINED_PROMPT>"
+        )
+
+        await bot_handler._handle_followup_conversation(
+            mock_update, user_id, "I want to increase user engagement"
+        )
+
+        # Verify the conversation was completed (transcript is cleared after completion)
+        # Since the refined prompt was returned, the conversation should be reset
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_prompt is True
+        assert user_state.in_followup_conversation is False
+        assert user_state.improved_prompt_cache is None
+
+        # Verify refined prompt was sent to user
+        reply_calls = mock_update.message.reply_text.call_args_list
+        refined_prompt_sent = False
+        for call in reply_calls:
+            if "Your refined prompt here" in call[0][0]:
+                refined_prompt_sent = True
+                break
+        assert refined_prompt_sent, "Refined prompt was not sent to user"
+
+    @pytest.mark.asyncio
+    async def test_simplified_state_transitions(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test state transitions through simplified follow-up flow."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Initial state - waiting for follow-up choice
+        improved_prompt = "Test prompt for state transitions"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+
+        # Verify initial state
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is True
+        assert user_state.in_followup_conversation is False
+        assert user_state.waiting_for_prompt is False
+        assert user_state.improved_prompt_cache == improved_prompt
+
+        # Step 2: User accepts follow-up (ДА)
+        mock_update.message.text = BTN_YES
+        bot_handler.llm_client.send_prompt.return_value = "Initial question"
+
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Verify state transition: choice -> conversation (direct)
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is True
+        assert user_state.waiting_for_prompt is False
+        assert user_state.improved_prompt_cache == improved_prompt  # Still cached
+
+        # Step 3: User provides answer
+        mock_update.message.text = "My answer to the question"
+        bot_handler.llm_client.send_prompt.return_value = "Follow-up question"
+
+        await bot_handler._handle_followup_conversation(
+            mock_update, user_id, "My answer to the question"
+        )
+
+        # Verify state remains in conversation
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is True
+        assert user_state.waiting_for_prompt is False
+        assert user_state.improved_prompt_cache == improved_prompt
+
+        # Step 4: User clicks generate button
+        mock_update.message.text = BTN_GENERATE_PROMPT
+        bot_handler.llm_client.send_prompt.return_value = (
+            "<REFINED_PROMPT>Final refined prompt</REFINED_PROMPT>"
+        )
+
+        await bot_handler._handle_followup_conversation(
+            mock_update, user_id, BTN_GENERATE_PROMPT
+        )
+
+        # Verify final state transition: conversation -> prompt input ready
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is False
+        assert user_state.waiting_for_prompt is True
+        assert user_state.improved_prompt_cache is None  # Cache cleared
+
+        # Step 5: Verify conversation was reset
+        assert bot_handler.conversation_manager.get_transcript(user_id) == []
+        assert not bot_handler.conversation_manager.is_in_followup_conversation(user_id)
+
+    @pytest.mark.asyncio
+    async def test_integration_with_existing_followup_functionality(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test integration with existing follow-up conversation functionality."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Start simplified flow
+        improved_prompt = "Original prompt for integration test"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        # Mock LLM responses for the conversation
+        llm_responses = [
+            "What is your target audience?",
+            "What tone do you prefer?",
+            "<REFINED_PROMPT>Your refined prompt based on our conversation</REFINED_PROMPT>",
+        ]
+        response_iter = iter(llm_responses)
+        bot_handler.llm_client.send_prompt.side_effect = lambda *args: next(
+            response_iter
+        )
+
+        # Step 2: User accepts and starts conversation
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 3: Verify integration with existing conversation management
+        # Check that conversation was properly initialized
+        assert bot_handler.conversation_manager.is_in_followup_conversation(user_id)
+
+        transcript = bot_handler.conversation_manager.get_transcript(user_id)
+        assert len(transcript) >= 2  # System + user context messages
+
+        # Step 4: Test existing conversation functionality works
+        # User provides first answer
+        mock_update.message.text = "Business professionals"
+        await bot_handler._handle_followup_conversation(
+            mock_update, user_id, "Business professionals"
+        )
+
+        # Verify message was added to conversation history
+        transcript = bot_handler.conversation_manager.get_transcript(user_id)
+        user_message_found = False
+        for message in transcript:
+            if (
+                message["role"] == "user"
+                and "Business professionals" in message["content"]
+            ):
+                user_message_found = True
+                break
+        assert user_message_found, "User message not added to conversation history"
+
+        # Step 5: Test generate button functionality
+        mock_update.message.text = BTN_GENERATE_PROMPT
+        await bot_handler._handle_followup_conversation(
+            mock_update, user_id, BTN_GENERATE_PROMPT
+        )
+
+        # Verify the conversation was completed (transcript is cleared after completion)
+        # Since the refined prompt was returned, the conversation should be reset
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_prompt is True
+        assert user_state.in_followup_conversation is False
+        assert user_state.improved_prompt_cache is None
+
+        # Step 6: Verify refined prompt parsing and completion
+        reply_calls = mock_update.message.reply_text.call_args_list
+
+        refined_prompt_sent = False
+        completion_message_sent = False
+
+        for call in reply_calls:
+            message_text = call[0][0]
+            if "refined prompt based on our conversation" in message_text:
+                refined_prompt_sent = True
+            if PROMPT_READY_FOLLOW_UP in message_text:
+                completion_message_sent = True
+
+        assert refined_prompt_sent, "Refined prompt was not sent"
+        assert completion_message_sent, "Completion message was not sent"
+
+        # Step 7: Verify final state and cleanup
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_prompt is True
+        assert user_state.in_followup_conversation is False
+        assert user_state.improved_prompt_cache is None
+
+    @pytest.mark.asyncio
+    async def test_simplified_flow_error_recovery(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test error recovery in simplified follow-up flow."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up follow-up choice state
+        improved_prompt = "Test prompt for error recovery"
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+
+        # Step 2: Mock LLM error on initial request
+        bot_handler.llm_client.send_prompt.side_effect = Exception("Network timeout")
+
+        # Step 3: User accepts follow-up
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 4: Verify error was handled gracefully
+        reply_calls = mock_update.message.reply_text.call_args_list
+        assert len(reply_calls) > 0, "No error handling response was sent"
+
+        # Step 5: Verify state was handled appropriately
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_followup_choice is False
+
+        # State should either be reset to prompt input or conversation completed with fallback
+        assert (
+            user_state.waiting_for_prompt is True
+            or user_state.in_followup_conversation is False
+        )
+
+    @pytest.mark.asyncio
+    async def test_simplified_flow_with_missing_cache(
+        self, bot_handler, mock_update, mock_context
+    ):
+        """Test simplified flow handles missing improved prompt cache gracefully."""
+        user_id = mock_update.effective_user.id
+
+        # Step 1: Set up follow-up choice state without cached prompt (edge case)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, None)
+
+        # Step 2: User accepts follow-up
+        mock_update.message.text = BTN_YES
+        await bot_handler._handle_followup_choice(mock_update, user_id, BTN_YES)
+
+        # Step 3: Verify fallback behavior
+        reply_calls = mock_update.message.reply_text.call_args_list
+        assert len(reply_calls) > 0, "No fallback response was sent"
+
+        # Should have sent reset confirmation as fallback
+        reset_message_sent = False
+        for call in reply_calls:
+            if RESET_CONFIRMATION in call[0][0]:
+                reset_message_sent = True
+                break
+
+        assert reset_message_sent, "Reset confirmation not sent as fallback"
+
+        # Step 4: Verify state was reset
+        user_state = bot_handler.state_manager.get_user_state(user_id)
+        assert user_state.waiting_for_prompt is True
+        assert user_state.waiting_for_followup_choice is False
+        assert user_state.in_followup_conversation is False

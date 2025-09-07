@@ -58,7 +58,6 @@ class UserState:
     last_interaction: Optional[str] = None
     # New fields for follow-up feature
     waiting_for_followup_choice: bool = False
-    waiting_for_followup_prompt_input: bool = False  # New state for prompt input
     in_followup_conversation: bool = False
     improved_prompt_cache: Optional[str] = None  # Store improved prompt for follow-up
 ```
@@ -66,7 +65,6 @@ class UserState:
 **New Methods:**
 ```python
 def set_waiting_for_followup_choice(self, user_id: int, waiting: bool)
-def set_waiting_for_followup_prompt_input(self, user_id: int, waiting: bool)
 def set_in_followup_conversation(self, user_id: int, active: bool)
 def set_improved_prompt_cache(self, user_id: int, prompt: str)
 def get_improved_prompt_cache(self, user_id: int) -> Optional[str]
@@ -78,6 +76,7 @@ def get_improved_prompt_cache(self, user_id: int) -> Optional[str]
 ```python
 def start_followup_conversation(self, user_id: int, improved_prompt: str)
     # Uses self.prompt_loader.followup_prompt to load system context
+    # Uses cached improved prompt directly as user context
 def is_in_followup_conversation(self, user_id: int) -> bool
 def reset_to_followup_ready(self, user_id: int)
 ```
@@ -92,11 +91,7 @@ FOLLOWUP_OFFER_MESSAGE = _(
     "Your prompt is ready to use, but we can make it even better. Ready to answer a few questions?"
 )
 
-# Prompt input instruction message
-FOLLOWUP_PROMPT_INPUT_MESSAGE = _(
-    "Поменяйте или добавьте любые детали промпта. Если всё верно, просто отправьте этот промпт мне:",
-    "Modify or add any details to the prompt. If everything is correct, just send this prompt to me:"
-)
+
 
 # Button labels
 BTN_YES = _("ДА", "YES")
@@ -113,24 +108,13 @@ FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
 )
 ```
 
-**New Telegram UI Components:**
-```python
-from telegram import ForceReply
 
-def create_prompt_input_reply(improved_prompt: str) -> ForceReply:
-    """Create ForceReply with improved prompt as placeholder text."""
-    return ForceReply(
-        input_field_placeholder=improved_prompt,
-        selective=False
-    )
-```
 
 ### 4. Bot Handler Extensions
 
 **New Handler Methods:**
 ```python
 async def _handle_followup_choice(self, update: Update, user_id: int, text: str)
-async def _handle_followup_prompt_input(self, update: Update, user_id: int, text: str)
 async def _handle_followup_conversation(self, update: Update, user_id: int, text: str)
 async def _process_followup_generation(self, update: Update, user_id: int)
 ```
@@ -150,7 +134,6 @@ class ConversationState(Enum):
     WAITING_FOR_METHOD = "waiting_for_method"
     IN_METHOD_CONVERSATION = "in_method_conversation"
     WAITING_FOR_FOLLOWUP_CHOICE = "waiting_for_followup_choice"        # New
-    WAITING_FOR_FOLLOWUP_PROMPT_INPUT = "waiting_for_followup_prompt_input"  # New
     IN_FOLLOWUP_CONVERSATION = "in_followup_conversation"              # New
 ```
 
