@@ -103,6 +103,27 @@ After first deployment, run migrations:
 docker-compose exec prompt-improver-bot python -m alembic upgrade head
 ```
 
+### User Profile Fields Migration
+
+The bot includes enhanced user profiling with Telegram profile data:
+
+**New Profile Fields Added:**
+- `first_name`: User's first name from Telegram
+- `last_name`: User's last name from Telegram  
+- `is_bot`: Boolean indicating bot accounts
+- `is_premium`: Telegram Premium subscription status
+- `language_code`: User's language preference (ISO 639-1)
+
+**Performance Indexes:**
+- `ix_users_language_code`: Language-based user queries
+- `ix_users_is_premium`: Premium user filtering
+- `ix_users_bot_premium`: Composite index for user analytics
+
+**Migration Safety:**
+- All new fields are nullable or have defaults for backward compatibility
+- Existing user data is preserved during migration
+- Profile data is captured automatically during user interactions
+
 ### Creating New Migrations
 
 When modifying database models:

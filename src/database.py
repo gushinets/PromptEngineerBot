@@ -1,8 +1,30 @@
 """
-Database models and connection management for email authentication feature.
+Database models and connection management for email authentication and user profiling.
 
 This module provides SQLAlchemy models for User and AuthEvent tables,
 database connection factory, and session management.
+
+User Profile Fields:
+The User model includes Telegram profile fields that are automatically extracted
+from update.effective_user during user interactions:
+
+- first_name: User's first name from Telegram profile
+- last_name: User's last name from Telegram profile
+- is_bot: Boolean indicating if user is a bot account
+- is_premium: Boolean indicating Telegram Premium subscription status
+- language_code: User's language preference (ISO 639-1 code)
+
+Profile Update Strategy:
+- New users: All available profile data captured during registration
+- Existing users: Selective updates only when meaningful changes detected
+- Profile updates trigger updated_at timestamp for change tracking
+- Graceful handling of missing or null profile data from Telegram API
+
+Database Indexes:
+Performance-optimized indexes are created for profile fields:
+- ix_users_language_code: For language-based user queries
+- ix_users_is_premium: For premium user filtering
+- ix_users_bot_premium: Composite index for user type analytics
 """
 
 import logging
@@ -23,10 +45,24 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """User model for storing authentication and email information."""
+    """
+    User model for storing authentication, email, and Telegram profile information.
+
+    This model stores both authentication data (email, verification status) and
+    Telegram profile information extracted from update.effective_user during user
+    interactions. Profile data is captured automatically during user registration
+    and updated selectively when meaningful changes are detected.
+
+    Profile Update Strategy:
+    - New users: All available profile data is captured during first interaction
+    - Existing users: Profile data is updated only when meaningful changes are detected
+      (name changes, premium status changes, language changes) to optimize performance
+    - Updates trigger the updated_at timestamp to track when profile changes occurred
+    """
 
     __tablename__ = "users"
 
+    # Core identification and authentication fields
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
@@ -45,8 +81,34 @@ class User(Base):
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
 
+    # Telegram profile fields extracted from update.effective_user
+    # These fields are automatically populated during user interactions
+
+    first_name: Mapped[Optional[str]] = mapped_column(Text)
+    """User's first name from Telegram (update.effective_user.first_name).
+    Nullable as some users may not have a first name set in their Telegram profile."""
+
+    last_name: Mapped[Optional[str]] = mapped_column(Text)
+    """User's last name from Telegram (update.effective_user.last_name).
+    Nullable as most users don't set a last name in their Telegram profile."""
+
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False)
+    """Indicates if this user is a Telegram bot account (update.effective_user.is_bot).
+    Defaults to False for regular user accounts. Used for analytics and bot detection."""
+
+    is_premium: Mapped[Optional[bool]] = mapped_column(Boolean)
+    """Indicates if user has Telegram Premium subscription (update.effective_user.is_premium).
+    Nullable as this field may not be available for all users or in all Telegram versions.
+    Used for feature differentiation and user analytics."""
+
+    language_code: Mapped[Optional[str]] = mapped_column(Text)
+    """User's language preference as ISO 639-1 code (update.effective_user.language_code).
+    Examples: 'en', 'es', 'fr', 'de'. Nullable as not all users have language set.
+    Used for localization and language-specific features."""
+
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, telegram_id={self.telegram_id}, email='{self.email[:3]}***')>"
+        name_part = f", name='{self.first_name}'" if self.first_name else ""
+        return f"<User(id={self.id}, telegram_id={self.telegram_id}, email='{self.email[:3]}***'{name_part})>"
 
 
 class AuthEvent(Base):
@@ -74,6 +136,13 @@ Index("ix_users_email", User.email)
 Index(
     "ix_users_authenticated", User.is_authenticated, User.last_authenticated_at.desc()
 )
+
+# Profile field indexes for efficient queries on Telegram user data
+Index("ix_users_language_code", User.language_code)  # Language-based user segmentation
+Index("ix_users_is_premium", User.is_premium)  # Premium user filtering and analytics
+Index(
+    "ix_users_bot_premium", User.is_bot, User.is_premium
+)  # Composite index for user type queries
 
 # Essential Indexes for AuthEvents Model
 Index(

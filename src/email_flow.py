@@ -376,7 +376,9 @@ class EmailFlowOrchestrator:
                 return False
 
             # Verify OTP with authentication service
-            success, error_reason = self.auth_service.verify_otp(user_id, text.strip())
+            success, error_reason = self.auth_service.verify_otp(
+                user_id, text.strip(), update.effective_user
+            )
 
             if success:
                 # Successful verification

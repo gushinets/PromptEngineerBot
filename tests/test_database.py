@@ -2,16 +2,12 @@
 
 import os
 import tempfile
-from datetime import datetime
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import sessionmaker
 
 from src.database import (
     AuthEvent,
-    Base,
     DatabaseManager,
     User,
     get_db_manager,
@@ -350,6 +346,375 @@ class TestSchemaConstraints:
 
         # Verify indexes exist (this is database-specific, so we'll test functionality)
         # The indexes are tested implicitly through query performance and constraint enforcement
+
+
+class TestUserModelProfileExtensions:
+    """Test User model profile field extensions."""
+
+    def test_user_model_creation_with_profile_fields(self, db_session):
+        """Test User model creation with new profile fields."""
+        # Arrange & Act
+        user = User(
+            telegram_id=123456789,
+            email="test@example.com",
+            email_original="Test@Example.Com",
+            is_authenticated=True,
+            first_name="John",
+            last_name="Doe",
+            is_bot=False,
+            is_premium=True,
+            language_code="en",
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=123456789).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name == "John"
+        assert retrieved_user.last_name == "Doe"
+        assert retrieved_user.is_bot is False
+        assert retrieved_user.is_premium is True
+        assert retrieved_user.language_code == "en"
+
+    def test_user_model_creation_with_minimal_profile_data(self, db_session):
+        """Test User model creation with minimal profile data."""
+        # Arrange & Act
+        user = User(
+            telegram_id=987654321,
+            email="minimal@example.com",
+            email_original="minimal@example.com",
+            first_name="Jane",
+            # Other profile fields will use defaults/None
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=987654321).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name == "Jane"
+        assert retrieved_user.last_name is None
+        assert retrieved_user.is_bot is False  # Default value
+        assert retrieved_user.is_premium is None
+        assert retrieved_user.language_code is None
+
+    def test_user_model_creation_bot_user(self, db_session):
+        """Test User model creation for bot users."""
+        # Arrange & Act
+        bot_user = User(
+            telegram_id=111222333,
+            email="bot@example.com",
+            email_original="bot@example.com",
+            first_name="TestBot",
+            is_bot=True,
+            is_premium=None,  # Bots typically don't have premium
+            language_code=None,
+        )
+
+        db_session.add(bot_user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=111222333).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name == "TestBot"
+        assert retrieved_user.last_name is None
+        assert retrieved_user.is_bot is True
+        assert retrieved_user.is_premium is None
+        assert retrieved_user.language_code is None
+
+    def test_user_model_creation_premium_user(self, db_session):
+        """Test User model creation for premium users."""
+        # Arrange & Act
+        premium_user = User(
+            telegram_id=444555666,
+            email="premium@example.com",
+            email_original="premium@example.com",
+            first_name="Premium",
+            last_name="User",
+            is_bot=False,
+            is_premium=True,
+            language_code="es",
+        )
+
+        db_session.add(premium_user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=444555666).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name == "Premium"
+        assert retrieved_user.last_name == "User"
+        assert retrieved_user.is_bot is False
+        assert retrieved_user.is_premium is True
+        assert retrieved_user.language_code == "es"
+
+    def test_user_model_default_values(self, db_session):
+        """Test User model default values for profile fields."""
+        # Arrange & Act - Create user without specifying profile fields
+        user = User(
+            telegram_id=777888999,
+            email="defaults@example.com",
+            email_original="defaults@example.com",
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=777888999).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name is None
+        assert retrieved_user.last_name is None
+        assert retrieved_user.is_bot is False  # Should default to False
+        assert retrieved_user.is_premium is None
+        assert retrieved_user.language_code is None
+
+    def test_user_model_nullable_fields(self, db_session):
+        """Test that nullable profile fields accept None values."""
+        # Arrange & Act
+        user = User(
+            telegram_id=101112131,
+            email="nullable@example.com",
+            email_original="nullable@example.com",
+            first_name=None,
+            last_name=None,
+            is_bot=False,
+            is_premium=None,
+            language_code=None,
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=101112131).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name is None
+        assert retrieved_user.last_name is None
+        assert retrieved_user.is_bot is False
+        assert retrieved_user.is_premium is None
+        assert retrieved_user.language_code is None
+
+    def test_user_model_unicode_names(self, db_session):
+        """Test User model with Unicode characters in names."""
+        # Arrange & Act
+        user = User(
+            telegram_id=141516171,
+            email="unicode@example.com",
+            email_original="unicode@example.com",
+            first_name="José",
+            last_name="García",
+            is_bot=False,
+            is_premium=False,
+            language_code="es",
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=141516171).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name == "José"
+        assert retrieved_user.last_name == "García"
+        assert retrieved_user.language_code == "es"
+
+    def test_user_model_long_names(self, db_session):
+        """Test User model with very long names."""
+        # Arrange
+        long_first_name = "A" * 100
+        long_last_name = "B" * 100
+
+        # Act
+        user = User(
+            telegram_id=181920212,
+            email="longnames@example.com",
+            email_original="longnames@example.com",
+            first_name=long_first_name,
+            last_name=long_last_name,
+            is_bot=False,
+            is_premium=True,
+            language_code="en",
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=181920212).first()
+        assert retrieved_user is not None
+        assert retrieved_user.first_name == long_first_name
+        assert retrieved_user.last_name == long_last_name
+
+    def test_user_model_various_language_codes(self, db_session):
+        """Test User model with various language codes."""
+        test_cases = [
+            ("en", "English"),
+            ("es", "Spanish"),
+            ("fr", "French"),
+            ("de", "German"),
+            ("ru", "Russian"),
+            ("zh", "Chinese"),
+            ("ja", "Japanese"),
+        ]
+
+        for i, (lang_code, description) in enumerate(test_cases):
+            # Arrange & Act
+            user = User(
+                telegram_id=300000000 + i,
+                email=f"lang_{lang_code}@example.com",
+                email_original=f"lang_{lang_code}@example.com",
+                first_name=f"User_{description}",
+                last_name="Test",
+                is_bot=False,
+                is_premium=False,
+                language_code=lang_code,
+            )
+
+            db_session.add(user)
+            db_session.commit()
+
+            # Assert
+            retrieved_user = (
+                db_session.query(User).filter_by(telegram_id=300000000 + i).first()
+            )
+            assert retrieved_user is not None
+            assert retrieved_user.language_code == lang_code
+            assert retrieved_user.first_name == f"User_{description}"
+
+    def test_user_model_repr_with_profile_data(self, db_session):
+        """Test updated __repr__ method with profile data."""
+        # Test with first_name present
+        user_with_name = User(
+            telegram_id=222333444,
+            email="repr@example.com",
+            email_original="repr@example.com",
+            first_name="John",
+            last_name="Doe",
+        )
+
+        db_session.add(user_with_name)
+        db_session.commit()
+
+        # Assert __repr__ includes first_name
+        repr_str = repr(user_with_name)
+        assert "name='John'" in repr_str
+        assert "telegram_id=222333444" in repr_str
+        assert "email='rep***'" in repr_str
+
+    def test_user_model_repr_without_first_name(self, db_session):
+        """Test __repr__ method when first_name is None."""
+        # Test without first_name
+        user_without_name = User(
+            telegram_id=555666777,
+            email="noname@example.com",
+            email_original="noname@example.com",
+            first_name=None,
+        )
+
+        db_session.add(user_without_name)
+        db_session.commit()
+
+        # Assert __repr__ doesn't include name part when first_name is None
+        repr_str = repr(user_without_name)
+        assert "name=" not in repr_str
+        assert "telegram_id=555666777" in repr_str
+        assert "email='non***'" in repr_str
+
+    def test_user_model_repr_with_empty_first_name(self, db_session):
+        """Test __repr__ method when first_name is empty string."""
+        # Test with empty first_name
+        user_empty_name = User(
+            telegram_id=888999000,
+            email="empty@example.com",
+            email_original="empty@example.com",
+            first_name="",
+        )
+
+        db_session.add(user_empty_name)
+        db_session.commit()
+
+        # Assert __repr__ doesn't include name part when first_name is empty
+        repr_str = repr(user_empty_name)
+        assert "name=" not in repr_str
+        assert "telegram_id=888999000" in repr_str
+
+    def test_user_model_profile_field_updates(self, db_session):
+        """Test updating profile fields on existing user."""
+        # Arrange - Create user with initial profile data
+        user = User(
+            telegram_id=123987456,
+            email="update@example.com",
+            email_original="update@example.com",
+            first_name="Initial",
+            last_name="Name",
+            is_bot=False,
+            is_premium=False,
+            language_code="en",
+        )
+
+        db_session.add(user)
+        db_session.commit()
+
+        # Act - Update profile fields
+        user.first_name = "Updated"
+        user.last_name = "NewName"
+        user.is_premium = True
+        user.language_code = "es"
+        db_session.commit()
+
+        # Assert
+        retrieved_user = db_session.query(User).filter_by(telegram_id=123987456).first()
+        assert retrieved_user.first_name == "Updated"
+        assert retrieved_user.last_name == "NewName"
+        assert retrieved_user.is_premium is True
+        assert retrieved_user.language_code == "es"
+        assert retrieved_user.is_bot is False  # Unchanged
+
+    def test_user_model_profile_validation_constraints(self, db_session):
+        """Test that profile fields don't interfere with existing constraints."""
+        # Test that telegram_id uniqueness still works with profile fields
+        user1 = User(
+            telegram_id=999888777,
+            email="unique1@example.com",
+            email_original="unique1@example.com",
+            first_name="User",
+            last_name="One",
+        )
+        db_session.add(user1)
+        db_session.commit()
+
+        # Try to create user with same telegram_id but different profile data
+        user2 = User(
+            telegram_id=999888777,  # Same telegram_id
+            email="unique2@example.com",
+            email_original="unique2@example.com",
+            first_name="User",
+            last_name="Two",
+        )
+        db_session.add(user2)
+
+        with pytest.raises(IntegrityError):
+            db_session.commit()
+
+        db_session.rollback()
+
+        # Test that email uniqueness still works with profile fields
+        user3 = User(
+            telegram_id=666555444,
+            email="unique1@example.com",  # Same email
+            email_original="unique1@example.com",
+            first_name="Different",
+            last_name="User",
+        )
+        db_session.add(user3)
+
+        with pytest.raises(IntegrityError):
+            db_session.commit()
 
 
 class TestDatabaseManager:

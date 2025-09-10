@@ -27,6 +27,7 @@ from .database import (
     normalize_email,
 )
 from .redis_client import get_redis_client
+from .user_profile_utils import extract_user_profile, should_update_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -273,13 +274,16 @@ class AuthService:
             )
             return False, "generation_error", None
 
-    def verify_otp(self, telegram_id: int, otp: str) -> Tuple[bool, str]:
+    def verify_otp(
+        self, telegram_id: int, otp: str, effective_user=None
+    ) -> Tuple[bool, str]:
         """
         Verify OTP with attempt counting and comprehensive error handling.
 
         Args:
             telegram_id: User's Telegram ID
             otp: OTP to verify
+            effective_user: Telegram User object for profile data extraction
 
         Returns:
             Tuple of (success, error_reason_if_failed)
@@ -348,7 +352,7 @@ class AuthService:
 
                 # Persist authentication state
                 success = self._persist_authentication_state(
-                    telegram_id, email, email_original
+                    telegram_id, email, email_original, effective_user
                 )
                 if not success:
                     logger.error(
@@ -399,7 +403,7 @@ class AuthService:
             return False, "verification_error"
 
     def _persist_authentication_state(
-        self, telegram_id: int, email: str, email_original: str
+        self, telegram_id: int, email: str, email_original: str, effective_user=None
     ) -> bool:
         """
         Persist authentication state on OTP success.
@@ -408,6 +412,7 @@ class AuthService:
             telegram_id: User's Telegram ID
             email: Normalized email address
             email_original: Original email as entered by user
+            effective_user: Telegram User object for profile data extraction
 
         Returns:
             True if persisted successfully, False otherwise
@@ -431,6 +436,33 @@ class AuthService:
                     if user.email_verified_at is None:
                         user.email_verified_at = current_time
 
+                    # Check if profile data should be updated for existing user
+                    try:
+                        if should_update_user_profile(user, effective_user):
+                            # Extract new profile data
+                            new_profile_data = extract_user_profile(effective_user)
+
+                            # Update profile fields with new data
+                            user.first_name = new_profile_data.get("first_name")
+                            user.last_name = new_profile_data.get("last_name")
+                            user.is_bot = new_profile_data.get("is_bot", False)
+                            user.is_premium = new_profile_data.get("is_premium")
+                            user.language_code = new_profile_data.get("language_code")
+
+                            # updated_at is already set above, ensuring timestamp update
+                            logger.debug(
+                                f"Updated profile data for existing user {mask_telegram_id(telegram_id)}"
+                            )
+                        else:
+                            logger.debug(
+                                f"No profile update needed for existing user {mask_telegram_id(telegram_id)}"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to update profile data for existing user {mask_telegram_id(telegram_id)}: {e}. "
+                            "Continuing with authentication without profile update."
+                        )
+
                     logger.debug(
                         f"Updated existing user for {mask_telegram_id(telegram_id)}"
                     )
@@ -449,7 +481,28 @@ class AuthService:
                         )
                         return False
 
-                    # Create new user with all required fields
+                    # Extract profile data for new user
+                    profile_data = {}
+                    try:
+                        profile_data = extract_user_profile(effective_user)
+                        logger.debug(
+                            f"Extracted profile data for new user {mask_telegram_id(telegram_id)}"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to extract profile data for {mask_telegram_id(telegram_id)}: {e}. "
+                            "Continuing with user creation without profile data."
+                        )
+                        # Use safe defaults if profile extraction fails
+                        profile_data = {
+                            "first_name": None,
+                            "last_name": None,
+                            "is_bot": False,
+                            "is_premium": None,
+                            "language_code": None,
+                        }
+
+                    # Create new user with all required fields including profile data
                     user = User(
                         telegram_id=telegram_id,
                         email=email,
@@ -459,10 +512,16 @@ class AuthService:
                         last_authenticated_at=current_time,
                         created_at=current_time,
                         updated_at=current_time,
+                        # Profile fields from Telegram
+                        first_name=profile_data.get("first_name"),
+                        last_name=profile_data.get("last_name"),
+                        is_bot=profile_data.get("is_bot", False),
+                        is_premium=profile_data.get("is_premium"),
+                        language_code=profile_data.get("language_code"),
                     )
                     session.add(user)
                     logger.debug(
-                        f"Created new user for {mask_telegram_id(telegram_id)}"
+                        f"Created new user with profile data for {mask_telegram_id(telegram_id)}"
                     )
 
                 session.commit()

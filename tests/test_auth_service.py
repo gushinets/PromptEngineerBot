@@ -4,15 +4,12 @@ Unit tests for authentication service.
 Tests OTP generation, hashing, verification, rate limiting, and user persistence.
 """
 
-import base64
-import hashlib
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from src.auth_service import AuthService, get_auth_service, init_auth_service
-from src.database import User
 
 
 class TestAuthService:
@@ -733,9 +730,9 @@ class TestAuthService:
         assert result is None, "Should return None for non-authenticated user"
 
     def test_redis_otp_complete_context_storage(self, auth_service, mock_redis_client):
-        """Test that complete OTP context is stored in Redis as per task 2.5."""
+        """Test that complete OTP context is stored in Redis with all required fields."""
         telegram_id = 123456789
-        email = "Test@Example.Com"
+        email = "Test@Example.Com"  # Original format with mixed case
         expected_normalized = "test@example.com"
 
         # Mock the enhanced method

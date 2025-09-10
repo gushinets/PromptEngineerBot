@@ -270,6 +270,38 @@ tail -f bot.log
 - **PromptLoader**: Loads and manages optimization method prompts
 - **LLMClientBase**: Abstract interface for all LLM clients
 
+### Database Schema:
+
+#### User Model
+The `User` model stores authentication data and Telegram profile information:
+
+**Authentication Fields:**
+- `telegram_id`: Unique Telegram user identifier
+- `email`: User's verified email address
+- `is_authenticated`: Email verification status
+- `email_verified_at`: Timestamp of email verification
+- `last_authenticated_at`: Last successful authentication
+
+**Profile Fields (Auto-captured from Telegram):**
+- `first_name`: User's first name from Telegram profile
+- `last_name`: User's last name from Telegram profile
+- `is_bot`: Boolean indicating if user is a bot account
+- `is_premium`: Telegram Premium subscription status
+- `language_code`: User's language preference (ISO 639-1 code)
+
+**Profile Update Strategy:**
+- **New users**: All available profile data captured during first interaction
+- **Existing users**: Selective updates only when meaningful changes detected (name changes, premium status changes)
+- **Performance optimization**: Profile updates only occur when necessary to minimize database writes
+- **Error handling**: Graceful handling of missing or null Telegram profile data
+
+**Database Indexes:**
+- Language-based queries: `ix_users_language_code`
+- Premium user filtering: `ix_users_is_premium`  
+- User type analytics: `ix_users_bot_premium` (composite)
+
+For detailed information about the user profile system, see [User Profile System Documentation](docs/USER_PROFILE_SYSTEM.md).
+
 ### Error Handling:
 - **Automatic fallbacks** for Markdown parsing errors
 - **Retry logic** with exponential backoff for API calls
