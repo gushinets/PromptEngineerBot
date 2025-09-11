@@ -79,11 +79,11 @@ def _maybe_add_file_logging() -> None:
         )
         logging.getLogger().addHandler(file_handler)
         logging.getLogger("application").info(
-            "FILE_LOGGING_ENABLED: Writing logs to file", path=log_file_path
+            "FILE_LOGGING_ENABLED: Writing logs to file: %s", log_file_path
         )
     except Exception as e:
         logging.getLogger("application").warning(
-            "FILE_LOGGING_DISABLED: Could not add file handler", reason=str(e)
+            "FILE_LOGGING_DISABLED: Could not add file handler: %s", str(e)
         )
 
 
