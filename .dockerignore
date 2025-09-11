@@ -33,6 +33,9 @@ Thumbs.db
 *.log
 bot.log
 
+# local db files
+bot.db
+
 # Test files
 tests/
 test_imports.py

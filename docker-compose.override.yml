@@ -8,15 +8,15 @@ services:
     # Enable development mode
     environment:
       - EMAIL_ENABLED=true
-      - DATABASE_URL=sqlite:///./bot.db  # Use SQLite for development
+      - DATABASE_URL=sqlite:///./bot.db # Use SQLite for development
       - REDIS_URL=redis://redis:6379
-      - LANGUAGE=EN
+      - LANGUAGE=RU
     volumes:
       # Mount source code for development (uncomment for live reload)
       # - ./src:/app/src:ro
       # - ./tests:/app/tests:ro
       - ./bot.log:/app/bot.log
-      - ./bot.db:/app/bot.db  # Persist SQLite database
+      - ./bot.db:/app/bot.db # Persist SQLite database
     # Expose ports for debugging
     # ports:
     #   - "5678:5678"  # Python debugger port
@@ -24,13 +24,13 @@ services:
   redis:
     # Development Redis settings
     ports:
-      - "6379:6379"  # Expose Redis port for development tools
+      - "6379:6379" # Expose Redis port for development tools
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
 
   postgres:
     # Development PostgreSQL settings
     ports:
-      - "5432:5432"  # Expose PostgreSQL port for development tools
+      - "5432:5432" # Expose PostgreSQL port for development tools
     environment:
       POSTGRES_DB: botdb_dev
       POSTGRES_USER: botuser

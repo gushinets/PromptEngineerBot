@@ -32,8 +32,8 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("language_code", sa.Text(), nullable=True))
 
     # Update existing rows to set default values for new columns
-    op.execute("UPDATE users SET is_premium = 0 WHERE is_premium IS NULL")
-    op.execute("UPDATE users SET is_bot = 0 WHERE is_bot IS NULL")
+    op.execute("UPDATE users SET is_premium = FALSE WHERE is_premium IS NULL")
+    op.execute("UPDATE users SET is_bot = FALSE WHERE is_bot IS NULL")
 
     # Create indexes for performance
     op.create_index("ix_users_language_code", "users", ["language_code"], unique=False)

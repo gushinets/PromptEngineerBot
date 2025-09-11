@@ -30,13 +30,21 @@ This guide covers deploying the Prompt Engineering Bot with email authentication
 
 3. **Start services**:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
-4. **Run database migrations**:
-   ```bash
-   docker-compose exec prompt-improver-bot python -m alembic upgrade head
-   ```
+4. **Run database migrations** (choose one):
+   - Option A — from host (recommended):
+     ```bash
+     python -m venv .venv
+     .venv/Scripts/pip install -r requirements.txt
+     $env:DATABASE_URL = "postgresql://botuser:botpass@localhost:5432/botdb"
+     .venv/Scripts/alembic upgrade head
+     ```
+   - Option B — one-off container with repo bind-mounted (Windows PowerShell):
+     ```bash
+     docker compose run --rm -v ${PWD}:/app prompt-improver-bot alembic upgrade head
+     ```
 
 ## Configuration Options
 
@@ -98,8 +106,18 @@ OTP_SPACING_SECONDS=60         # Minimum seconds between OTP sends
 
 ### Initial Setup
 
-After first deployment, run migrations:
+After first deployment, run migrations (pick one method):
 ```bash
+# A) Host-based (recommended)
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt
+$env:DATABASE_URL="postgresql://botuser:botpass@localhost:5432/botdb"
+.venv/Scripts/alembic upgrade head
+
+# B) One-off container with repo bind-mounted (Windows PowerShell)
+docker compose run --rm -v ${PWD}:/app prompt-improver-bot alembic upgrade head
+
+or
 docker-compose exec prompt-improver-bot python -m alembic upgrade head
 ```
 
@@ -159,12 +177,12 @@ The bot includes built-in health monitoring for:
 
 View bot logs:
 ```bash
-docker-compose logs -f prompt-improver-bot
+docker compose logs -f prompt-improver-bot
 ```
 
 View service logs:
 ```bash
-docker-compose logs -f redis postgres
+docker compose logs -f redis postgres
 ```
 
 ### Metrics
@@ -268,27 +286,27 @@ SSL_KEY_PATH=/app/ssl/key.pem
 **Database connection failed**:
 ```bash
 # Check PostgreSQL status
-docker-compose ps postgres
-docker-compose logs postgres
+docker compose ps postgres
+docker compose logs postgres
 
 # Test connection
-docker-compose exec postgres psql -U botuser -d botdb -c "SELECT 1;"
+docker compose exec postgres psql -U botuser -d botdb -c "SELECT 1;"
 ```
 
 **Redis connection failed**:
 ```bash
 # Check Redis status
-docker-compose ps redis
-docker-compose logs redis
+docker compose ps redis
+docker compose logs redis
 
 # Test connection
-docker-compose exec redis redis-cli ping
+docker compose exec redis redis-cli ping
 ```
 
 **SMTP authentication failed**:
 ```bash
 # Test SMTP connection
-docker-compose exec prompt-improver-bot python -c "
+docker compose exec prompt-improver-bot python -c "
 from src.email_service import EmailService
 from src.config import BotConfig
 config = BotConfig.from_env()
@@ -318,17 +336,17 @@ print('SMTP test:', service._check_smtp_health())
 
 **Find authentication issues**:
 ```bash
-docker-compose logs prompt-improver-bot | grep "OTP_"
+docker compose logs prompt-improver-bot | grep "OTP_"
 ```
 
 **Monitor email delivery**:
 ```bash
-docker-compose logs prompt-improver-bot | grep "EMAIL_"
+docker compose logs prompt-improver-bot | grep "EMAIL_"
 ```
 
 **Check health status**:
 ```bash
-docker-compose logs prompt-improver-bot | grep "HEALTH_"
+docker compose logs prompt-improver-bot | grep "HEALTH_"
 ```
 
 ## Backup and Recovery
@@ -337,10 +355,10 @@ docker-compose logs prompt-improver-bot | grep "HEALTH_"
 
 ```bash
 # Create backup
-docker-compose exec postgres pg_dump -U botuser botdb > backup.sql
+docker compose exec postgres pg_dump -U botuser botdb > backup.sql
 
 # Restore backup
-docker-compose exec -T postgres psql -U botuser botdb < backup.sql
+docker compose exec -T postgres psql -U botuser botdb < backup.sql
 ```
 
 ### Redis Backup
@@ -355,15 +373,59 @@ docker cp prompt-bot-redis:/data/dump.rdb ./redis-backup.rdb
 
 ```bash
 # Stop services
-docker-compose down
+docker compose down
 
 # Backup volumes
 docker run --rm -v prompt-engineering-bot_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres-backup.tar.gz -C /data .
 docker run --rm -v prompt-engineering-bot_redis_data:/data -v $(pwd):/backup alpine tar czf /backup/redis-backup.tar.gz -C /data .
 
 # Restart services
-docker-compose up -d
+docker compose up -d
 ```
+
+## Run Production-like Locally
+
+Use only the base compose file to mimic production:
+
+1. Ensure `.env` contains required values (`TELEGRAM_TOKEN`, LLM backend/API key, SMTP if `EMAIL_ENABLED=true`).
+2. Pre-create the log file on host to avoid directory bind issues:
+   ```bash
+   # PowerShell
+   if (Test-Path .\bot.log) { Remove-Item -Force .\bot.log }
+   New-Item -ItemType File .\bot.log | Out-Null
+   ```
+3. Start infrastructure:
+   ```bash
+   docker compose -f docker-compose.yml up -d postgres redis
+   ```
+4. Run migrations (see Quick Start step 4 for options). Host-based example:
+   ```bash
+   python -m venv .venv
+   .venv/Scripts/pip install -r requirements.txt
+   $env:DATABASE_URL = "postgresql://botuser:botpass@localhost:5432/botdb"
+   .venv/Scripts/alembic upgrade head
+   ```
+5. Start the app:
+   ```bash
+   docker compose -f docker-compose.yml up -d prompt-improver-bot
+   ```
+6. Verify:
+   ```bash
+   docker compose -f docker-compose.yml ps
+   docker compose -f docker-compose.yml logs -f prompt-improver-bot
+   ```
+
+### Prod-like Local Troubleshooting
+
+- bot.log mount error (IsADirectoryError): Ensure `./bot.log` exists as a file before `docker compose up`. See step 2.
+- Stale image (outdated sources):
+  ```bash
+  docker compose -f docker-compose.yml up -d --build --force-recreate
+  # or, to force a clean rebuild
+  docker compose -f docker-compose.yml build --no-cache --pull prompt-improver-bot
+  docker compose -f docker-compose.yml up -d --force-recreate prompt-improver-bot
+  ```
+- Compose warning about `version` key: Safe to ignore on Compose V2, or remove the `version:` line from `docker-compose.yml` to silence the warning.
 
 ## Support
 
