@@ -20,6 +20,8 @@ RUN useradd --create-home --shell /bin/bash app
 # Copy application files
 COPY .env* ./
 COPY google_service_key.json* ./
+COPY alembic.ini .
+COPY alembic ./alembic
 COPY src ./src
 COPY run_bot.py .
 

@@ -113,6 +113,20 @@ tools/
     docker compose up --build
     ```
 
+3. Run database migrations against Postgres (recommended):
+    ```bash
+    # Build image to ensure alembic config is inside the container
+    docker compose -f docker-compose.yml build --no-cache prompt-improver-bot
+
+    # Run migrations using Postgres service defined in compose
+    docker compose -f docker-compose.yml run --rm \
+      -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
+      prompt-improver-bot alembic upgrade head
+    ```
+
+    - Avoid bind-mounting the repo during migrations; it can hide `alembic/` in the image.
+    - If you use a dev override that sets SQLite, override `DATABASE_URL` as shown above.
+
 ### Development with VS Code/Kiro IDE
 
 The project includes VS Code launch configurations for easy debugging:

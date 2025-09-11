@@ -33,18 +33,16 @@ This guide covers deploying the Prompt Engineering Bot with email authentication
    docker compose up -d
    ```
 
-4. **Run database migrations** (choose one):
-   - Option A — from host (recommended):
-     ```bash
-     python -m venv .venv
-     .venv/Scripts/pip install -r requirements.txt
-     $env:DATABASE_URL = "postgresql://botuser:botpass@localhost:5432/botdb"
-     .venv/Scripts/alembic upgrade head
-     ```
-   - Option B — one-off container with repo bind-mounted (Windows PowerShell):
-     ```bash
-     docker compose run --rm -v ${PWD}:/app prompt-improver-bot alembic upgrade head
-     ```
+4. **Run database migrations** (recommended via Postgres in Compose):
+   ```bash
+   # Ensure image includes alembic files
+   docker compose -f docker-compose.yml build --no-cache prompt-improver-bot
+
+   # Run migrations against the Postgres service
+   docker compose -f docker-compose.yml run --rm \
+     -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
+     prompt-improver-bot alembic upgrade head
+   ```
 
 ## Configuration Options
 
@@ -104,21 +102,25 @@ OTP_SPACING_SECONDS=60         # Minimum seconds between OTP sends
 
 ## Database Migrations
 
-### Initial Setup
+### Initial Setup (Container-based, Postgres)
 
-After first deployment, run migrations (pick one method):
 ```bash
-# A) Host-based (recommended)
+# Build image to include alembic config
+docker compose -f docker-compose.yml build --no-cache prompt-improver-bot
+
+# Apply migrations to Postgres service from the app container
+docker compose -f docker-compose.yml run --rm \
+  -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
+  prompt-improver-bot alembic upgrade head
+```
+
+### Alternative: Host-based
+
+```bash
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt
 $env:DATABASE_URL="postgresql://botuser:botpass@localhost:5432/botdb"
 .venv/Scripts/alembic upgrade head
-
-# B) One-off container with repo bind-mounted (Windows PowerShell)
-docker compose run --rm -v ${PWD}:/app prompt-improver-bot alembic upgrade head
-
-or
-docker-compose exec prompt-improver-bot python -m alembic upgrade head
 ```
 
 ### User Profile Fields Migration
@@ -146,11 +148,13 @@ The bot includes enhanced user profiling with Telegram profile data:
 
 When modifying database models:
 ```bash
-# Generate migration
-docker-compose exec prompt-improver-bot python -m alembic revision --autogenerate -m "Description"
+# Generate migration inside running app container
+docker compose exec prompt-improver-bot python -m alembic revision --autogenerate -m "Description"
 
 # Apply migration
-docker-compose exec prompt-improver-bot python -m alembic upgrade head
+docker compose -f docker-compose.yml run --rm \
+  -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
+  prompt-improver-bot alembic upgrade head
 ```
 
 ### Migration Rollback
@@ -158,10 +162,10 @@ docker-compose exec prompt-improver-bot python -m alembic upgrade head
 To rollback to previous version:
 ```bash
 # Rollback one version
-docker-compose exec prompt-improver-bot python -m alembic downgrade -1
+docker compose exec prompt-improver-bot python -m alembic downgrade -1
 
 # Rollback to specific revision
-docker-compose exec prompt-improver-bot python -m alembic downgrade <revision_id>
+docker compose exec prompt-improver-bot python -m alembic downgrade <revision_id>
 ```
 
 ## Monitoring and Health Checks
@@ -417,7 +421,8 @@ Use only the base compose file to mimic production:
 
 ### Prod-like Local Troubleshooting
 
-- bot.log mount error (IsADirectoryError): Ensure `./bot.log` exists as a file before `docker compose up`. See step 2.
+- Alembic error `No 'script_location' key found`: Ensure the image includes `alembic.ini` and the `alembic/` folder (already added in Dockerfile). Avoid bind-mounting the repo during migrations as it can shadow these files.
+- Using dev override with SQLite: Override `DATABASE_URL` to Postgres when running migrations (see commands above).
 - Stale image (outdated sources):
   ```bash
   docker compose -f docker-compose.yml up -d --build --force-recreate
@@ -425,7 +430,6 @@ Use only the base compose file to mimic production:
   docker compose -f docker-compose.yml build --no-cache --pull prompt-improver-bot
   docker compose -f docker-compose.yml up -d --force-recreate prompt-improver-bot
   ```
-- Compose warning about `version` key: Safe to ignore on Compose V2, or remove the `version:` line from `docker-compose.yml` to silence the warning.
 
 ## Support
 
