@@ -38,6 +38,7 @@ from .graceful_degradation import init_degradation_manager
 from .gsheets_logging import build_google_sheets_handler_from_env
 from .health_checks import init_health_monitor
 from .llm_factory import LLMClientFactory
+from .logging_utils import setup_application_logging
 from .messages import (
     ERROR_EMPTY_MESSAGE,
     ERROR_GENERIC,
@@ -47,19 +48,19 @@ from .messages import (
 )
 from .redis_client import init_redis_client
 
-# Configure logging (keep internal logging to file/console unchanged)
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler("bot.log", encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
-logger = logging.getLogger(__name__)
-
 # Load env early so Sheets handler sees variables from .env
 load_dotenv()
+
+# Centralized logging with PII-protected formatting and quieter third-party libs
+setup_application_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+
+# Also log to file
+_file_handler = logging.FileHandler("bot.log", encoding="utf-8")
+_file_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+logging.getLogger().addHandler(_file_handler)
+logger = logging.getLogger(__name__)
 
 # Dedicated Google Sheets logger (only for selected events)
 _sheets_logger = None
