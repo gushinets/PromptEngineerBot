@@ -54,12 +54,40 @@ load_dotenv()
 # Centralized logging with PII-protected formatting and quieter third-party libs
 setup_application_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
 
-# Also log to file
-_file_handler = logging.FileHandler("bot.log", encoding="utf-8")
-_file_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-)
-logging.getLogger().addHandler(_file_handler)
+
+# Optional file logging (disabled by default in containers)
+def _maybe_add_file_logging() -> None:
+    """
+    Optionally add a file handler if explicitly enabled via environment.
+
+    This avoids permission issues in containers and keeps the default logging
+    directed to stdout/stderr for Docker log collectors.
+
+    Environment variables:
+    - LOG_TO_FILE: enable file logging when set to true/1/yes
+    - LOG_FILE_PATH: path to the log file (default: bot.log)
+    """
+    log_to_file = os.getenv("LOG_TO_FILE", "").lower() in ("true", "1", "yes")
+    if not log_to_file:
+        return
+
+    log_file_path = os.getenv("LOG_FILE_PATH", "bot.log")
+    try:
+        file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        logging.getLogger().addHandler(file_handler)
+        logging.getLogger("application").info(
+            "FILE_LOGGING_ENABLED: Writing logs to file", path=log_file_path
+        )
+    except Exception as e:
+        logging.getLogger("application").warning(
+            "FILE_LOGGING_DISABLED: Could not add file handler", reason=str(e)
+        )
+
+
+_maybe_add_file_logging()
 logger = logging.getLogger(__name__)
 
 # Dedicated Google Sheets logger (only for selected events)

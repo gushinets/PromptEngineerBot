@@ -251,8 +251,19 @@ LOG_LEVEL=DEBUG
 ```
 
 #### Check Bot Logs
+When running in Docker/Compose, logs are written to stdout/stderr by default:
 ```bash
-tail -f bot.log
+docker compose logs -f prompt-improver-bot
+```
+
+If you explicitly enable file logging, set environment variables and ensure write permissions:
+```env
+LOG_TO_FILE=true
+LOG_FILE_PATH=/app/bot.log
+```
+And then you can tail the file in the container:
+```bash
+docker exec -it prompt-improver-bot sh -lc 'tail -f /app/bot.log'
 ```
 
 ## 🏛️ Architecture Details

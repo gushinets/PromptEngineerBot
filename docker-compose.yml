@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Main bot application
   prompt-improver-bot:
@@ -12,7 +10,8 @@ services:
       - redis
       - postgres
     volumes:
-      - ./bot.log:/app/bot.log
+      # Persist logs only if you enable file logging and ensure permissions
+      # Recommended: rely on Docker logs instead of file logging in container
       - ./google_service_key.json:/app/google_service_key.json:ro
     environment:
       # Override database and Redis URLs for container networking
@@ -22,7 +21,7 @@ services:
     # ports:
     #   - "8080:8080"
 
-  # Redis for OTP storage and rate limiting
+    # Redis for OTP storage and rate limiting
   redis:
     image: redis:7-alpine
     container_name: prompt-bot-redis
@@ -33,7 +32,7 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -54,7 +53,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U botuser -d botdb"]
+      test: [ "CMD-SHELL", "pg_isready -U botuser -d botdb" ]
       interval: 30s
       timeout: 10s
       retries: 3

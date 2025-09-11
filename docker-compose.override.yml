@@ -1,8 +1,6 @@
 # Docker Compose override for development
 # This file is automatically loaded by docker-compose and provides development-specific settings
 
-version: '3.8'
-
 services:
   prompt-improver-bot:
     # Enable development mode
@@ -15,7 +13,6 @@ services:
       # Mount source code for development (uncomment for live reload)
       # - ./src:/app/src:ro
       # - ./tests:/app/tests:ro
-      - ./bot.log:/app/bot.log
       - ./bot.db:/app/bot.db # Persist SQLite database
     # Expose ports for debugging
     # ports:
