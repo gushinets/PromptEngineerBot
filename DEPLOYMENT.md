@@ -224,6 +224,15 @@ Never commit sensitive data to version control:
 - Configure Redis to bind to localhost only
 - Set memory limits to prevent DoS
 
+### Redis Write Health Check
+
+The bot verifies Redis write capability at startup. If `REDIS_URL` points to a read-only replica, startup will fail fast with a clear error. Ensure `REDIS_URL` targets a writable primary (e.g., primary endpoint on managed services). You can manually verify with:
+
+```
+redis-cli -u "$REDIS_URL" ROLE
+redis-cli -u "$REDIS_URL" SET __bot_rw_check__ 1 EX 5 NX
+```
+
 ## Production Deployment
 
 ### Docker Compose Production

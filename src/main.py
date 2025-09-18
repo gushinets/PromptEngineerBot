@@ -39,14 +39,9 @@ from .gsheets_logging import build_google_sheets_handler_from_env
 from .health_checks import init_health_monitor
 from .llm_factory import LLMClientFactory
 from .logging_utils import setup_application_logging
-from .messages import (
-    ERROR_EMPTY_MESSAGE,
-    ERROR_GENERIC,
-    ERROR_NETWORK,
-    ERROR_RATE_LIMIT,
-    ERROR_TOO_LONG,
-)
-from .redis_client import init_redis_client
+
+# NOTE: Specific message constants are imported where needed inside handlers
+from .redis_client import get_redis_client, init_redis_client
 
 # Load env early so Sheets handler sees variables from .env
 load_dotenv()
@@ -182,7 +177,7 @@ async def main():
 
     # Initialize graceful degradation manager
     language = os.getenv("LANGUAGE", "EN")
-    degradation_manager = init_degradation_manager(language)
+    _degradation_manager = init_degradation_manager(language)
     logger.info(f"Graceful degradation manager initialized with language: {language}")
 
     # Initialize email feature components
@@ -201,6 +196,20 @@ async def main():
             # Initialize Redis client
             init_redis_client(config)
             logger.info("Redis client initialized successfully")
+            # Verify Redis write capability to avoid read-only replica misconfigurations
+            try:
+                if not get_redis_client().health_check():
+                    message = "Redis health (write) check failed. Ensure REDIS_URL points to a writable primary."
+                    if config.redis_write_check_strict:
+                        logger.error(message)
+                        raise RuntimeError("Redis write health check failed")
+                    else:
+                        logger.warning(message)
+            except Exception as redis_init_err:
+                logger.error(
+                    f"Redis initialization/health verification failed: {redis_init_err}"
+                )
+                raise
 
             # Initialize auth service
             from .auth_service import init_auth_service

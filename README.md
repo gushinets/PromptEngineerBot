@@ -82,6 +82,11 @@ tools/
     GSHEETS_WORKSHEET=Logs
     GSHEETS_BATCH_SIZE=20
     GSHEETS_FLUSH_INTERVAL_SECONDS=5.0
+
+    # Redis (recommended in production)
+    REDIS_URL=redis://redis:6379
+    # Fail fast if Redis is read-only
+    REDIS_WRITE_CHECK_STRICT=false
     ```
 
 3. **Run the bot:**

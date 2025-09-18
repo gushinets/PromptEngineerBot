@@ -47,14 +47,25 @@ class RedisClient:
 
     def health_check(self) -> bool:
         """
-        Check Redis connectivity.
+        Check Redis connectivity and write capability.
 
         Returns:
-            True if Redis is healthy, False otherwise
+            True if Redis is reachable and writable, False otherwise.
         """
         try:
             client = self.get_client()
+            # Basic reachability
             client.ping()
+
+            # Verify write capability with a short‑TTL key
+            probe_key = "__health_rw_probe__"
+            try:
+                # If this raises, Redis is not writable; exact return value varies by client
+                client.set(probe_key, "1", ex=5, nx=True)
+            except Exception as write_err:
+                logger.error(f"Redis write probe failed: {write_err}")
+                return False
+
             return True
         except Exception as e:
             logger.error(f"Redis health check failed: {e}")

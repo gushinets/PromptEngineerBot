@@ -81,6 +81,8 @@ class BotConfig:
 
     # Email feature toggle
     email_enabled: bool = True
+    # Redis write check strictness
+    redis_write_check_strict: bool = False
 
     @staticmethod
     def _get_default_smtp_port() -> int:
@@ -182,6 +184,11 @@ class BotConfig:
             language=os.getenv("LANGUAGE", "EN").upper(),
             # Email feature toggle
             email_enabled=os.getenv("EMAIL_ENABLED", "true").lower()
+            in ("true", "1", "yes"),
+            # Redis write check strictness
+            redis_write_check_strict=os.getenv(
+                "REDIS_WRITE_CHECK_STRICT", "false"
+            ).lower()
             in ("true", "1", "yes"),
         )
 
