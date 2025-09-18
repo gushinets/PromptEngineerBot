@@ -16,7 +16,8 @@ services:
     environment:
       # Override database and Redis URLs for container networking
       - DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - REDIS_WRITE_CHECK_STRICT=true
     # Uncomment and set if you need to expose a port for webhook
     # ports:
     #   - "8080:8080"
@@ -26,13 +27,12 @@ services:
     image: redis:7-alpine
     container_name: prompt-bot-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --protected-mode yes --maxmemory 256mb --maxmemory-policy allkeys-lru --rename-command SLAVEOF "" --rename-command REPLICAOF "" --rename-command CONFIG "" --rename-command FLUSHALL ""
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
