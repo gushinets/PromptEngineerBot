@@ -240,8 +240,8 @@ ERROR_EMAIL_SEND_FAILED = _(
 )
 
 EMAIL_OPTIMIZATION_SUCCESS = _(
-    "✅ Оптимизированные промпты отправлены на {email}!",
-    "✅ Optimized prompts sent to {email}!",
+    "✅ Готово! Я отправил Ваш промпт на e-mail.\n📋 Теперь можно сразу вставить его в ChatGPT, Gemini, Claude или любую другую — и получить ясный результат без лишних шагов.\n➡️ Есть новая задача? Просто напишите её — всё остальное я сделаю за вас.",
+    "✅ Done! I sent your prompt to email.\n📋 Now you can directly paste it into ChatGPT, Gemini, Claude or any other — and get clear results without extra steps.\n➡️ Have a new task? Just write it — I'll handle everything else for you.",
 )
 
 ERROR_EMAIL_OPTIMIZATION_FAILED = _(
@@ -363,18 +363,20 @@ INFO_ALL_METHODS_OPTIMIZATION = _(
 )
 
 SELECT_METHOD_MESSAGE = _(
-    "📝 **Ваш промпт получен!**\n\n"
-    "Теперь выберите метод оптимизации:\n\n"
-    "⚡ LYRA — мгновенный результат\n"
+    "📝 **Ваш запрос получен!**\n\n"
+    "Теперь выберите один метод оптимизации:\n\n"
+    "⚡️ LYRA — мгновенный результат\n"
     "🛠 CRAFT — структурированный подход\n"
     "🔍 GGL — фокус на цели, минимум вопросов\n\n"
-    "👉 *Нажмите на метод ниже, чтобы начать*:",
-    "📝 **Your prompt has been received!**\n\n"
-    "Now choose an optimization method:\n\n"
-    "⚡ LYRA — instant results\n"
+    "Или нажмите кнопку \"Отправить на e-mail\" и получите запрос, оптимизированный всеми тремя методами сразу, на вашу почту.\n\n"
+    "👉 *Нажмите на кнопку ниже, чтобы начать*:",
+    "📝 **Your request has been received!**\n\n"
+    "Now choose one optimization method:\n\n"
+    "⚡️ LYRA — instant results\n"
     "🛠 CRAFT — structured approach\n"
     "🔍 GGL — goal-focused, minimal questions\n\n"
-    "👉 *Click on the method below to start*:",
+    "Or click the \"Send to e-mail\" button and receive your request optimized with all three methods at once in your email.\n\n"
+    "👉 *Click the button below to start*:",
 )
 
 ENTER_PROMPT_MESSAGE = _(
