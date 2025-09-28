@@ -55,6 +55,7 @@ from .messages import (
     FOLLOWUP_API_ERROR_RESTART,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
+    FOLLOWUP_DECLINED_MESSAGE,
     FOLLOWUP_GENERIC_ERROR_RESTART,
     FOLLOWUP_NETWORK_FALLBACK,
     FOLLOWUP_NETWORK_RESTART,
@@ -427,10 +428,10 @@ class BotHandler:
         """Handle follow-up choice (YES/NO) from user."""
         if text == BTN_NO:
             # User declined follow-up questions
-            # Send reset confirmation message
+            # Send follow-up declined message
             await self._safe_reply(
                 update,
-                RESET_CONFIRMATION,
+                FOLLOWUP_DECLINED_MESSAGE,
                 parse_mode="Markdown",
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
