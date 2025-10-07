@@ -2,20 +2,22 @@
 
 ## Introduction
 
-This feature introduces email-based authentication and prompt delivery functionality to the existing Telegram bot. Users will be able to authenticate with their email address using a one-time password (OTP) system, and receive optimized prompts via email after completing the optimization process. The feature adds a new "Send 3 prompts to email" button that appears after users enter optimization mode, enabling them to receive results from all three optimization methods (CRAFT, LYRA, GGL) directly in their inbox.
+This feature extends the existing email-based authentication and prompt delivery functionality in the Telegram bot. The existing "Send 3 prompts to email" button (which appears at method selection and sends all three optimization results) will remain unchanged. This feature adds a new "Отправить промпт на e-mail" button that appears in two specific cases: (1) after successfully completing the follow-up optimization process, or (2) after successfully completing optimization by one method (CRAFT, LYRA, or GGL) and declining the follow-up optimization process. In both cases, clicking the new button triggers the existing email flow with registration and authentication, then sends the current optimization result to the user's email.
 
 ## Requirements
 
 ### Requirement 1
 
-**User Story:** As a user, I want to see a "Send 3 prompts to email" button after entering optimization mode, so that I can choose to receive optimized prompts via email instead of just viewing them in the chat.
+**User Story:** As a user, I want to see a new "Отправить промпт на e-mail" button after completing specific optimization scenarios, so that I can receive the current optimization result via email while keeping the existing email functionality unchanged.
 
 #### Acceptance Criteria
 
-1. WHEN user enters a prompt and reaches the method selection screen THEN system SHALL display a "Send 3 prompts to email" button above the existing three optimization method buttons (CRAFT, LYRA, GGL)
-2. WHEN user clicks the "Send 3 prompts to email" button THEN system SHALL prompt the user to enter their email address
-3. IF user has not been authenticated before THEN system SHALL require email verification process
-4. IF user has been previously authenticated THEN system SHALL proceed directly to prompt optimization and email delivery
+1. WHEN user successfully completes follow-up optimization process THEN system SHALL display new "Отправить промпт на e-mail" button alongside the final optimized result
+2. WHEN user successfully completes optimization by one method (CRAFT, LYRA, or GGL) AND declines follow-up optimization THEN system SHALL display new "Отправить промпт на e-mail" button alongside that method's result
+3. WHEN user clicks the new "Отправить промпт на e-mail" button THEN system SHALL trigger the existing email authentication flow
+4. WHEN existing "Send 3 prompts to email" button functionality is used THEN system SHALL continue to work exactly as before (unchanged)
+5. IF user has not been authenticated before THEN system SHALL require email verification process using existing authentication system
+6. IF user has been previously authenticated THEN system SHALL proceed directly to email delivery of the current optimization result
 
 ### Requirement 2
 
@@ -46,29 +48,30 @@ This feature introduces email-based authentication and prompt delivery functiona
 
 ### Requirement 4
 
-**User Story:** As a user, I want my original prompt to be sent directly to optimization methods without follow-up questions, so that I can quickly receive optimized versions without additional refinement steps.
+**User Story:** As a user, I want to receive the current optimization result via email, so that I can access it outside of the chat interface.
 
 #### Acceptance Criteria
 
-1. WHEN user completes email verification and authentication THEN system SHALL skip the follow-up questions system and proceed directly to prompt optimization
-2. WHEN system begins optimization THEN system SHALL use the original user prompt as input for all three optimization methods (CRAFT, LYRA, GGL)
-3. WHEN sending prompts to LLM for optimization THEN system SHALL load modified versions of optimization prompts from files: `src/prompts/CRAFT_email_prompt.txt`, `src/prompts/LYRA_email_prompt.txt`, `src/prompts/GGL_email_prompt.txt` and send each one as a system prompt for each optimization method accordingly
-4. WHEN optimization methods are executed THEN each method SHALL receive the email-specific system prompt that already contains instructions to avoid follow-up questions
-5. WHEN optimization is complete THEN system SHALL proceed directly to email delivery with the three optimized results
-6. WHEN system processes the original prompt THEN system SHALL NOT initiate any follow-up questions or prompt refinement processes
-7. WHEN system loads email optimization prompts THEN system SHALL NOT append any constant string to the system prompts as they already contain the necessary instructions
+1. WHEN user clicks "Отправить промпт на e-mail" after follow-up optimization completion THEN system SHALL send the final follow-up optimized result via email
+2. WHEN user clicks "Отправить промпт на e-mail" after declining follow-up optimization THEN system SHALL send the single method result (CRAFT, LYRA, or GGL) via email
+3. WHEN system sends email THEN email SHALL contain the original user prompt for reference
+4. WHEN system sends email after follow-up completion THEN email SHALL contain the final optimized prompt from follow-up process
+5. WHEN system sends email after declining follow-up THEN email SHALL contain the result from the selected optimization method (CRAFT, LYRA, or GGL)
+6. WHEN email is sent THEN system SHALL trigger the existing email flow with registration and authentication process
+7. WHEN email delivery is complete THEN system SHALL notify user of successful delivery in chat
 
 ### Requirement 5
 
-**User Story:** As a user, I want to receive optimized prompts from all three methods via email, so that I can compare different optimization approaches and choose the best one for my needs.
+**User Story:** As a user, I want to receive the current optimization result via email with proper formatting, so that I can easily read and use the optimized content.
 
 #### Acceptance Criteria
 
-1. WHEN email sending succeeds THEN system SHALL notify success in chat.
-2. WHEN email sending fails THEN system SHALL post only an error message in chat and SHALL NOT share any optimized prompts.
-3. WHEN email contains code blocks or technical content THEN email SHALL preserve formatting using appropriate HTML tags (e.g., `<pre><code>`).
-4. WHEN email is sent THEN email SHALL include the original prompt for user reference, as well as all three optimized prompts (CRAFT, LYRA, GGL).
-5. WHEN email is composed THEN email SHALL NOT include any follow-up improved prompt since no follow-up questions are asked.
+1. WHEN email sending succeeds THEN system SHALL notify success in chat
+2. WHEN email sending fails THEN system SHALL post only an error message in chat and SHALL NOT share any optimized prompts
+3. WHEN email contains code blocks or technical content THEN email SHALL preserve formatting using appropriate HTML tags (e.g., `<pre><code>`)
+4. WHEN email is sent after follow-up completion THEN email SHALL include the original prompt and the final follow-up optimized result
+5. WHEN email is sent after declining follow-up THEN email SHALL include the original prompt and the single method result (CRAFT, LYRA, or GGL)
+6. WHEN email is composed THEN email SHALL include clear labeling of which optimization result is being sent
 
 ### Requirement 6
 
@@ -114,6 +117,17 @@ This feature introduces email-based authentication and prompt delivery functiona
 6. WHEN system configuration changes THEN language setting SHALL be moved to environment variable (LANGUAGE) for easier deployment configuration.
 
 ### Requirement 9
+
+**User Story:** As a user, I want the existing "Send 3 prompts to email" functionality to remain completely unchanged, so that current workflows are not disrupted.
+
+#### Acceptance Criteria
+
+1. WHEN user uses existing "Send 3 prompts to email" button THEN system SHALL continue to work exactly as currently implemented
+2. WHEN existing email flow is triggered THEN system SHALL send all three optimization results (CRAFT, LYRA, GGL) as before
+3. WHEN existing button is displayed THEN system SHALL show it in the same location and with same behavior as current implementation
+4. WHEN new "Отправить промпт на e-mail" functionality is added THEN existing functionality SHALL NOT be modified or affected
+
+### Requirement 10
 
 **User Story:** As an operator, I want an audit trail for authentication and email delivery to analyze abuse and debug issues.
 

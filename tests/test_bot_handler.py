@@ -411,10 +411,10 @@ class TestBotHandler:
 
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_NO)
 
-        # Verify RESET_CONFIRMATION message was sent
+        # Verify FOLLOWUP_DECLINED_MESSAGE was sent (new behavior with post-optimization email button)
         mock_update.message.reply_text.assert_called_once()
         args, kwargs = mock_update.message.reply_text.call_args
-        assert "сброшен" in args[0] or "reset" in args[0].lower()
+        assert "Готово!" in args[0] or "Done!" in args[0]
 
         # Verify state was reset properly
         user_state = bot_handler.state_manager.get_user_state(user_id)

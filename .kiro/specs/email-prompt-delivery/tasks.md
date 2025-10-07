@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation plan breaks down the email-prompt-delivery feature into manageable, incremental tasks. Each task builds on previous work and includes specific requirements, testing criteria, and integration points. The plan follows test-driven development principles and ensures early validation of core functionality.
+This implementation plan extends the existing email-prompt-delivery feature to add a new "Отправить промпт на e-mail" button that appears after specific optimization scenarios. The plan reuses existing email infrastructure (authentication, database, SMTP) while adding new UI components and workflow logic. Most infrastructure tasks are already completed, so this focuses on the new post-optimization email functionality.
 
 ## Task Execution Guidelines
 
@@ -16,19 +16,12 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 1. Set up project infrastructure and dependencies
 
-
-
-
-
-
-
   - Create database models and migration system
   - Set up Redis client and connection management
   - Configure environment variables and settings
   - _Requirements: 6.4, 6.5, 6.6, 6.7_
 
 - [x] 1.1 Create database models and schema
-
 
   - Implement User and AuthEvent SQLAlchemy models in `src/database.py`
   - Add proper indexes for performance (telegram_id, email, created_at combinations)
@@ -38,7 +31,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 1.2 Implement Redis client and connection management
 
-
   - Create `src/redis_client.py` with connection pooling
   - Implement OTP storage, rate limiting, and flow state operations
   - Add Redis health checks and error handling
@@ -47,7 +39,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 1.3 Extend configuration management
 
-
   - Update `src/config.py` with database, Redis, SMTP, and audit settings
   - Add environment variable validation and defaults
   - Implement SMTP port selection logic (TLS/SSL)
@@ -55,7 +46,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - _Requirements: 8.6_
 
 - [x] 1.4 Finalize schema constraints and email field handling
-
 
   - Add UNIQUE constraints to users.email (normalized) and users.telegram_id
   - Ensure both email (normalized) and email_original (exact user input) are persisted
@@ -151,21 +141,12 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 4. Extend bot handler with email authentication flow
 
-
-
-
-
-
-
-
-
   - Add "Send 3 prompts to email" button to method selection screen
   - Implement email input and OTP verification conversation flow
   - Integrate with existing conversation management system
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3_
 
 - [x] 4.1 Add email delivery button to UI
-
 
   - Extend `src/messages.py` with new button definition
   - Update method selection keyboard to include email button
@@ -175,7 +156,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 4.2 Implement email input and validation flow
 
-
   - Add email input handler to `src/bot_handler.py`
   - Implement email format validation and normalization
   - Add user-friendly error messages in RU/EN
@@ -183,7 +163,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - _Requirements: 1.2, 2.1, 2.2, 2.3_
 
 - [x] 4.3 Create OTP verification conversation flow
-
 
   - Implement OTP input handler with attempt tracking
   - Add proper error messages for invalid, expired, and exceeded attempts
@@ -193,18 +172,12 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 4.4 Bypass OTP for already-authenticated users
 
-
-
-
   - On "Send 3 prompts to email", if users.is_authenticated is true for this telegram_id, skip OTP and proceed directly to optimization → delivery
   - Make sure the flow still uses the stored (normalized) email
   - Integration tests for the "returning user" path
   - _Requirements: 1.4_
 
 - [x] 4.5 Gate the flow with health checks (bot-level)
-
-
-
 
   - Before starting email auth: require Redis healthy; otherwise show temporary-unavailable message and stop
   - Before sending email: require SMTP healthy; otherwise show error message in chat (no prompt sharing)
@@ -213,19 +186,12 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 5. Create direct optimization workflow
 
-
-
-
-
-
   - Skip follow-up questions and proceed directly to optimization
   - Implement system prompt modification for optimization methods
   - Add proper state management for direct optimization flow
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [x] 5.1 Create email flow orchestration
-
-
 
   - Implement `src/email_flow.py` as main workflow coordinator
   - Integrate authentication and direct optimization (skip follow-up questions)
@@ -235,9 +201,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
 
 - [x] 5.2 Implement email-specific prompt loading for optimization methods
 
-
-
-
   - Modify PromptLoader to load email-specific prompt files: CRAFT_email_prompt.txt, LYRA_email_prompt.txt, GGL_email_prompt.txt
   - Remove constant string appending from email flow - use email prompts directly
   - Ensure original system prompts remain unchanged for regular optimization use cases
@@ -245,8 +208,6 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - _Requirements: 4.3, 4.4, 4.7_
 
 - [x] 5.3 Add direct optimization flow without follow-up questions
-
-
 
   - Remove follow-up questions integration from email flow
   - Use original user prompt directly for optimization
@@ -438,6 +399,63 @@ This implementation plan breaks down the email-prompt-delivery feature into mana
   - Conduct security review and penetration testing
   - _Requirements: All requirements final validation_
 
+- [x] 11. Implement post-optimization email button functionality
+
+  - Add new "Отправить промпт на e-mail" button for specific post-optimization scenarios
+  - Extend existing email infrastructure to handle single-result emails
+  - Ensure existing "Send 3 prompts to email" functionality remains unchanged
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 4.6, 4.7, 9.1, 9.2, 9.3, 9.4_
+
+- [x] 11.1 Add new post-optimization email button to UI
+
+  - Extend `src/messages.py` with new "Отправить промпт на e-mail" button definition
+  - Add button display logic for two scenarios: after follow-up completion, after follow-up decline
+  - Ensure existing "Send 3 prompts to email" button remains unchanged
+  - Test button display in correct scenarios and verify existing functionality unaffected
+  - _Requirements: 1.1, 1.2, 1.4, 9.1, 9.2, 9.3, 9.4_
+
+- [x] 11.2 Implement post-optimization email handlers in bot
+
+  - Add new message handlers in `src/bot_handler.py` for post-optimization email requests
+  - Implement logic to determine current optimization result (follow-up vs single method)
+  - Integrate with existing email authentication flow (reuse existing handlers)
+  - Test handler integration and ensure existing email handlers remain unchanged
+  - _Requirements: 1.3, 1.5, 1.6, 4.6, 9.1, 9.2, 9.3, 9.4_
+
+- [x] 11.3 Create single-result email templates
+
+  - Extend `src/email_templates.py` with new template for single optimization results
+  - Support both follow-up results and single method results (CRAFT/LYRA/GGL)
+  - Maintain existing multilingual support (RU/EN) and HTML formatting
+  - Test template rendering for both result types and verify existing templates unchanged
+  - _Requirements: 4.4, 4.5, 5.1, 5.3, 5.6, 8.2, 8.4_
+
+- [x] 11.4 Extend email flow for post-optimization scenarios
+
+  - Add new entry point in `src/email_flow.py` for post-optimization email delivery
+  - Implement logic to send current result (follow-up or single method) via existing email service
+  - Reuse existing authentication, database, and SMTP infrastructure
+  - Test new flow integration and ensure existing email flow remains unchanged
+  - _Requirements: 1.6, 4.1, 4.2, 4.3, 4.6, 4.7, 5.2, 9.4_
+
+- [x] 11.5 Add comprehensive testing for new functionality
+
+
+
+  - Create tests for new button display logic and post-optimization scenarios
+  - Test single-result email template rendering and content
+  - Add integration tests for new email flow while verifying existing flow unchanged
+  - Test error handling and ensure existing error scenarios still work
+  - _Requirements: All new requirements validation_
+
+- [x] 11.6 Perform final integration and validation
+
+  - Integrate new functionality with existing bot system
+  - Verify existing "Send 3 prompts to email" functionality completely unchanged
+  - Test both new scenarios: post follow-up completion and post follow-up decline
+  - Validate email delivery, authentication reuse, and audit logging
+  - _Requirements: All requirements final validation_
+
 ## Task Dependencies
 
 ```mermaid
@@ -458,6 +476,10 @@ graph TD
     G --> I
     H --> I
     I --> J[10. Final Integration]
+    J --> K[11. Post-Optimization Email Button]
+    
+    style K fill:#e1f5fe
+    style K stroke:#01579b
 ```
 
 ## Success Criteria

@@ -12,9 +12,11 @@ class UserState:
         waiting_for_followup_choice (bool): Whether the bot is waiting for user to choose YES/NO for follow-up questions.
         in_followup_conversation (bool): Whether the user is currently in a follow-up question conversation.
         improved_prompt_cache (Optional[str]): Cached improved prompt for follow-up conversation context.
+        cached_method_name (Optional[str]): Cached method name for the improved prompt (CRAFT, LYRA, GGL, etc.).
         waiting_for_email_input (bool): Whether the bot is waiting for user to enter email address.
         waiting_for_otp_input (bool): Whether the bot is waiting for user to enter OTP code.
         email_flow_data (Optional[dict]): Data for email authentication flow (email, original_prompt, etc.).
+        post_optimization_result (Optional[dict]): Cached optimization result for post-optimization email button.
     """
 
     waiting_for_prompt: bool = (
@@ -24,9 +26,11 @@ class UserState:
     waiting_for_followup_choice: bool = False
     in_followup_conversation: bool = False
     improved_prompt_cache: Optional[str] = None
+    cached_method_name: Optional[str] = None
     waiting_for_email_input: bool = False
     waiting_for_otp_input: bool = False
     email_flow_data: Optional[dict] = None
+    post_optimization_result: Optional[dict] = None
 
 
 class StateManager:
@@ -111,6 +115,27 @@ class StateManager:
         state = self.get_user_state(user_id)
         return state.improved_prompt_cache
 
+    def set_cached_method_name(self, user_id: int, method_name: Optional[str]):
+        """
+        Cache the method name for the improved prompt.
+        Args:
+            user_id (int): The Telegram user ID.
+            method_name (Optional[str]): The method name to cache (CRAFT, LYRA, GGL, etc.), or None to clear.
+        """
+        state = self.get_user_state(user_id)
+        state.cached_method_name = method_name
+
+    def get_cached_method_name(self, user_id: int) -> Optional[str]:
+        """
+        Get the cached method name for the improved prompt.
+        Args:
+            user_id (int): The Telegram user ID.
+        Returns:
+            Optional[str]: The cached method name, or None if not set.
+        """
+        state = self.get_user_state(user_id)
+        return state.cached_method_name
+
     def set_waiting_for_email_input(self, user_id: int, waiting: bool):
         """
         Set whether the bot is waiting for user to enter email address.
@@ -151,3 +176,24 @@ class StateManager:
         """
         state = self.get_user_state(user_id)
         return state.email_flow_data
+
+    def set_post_optimization_result(self, user_id: int, result: Optional[dict]):
+        """
+        Set post-optimization result for the user.
+        Args:
+            user_id (int): The Telegram user ID.
+            result (Optional[dict]): Post-optimization result data or None to clear.
+        """
+        state = self.get_user_state(user_id)
+        state.post_optimization_result = result
+
+    def get_post_optimization_result(self, user_id: int) -> Optional[dict]:
+        """
+        Get post-optimization result for the user.
+        Args:
+            user_id (int): The Telegram user ID.
+        Returns:
+            Optional[dict]: Post-optimization result data or None if not set.
+        """
+        state = self.get_user_state(user_id)
+        return state.post_optimization_result

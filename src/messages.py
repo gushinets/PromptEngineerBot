@@ -31,8 +31,11 @@ BTN_YES = _("✅ДА", "✅YES")
 BTN_NO = _("❌НЕТ", "❌NO")
 BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Generate Prompt")
 
-# Email delivery button
+# Email delivery buttons
 BTN_EMAIL_DELIVERY = _("📧 Отправить 3 промпта на email", "📧 Send 3 prompts to email")
+BTN_POST_OPTIMIZATION_EMAIL = _(
+    "📧 Отправить промпт на e-mail", "📧 Send prompt to e-mail"
+)
 
 # ===== Welcome and Help Messages =====
 WELCOME_MESSAGE = _(
@@ -290,6 +293,11 @@ ERROR_ORIGINAL_PROMPT_NOT_FOUND = _(
     "❌ Failed to find original prompt. Please start over.",
 )
 
+ERROR_POST_OPTIMIZATION_NO_RESULT = _(
+    "❌ Нет доступного промпта для отправки на email.\n\n💡 Сначала оптимизируйте промпт одним из методов (CRAFT, LYRA, GGL), а затем используйте кнопку отправки на email.",
+    "❌ No prompt available to send to email.\n\n💡 First optimize a prompt using one of the methods (CRAFT, LYRA, GGL), then use the email send button.",
+)
+
 ERROR_EMAIL_FLOW_START_FAILED = _(
     "❌ Произошла ошибка при запуске email-потока. Попробуйте позже.",
     "❌ An error occurred while starting email flow. Please try again later.",
@@ -353,8 +361,8 @@ RESET_CONFIRMATION = _(
 
 # Processing status messages
 INFO_EMAIL_OPTIMIZATION_PROCESSING = _(
-    "🔄 Оптимизируем ваш промпт тремя методами и отправляем на email...",
-    "🔄 Optimizing your prompt with three methods and sending to email...",
+    "🔄 Оптимизируем ваш промпт и отправляем на email...",
+    "🔄 Optimizing your prompt and sending to email...",
 )
 
 INFO_ALL_METHODS_OPTIMIZATION = _(
@@ -368,14 +376,14 @@ SELECT_METHOD_MESSAGE = _(
     "⚡️ LYRA — мгновенный результат\n"
     "🛠 CRAFT — структурированный подход\n"
     "🔍 GGL — фокус на цели, минимум вопросов\n\n"
-    "Или нажмите кнопку \"Отправить на e-mail\" и получите запрос, оптимизированный всеми тремя методами сразу, на вашу почту.\n\n"
+    'Или нажмите кнопку "Отправить на e-mail" и получите запрос, оптимизированный всеми тремя методами сразу, на вашу почту.\n\n'
     "👉 *Нажмите на кнопку ниже, чтобы начать*:",
     "📝 **Your request has been received!**\n\n"
     "Now choose one optimization method:\n\n"
     "⚡️ LYRA — instant results\n"
     "🛠 CRAFT — structured approach\n"
     "🔍 GGL — goal-focused, minimal questions\n\n"
-    "Or click the \"Send to e-mail\" button and receive your request optimized with all three methods at once in your email.\n\n"
+    'Or click the "Send to e-mail" button and receive your request optimized with all three methods at once in your email.\n\n'
     "👉 *Click the button below to start*:",
 )
 
@@ -483,6 +491,15 @@ FOLLOWUP_CHOICE_KEYBOARD = ReplyKeyboardMarkup(
 
 FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
     [[BTN_GENERATE_PROMPT], [BTN_RESET]], resize_keyboard=True
+)
+
+# Post-optimization email keyboards
+POST_FOLLOWUP_COMPLETION_KEYBOARD = ReplyKeyboardMarkup(
+    [[BTN_POST_OPTIMIZATION_EMAIL], [BTN_RESET]], resize_keyboard=True
+)
+
+POST_FOLLOWUP_DECLINE_KEYBOARD = ReplyKeyboardMarkup(
+    [[BTN_POST_OPTIMIZATION_EMAIL], [BTN_RESET]], resize_keyboard=True
 )
 
 # ===== Improved Prompt Response =====

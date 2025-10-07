@@ -51,6 +51,7 @@ from .messages import (
     ERROR_OTP_EXPIRED,
     ERROR_OTP_INVALID,
     ERROR_OTP_VERIFICATION_PROCESSING,
+    ERROR_POST_OPTIMIZATION_NO_RESULT,
     ERROR_PROMPT_OPTIMIZATION_FAILED,
     ERROR_REDIS_UNAVAILABLE,
     ERROR_SMTP_UNAVAILABLE,
@@ -219,6 +220,118 @@ class EmailFlowOrchestrator:
                 ERROR_EMAIL_FLOW_START_FAILED,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
+            return False
+
+    async def start_post_optimization_email_flow(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        user_id: int,
+    ) -> bool:
+        """
+        Start post-optimization email flow for sending current optimization result.
+
+        This method handles two scenarios:
+        1. After follow-up completion - sends the final follow-up result
+        2. After follow-up decline - sends the single method result
+
+        Args:
+            update: Telegram update object
+            context: Telegram context
+            user_id: User ID
+
+        Returns:
+            bool: True if flow started successfully, False otherwise
+        """
+        try:
+            logger.info(
+                f"post_optimization_email_flow_start | user_id={mask_telegram_id(user_id)}"
+            )
+
+            # Check if we have a current optimization result to send
+            current_result = self._get_current_optimization_result(user_id)
+            if not current_result:
+                logger.warning(
+                    f"post_optimization_no_result | user_id={mask_telegram_id(user_id)}"
+                )
+                await self._safe_reply(update, ERROR_POST_OPTIMIZATION_NO_RESULT)
+                return False
+
+            # Get original prompt for email content
+            original_prompt = self.conversation_manager.get_user_prompt(user_id)
+
+            # If not found in conversation manager, try to get it from stored result
+            if (
+                not original_prompt
+                and current_result
+                and current_result.get("original_prompt")
+            ):
+                original_prompt = current_result.get("original_prompt")
+                logger.info(
+                    f"post_optimization_using_stored_original_prompt | user_id={mask_telegram_id(user_id)}"
+                )
+
+            if not original_prompt:
+                logger.warning(
+                    f"post_optimization_no_original_prompt | user_id={mask_telegram_id(user_id)}"
+                )
+                await self._safe_reply(update, ERROR_ORIGINAL_PROMPT_NOT_FOUND)
+                return False
+
+            # Store post-optimization email flow data
+            flow_data = {
+                "flow_type": "post_optimization",
+                "original_prompt": original_prompt,
+                "current_result": current_result,
+                "result_type": current_result.get(
+                    "type", "single_method"
+                ),  # "follow_up" or "single_method"
+                "method_name": current_result.get("method_name", ""),
+                "optimized_content": current_result.get("content", ""),
+                "started_at": time.time(),
+            }
+
+            # Set email flow state
+            self.state_manager.set_email_flow_data(user_id, flow_data)
+
+            # Check if user is already authenticated
+            if self.auth_service.is_user_authenticated(user_id):
+                user_email = self.auth_service.get_user_email(user_id)
+                if user_email:
+                    logger.info(
+                        f"post_optimization_user_already_authenticated | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
+                    )
+                    await self._safe_reply(
+                        update,
+                        EMAIL_ALREADY_AUTHENTICATED.format(
+                            email=mask_email(user_email)
+                        ),
+                    )
+                    # Proceed directly to email delivery
+                    return await self._send_post_optimization_email(
+                        update,
+                        context,
+                        user_id,
+                        user_email,
+                        current_result,
+                        original_prompt,
+                    )
+
+            # Start authentication flow
+            self.state_manager.set_waiting_for_email_input(user_id, True)
+            await self._safe_reply(update, EMAIL_INPUT_MESSAGE)
+
+            logger.info(
+                f"post_optimization_email_auth_started | user_id={mask_telegram_id(user_id)}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"post_optimization_email_flow_error | user_id={mask_telegram_id(user_id)} | error={str(e)}",
+                exc_info=True,
+            )
+            await self._safe_reply(update, ERROR_EMAIL_FLOW_START_FAILED)
             return False
 
     async def handle_email_input(
@@ -394,10 +507,37 @@ class EmailFlowOrchestrator:
 
                 logger.info(f"otp_verified | user_id={mask_telegram_id(user_id)}")
 
-                # Proceed to follow-up questions and email delivery
-                return await self._proceed_to_followup_and_delivery(
-                    update, context, user_id
-                )
+                # Check if this is a post-optimization flow
+                email_flow_data = self.state_manager.get_email_flow_data(user_id)
+                if (
+                    email_flow_data
+                    and email_flow_data.get("flow_type") == "post_optimization"
+                ):
+                    # Post-optimization flow - send current result directly
+                    user_email = self.auth_service.get_user_email(user_id)
+                    current_result = email_flow_data.get("current_result")
+                    original_prompt = email_flow_data.get("original_prompt")
+
+                    if user_email and current_result and original_prompt:
+                        return await self._send_post_optimization_email(
+                            update,
+                            context,
+                            user_id,
+                            user_email,
+                            current_result,
+                            original_prompt,
+                        )
+                    else:
+                        logger.error(
+                            f"post_optimization_missing_data | user_id={mask_telegram_id(user_id)}"
+                        )
+                        await self._safe_reply(update, ERROR_EMAIL_PROCESSING_FAILED)
+                        return False
+                else:
+                    # Regular flow - proceed to follow-up questions and email delivery
+                    return await self._proceed_to_followup_and_delivery(
+                        update, context, user_id
+                    )
 
             else:
                 # Handle verification failure
@@ -1094,6 +1234,119 @@ class EmailFlowOrchestrator:
             logger.error(f"Error checking follow-up timeout: {e}")
             return False
 
+    def _get_current_optimization_result(self, user_id: int) -> Optional[dict]:
+        """
+        Get the current optimization result for post-optimization email.
+
+        This method determines what result to send based on the current state:
+        - If user completed follow-up: return follow-up result
+        - If user declined follow-up: return single method result
+
+        Args:
+            user_id: User's Telegram ID
+
+        Returns:
+            dict with result info or None if no result available
+        """
+        try:
+            # First check if we have a stored post-optimization result (from follow-up decline)
+            stored_result = self.state_manager.get_post_optimization_result(user_id)
+            if stored_result:
+                logger.info(
+                    f"post_optimization_found_stored_result | user_id={mask_telegram_id(user_id)} | type={stored_result.get('type')} | method={stored_result.get('method_name')}"
+                )
+                return stored_result
+
+            # Check if we have a cached improved prompt (legacy fallback - shouldn't happen with proper state management)
+            improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
+            if improved_prompt:
+                # This is a legacy fallback scenario
+                logger.warning(
+                    f"post_optimization_using_legacy_cache_fallback | user_id={mask_telegram_id(user_id)}"
+                )
+                return {
+                    "type": "follow_up",
+                    "method_name": "Follow-up Optimization",
+                    "content": improved_prompt,
+                }
+
+            # If we reach here, no optimization result is available
+            logger.warning(
+                f"no_current_optimization_result | user_id={mask_telegram_id(user_id)}"
+            )
+            return None
+
+        except Exception as e:
+            logger.error(
+                f"Error getting current optimization result for user {mask_telegram_id(user_id)}: {e}"
+            )
+            return None
+
+    async def _send_post_optimization_email(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        user_id: int,
+        user_email: str,
+        current_result: dict,
+        original_prompt: str,
+    ) -> bool:
+        """
+        Send post-optimization email with current result.
+
+        Args:
+            update: Telegram update object
+            context: Telegram context
+            user_id: User's Telegram ID
+            user_email: User's email address
+            current_result: Current optimization result to send
+            original_prompt: Original user prompt
+
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            logger.info(
+                f"post_optimization_email_send | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
+            )
+
+            # Send processing message
+            await self._safe_reply(update, INFO_EMAIL_OPTIMIZATION_PROCESSING)
+
+            # Send the single result email
+            result = await self.email_service.send_single_result_email(
+                user_email,
+                original_prompt,
+                current_result["method_name"],
+                current_result["content"],
+                user_id,  # Pass telegram_id for audit logging
+            )
+            success = result.success
+
+            if success:
+                await self._safe_reply(update, EMAIL_OPTIMIZATION_SUCCESS)
+                logger.info(
+                    f"post_optimization_email_success | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
+                )
+
+                # Reset user state
+                self._reset_user_state(user_id)
+                return True
+            else:
+                await self._safe_reply(update, ERROR_EMAIL_OPTIMIZATION_FAILED)
+                logger.error(
+                    f"post_optimization_email_failed | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
+                )
+                return False
+
+        except Exception as e:
+            logger.error(
+                f"Error sending post-optimization email for user {mask_telegram_id(user_id)}: {e}",
+                exc_info=True,
+            )
+            await self._safe_reply(update, ERROR_EMAIL_OPTIMIZATION_FAILED)
+            return False
+
     async def _handle_followup_timeout(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int
     ) -> bool:
@@ -1787,6 +2040,7 @@ class EmailFlowOrchestrator:
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_improved_prompt_cache(user_id, None)
         self.state_manager.set_email_flow_data(user_id, None)
+        self.state_manager.set_post_optimization_result(user_id, None)
         self.conversation_manager.reset(user_id)
         self.redis_client.delete_flow_state(user_id)
 

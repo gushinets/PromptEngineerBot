@@ -28,6 +28,7 @@ from .messages import (
     BTN_LYRA,
     BTN_LYRA_DETAIL,
     BTN_NO,
+    BTN_POST_OPTIMIZATION_EMAIL,
     BTN_RESET,
     BTN_YES,
     EMAIL_ALREADY_AUTHENTICATED,
@@ -65,6 +66,8 @@ from .messages import (
     FOLLOWUP_TIMEOUT_FALLBACK,
     FOLLOWUP_TIMEOUT_RESTART,
     OTP_VERIFICATION_SUCCESS,
+    POST_FOLLOWUP_COMPLETION_KEYBOARD,
+    POST_FOLLOWUP_DECLINE_KEYBOARD,
     PROMPT_READY_FOLLOW_UP,
     RESET_CONFIRMATION,
     SELECT_METHOD_KEYBOARD,
@@ -75,8 +78,6 @@ from .messages import (
     parse_followup_response,
     parse_llm_response,
 )
-from .prompt_loader import PromptLoader
-from .state_manager import StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -146,18 +147,28 @@ class BotHandler:
         """Set the email flow orchestrator after initialization."""
         self.email_flow_orchestrator = orchestrator
 
-    def reset_user_state(self, user_id: int):
-        """Reset the user's state and conversation history."""
+    def reset_user_state(self, user_id: int, preserve_post_optimization: bool = False):
+        """
+        Reset the user's state and conversation history.
+
+        Args:
+            user_id: User ID to reset
+            preserve_post_optimization: If True, preserve post_optimization_result for email button
+        """
         self.state_manager.set_waiting_for_prompt(user_id, True)
         self.state_manager.set_last_interaction(user_id, None)
         # Reset follow-up states
         self.state_manager.set_waiting_for_followup_choice(user_id, False)
         self.state_manager.set_in_followup_conversation(user_id, False)
         self.state_manager.set_improved_prompt_cache(user_id, None)
+        self.state_manager.set_cached_method_name(user_id, None)
         # Reset email states
         self.state_manager.set_waiting_for_email_input(user_id, False)
         self.state_manager.set_waiting_for_otp_input(user_id, False)
         self.state_manager.set_email_flow_data(user_id, None)
+        # Reset post-optimization result (unless we want to preserve it)
+        if not preserve_post_optimization:
+            self.state_manager.set_post_optimization_result(user_id, None)
         self.conversation_manager.reset(user_id)
 
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -188,6 +199,11 @@ class BotHandler:
         # Reset button always resets conversation
         if text == BTN_RESET:
             await self.handle_start(update, context)
+            return
+
+        # Handle post-optimization email button
+        if text == BTN_POST_OPTIMIZATION_EMAIL:
+            await self._handle_post_optimization_email(update, context, user_id)
             return
 
         # Handle email input waiting state
@@ -424,22 +440,110 @@ class BotHandler:
         method_name = self.conversation_manager.get_current_method(user_id)
         await self._process_with_llm(update, user_id, method_name)
 
+    async def _handle_post_optimization_email(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int
+    ):
+        """Handle post-optimization email button click."""
+        if self.email_flow_orchestrator:
+            try:
+                # Check health before starting email flow
+                from .health_checks import get_health_monitor
+
+                health_monitor = get_health_monitor()
+
+                # Check if Redis is healthy (required for email flow)
+                if not health_monitor.is_service_healthy("redis"):
+                    await self._safe_reply(
+                        update,
+                        ERROR_REDIS_UNAVAILABLE,
+                        reply_markup=ReplyKeyboardMarkup(
+                            [[BTN_RESET]], resize_keyboard=True
+                        ),
+                    )
+                    logger.warning(
+                        f"post_optimization_email_blocked_redis_unhealthy | user_id={user_id}"
+                    )
+                    return
+
+                # Check if SMTP is healthy - warn but allow to proceed with chat fallback
+                if not health_monitor.is_service_healthy("smtp"):
+                    logger.warning(
+                        f"post_optimization_email_smtp_unhealthy_proceeding_with_fallback | user_id={user_id}"
+                    )
+
+            except Exception as e:
+                # Health monitor not available, log warning but proceed
+                logger.warning(
+                    f"health_monitor_unavailable_proceeding_post_optimization | user_id={user_id} | error={e}"
+                )
+
+            try:
+                # Start post-optimization email flow
+                await self.email_flow_orchestrator.start_post_optimization_email_flow(
+                    update, context, user_id
+                )
+            except Exception as e:
+                logger.error(
+                    f"Post-optimization email flow error for user {user_id}: {e}"
+                )
+                await self._safe_reply(update, ERROR_EMAIL_SERVICE_ERROR)
+        else:
+            await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
+
     async def _handle_followup_choice(self, update: Update, user_id: int, text: str):
         """Handle follow-up choice (YES/NO) from user."""
         if text == BTN_NO:
             # User declined follow-up questions
-            # Send follow-up declined message
+            # Preserve optimization result for post-optimization email button
+
+            # Get the original prompt before any resets
+            original_prompt = self.conversation_manager.get_user_prompt(user_id)
+
+            # First check if we have a cached improved prompt (this should be available after optimization)
+            improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
+
+            # Get the cached method name (stored when the improved prompt was cached)
+            cached_method = self.state_manager.get_cached_method_name(user_id)
+
+            if improved_prompt:
+                # We have an improved prompt from the initial optimization, use it
+                # Use the cached method name, or fallback to "Optimization"
+                method_name = cached_method if cached_method else "Optimization"
+
+                self.state_manager.set_post_optimization_result(
+                    user_id,
+                    {
+                        "type": "single_method",
+                        "method_name": method_name,
+                        "content": improved_prompt,
+                        "original_prompt": original_prompt,
+                    },
+                )
+                logger.info(
+                    f"followup_declined_using_cached_prompt | user_id={user_id} | method={method_name} | content_length={len(improved_prompt)} | has_original={bool(original_prompt)}"
+                )
+            else:
+                # This should not happen with proper state management
+                # Log warning and continue without storing result
+                logger.warning(
+                    f"followup_declined_no_cached_prompt | user_id={user_id} | This indicates a state management issue"
+                )
+
+            # Send follow-up declined message with post-optimization email button
             await self._safe_reply(
                 update,
                 FOLLOWUP_DECLINED_MESSAGE,
                 parse_mode="Markdown",
-                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
+                reply_markup=POST_FOLLOWUP_DECLINE_KEYBOARD,
             )
 
             # Reset state to prompt input ready
             self.state_manager.set_waiting_for_followup_choice(user_id, False)
             self.state_manager.set_waiting_for_prompt(user_id, True)
             self.state_manager.set_improved_prompt_cache(user_id, None)  # Clear cache
+            self.state_manager.set_cached_method_name(
+                user_id, None
+            )  # Clear cached method
             self.conversation_manager.reset(user_id)
 
             logger.info(f"followup_declined | user_id={user_id}")
@@ -524,6 +628,9 @@ class BotHandler:
         self, update: Update, user_id: int, refined_prompt: str
     ):
         """Complete the follow-up conversation by sending refined prompt and resetting state."""
+        # Get original prompt before resetting
+        original_prompt = self.conversation_manager.get_user_prompt(user_id)
+
         # Send the refined prompt to user
         await self._safe_reply(
             update,
@@ -532,12 +639,12 @@ class BotHandler:
             reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
         )
 
-        # Send follow-up completion message
+        # Send follow-up completion message with post-optimization email button
         await self._safe_reply(
             update,
             PROMPT_READY_FOLLOW_UP,
             parse_mode="Markdown",
-            reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True),
+            reply_markup=POST_FOLLOWUP_COMPLETION_KEYBOARD,
         )
 
         # Log conversation totals for follow-up
@@ -547,8 +654,24 @@ class BotHandler:
             user_id, "FOLLOWUP", refined_prompt, improved_prompt
         )
 
-        # Reset state to prompt input ready
-        self.reset_user_state(user_id)
+        # Preserve the refined prompt for post-optimization email button
+        # Store it BEFORE resetting state
+        self.state_manager.set_post_optimization_result(
+            user_id,
+            {
+                "type": "follow_up",
+                "method_name": "Follow-up Optimization",
+                "content": refined_prompt,
+                "original_prompt": original_prompt,
+            },
+        )
+
+        logger.info(
+            f"followup_completed_result_preserved | user_id={user_id} | content_length={len(refined_prompt)} | has_original={bool(original_prompt)}"
+        )
+
+        # Reset state to prompt input ready, but preserve post-optimization result
+        self.reset_user_state(user_id, preserve_post_optimization=True)
 
         logger.info(f"followup_completed | user_id={user_id}")
 
@@ -822,7 +945,7 @@ class BotHandler:
                 return False
 
             # Check if we have a cached improved prompt
-            if not user_state.improved_prompt_cache:
+            if not self.state_manager.get_improved_prompt_cache(user_id):
                 return False
 
             # Check if conversation manager thinks we're in follow-up
@@ -1057,8 +1180,9 @@ class BotHandler:
                     ),
                 )
 
-                # Cache the improved prompt for potential follow-up use
+                # Cache the improved prompt AND method name for potential follow-up use
                 self.state_manager.set_improved_prompt_cache(user_id, optimized_prompt)
+                self.state_manager.set_cached_method_name(user_id, method_name)
 
                 # Log conversation totals for initial optimization phase
                 # This logs tokens with initial prompt as UserRequest and optimized prompt as Answer

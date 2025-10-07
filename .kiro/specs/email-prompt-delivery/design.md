@@ -2,33 +2,33 @@
 
 ## Overview
 
-This design document outlines the technical architecture for implementing email-based authentication and prompt delivery functionality in the Telegram bot. The system will add a new user flow where users can authenticate via email OTP and receive optimized prompts from all three methods (CRAFT, LYRA, GGL) directly in their inbox.
+This design document outlines the technical architecture for extending the existing email-based authentication and prompt delivery functionality in the Telegram bot. The system will add a new "Отправить промпт на e-mail" button that appears after specific optimization scenarios, while keeping the existing "Send 3 prompts to email" functionality completely unchanged.
 
-The design follows a modular approach, integrating with existing bot components while adding new layers for authentication, email services, and database management. The system uses Redis for temporary OTP storage, SQLAlchemy for persistent data, and SMTP for email delivery.
+The design follows a modular approach, reusing existing email infrastructure (authentication, email services, database management) while adding new UI components and workflow logic for the post-optimization email delivery scenarios. The system leverages the existing Redis OTP storage, SQLAlchemy models, and SMTP services.
 
 ## Architecture
 
-### Project Structure (Hybrid Approach)
+### Project Structure (Extension Approach)
 
 ```
 src/
-├── bot_handler.py          # ✅ Extended: Add email flow handlers
-├── config.py               # ✅ Extended: Add email/DB/Redis config
+├── bot_handler.py          # ✅ Extended: Add new post-optimization email handlers
+├── config.py               # ✅ Existing: Email/DB/Redis config (already implemented)
 ├── main.py                 # ✅ Keep existing
-├── messages.py             # ✅ Extended: Add email button
+├── messages.py             # ✅ Extended: Add new "Отправить промпт на e-mail" button
 ├── conversation_manager.py # ✅ Keep existing
 ├── state_manager.py        # ✅ Keep existing
 ├── [other existing files]  # ✅ Keep all existing files
 │
-├── auth_service.py         # 🆕 New: Authentication & OTP logic
-├── email_service.py        # 🆕 New: Email sending functionality
-├── email_templates.py      # 🆕 New: Email templates
-├── database.py             # 🆕 New: SQLAlchemy models & connection
-├── redis_client.py         # 🆕 New: Redis operations
-├── email_flow.py           # 🆕 New: Email workflow orchestration
-├── health_checks.py        # 🆕 New: Health monitoring & alerting
-├── metrics.py              # 🆕 New: Metrics collection & observability
-└── audit_service.py        # 🆕 New: Audit logging & event purging
+├── auth_service.py         # ✅ Existing: Authentication & OTP logic (reuse)
+├── email_service.py        # ✅ Existing: Email sending functionality (reuse)
+├── email_templates.py      # ✅ Extended: Add new template for single result emails
+├── database.py             # ✅ Existing: SQLAlchemy models & connection (reuse)
+├── redis_client.py         # ✅ Existing: Redis operations (reuse)
+├── email_flow.py           # ✅ Extended: Add new workflow for post-optimization emails
+├── health_checks.py        # ✅ Existing: Health monitoring & alerting (reuse)
+├── metrics.py              # ✅ Existing: Metrics collection & observability (reuse)
+└── audit_service.py        # ✅ Existing: Audit logging & event purging (reuse)
 
 alembic/                    # 🆕 New: Database migrations
 ├── versions/
@@ -101,12 +101,43 @@ graph TB
 
 ### Component Flow
 
-1. **User Input** → Bot Handler → Auth Service
-2. **OTP Generation** → Redis Storage → Email Service
-3. **Verification** → Database Update → Direct Optimization
-4. **Optimization** → Email Delivery → Audit Logging
+**Existing Flow (Unchanged):**
+1. **Method Selection** → "Send 3 prompts to email" → Auth Service → All 3 Optimizations → Email Delivery
 
-## Components and Interfaces
+**New Flow (Added):**
+1. **Optimization Completion** → "Отправить промпт на e-mail" button → Existing Auth Service → Current Result Email Delivery
+2. **Follow-up Decline** → "Отправить промпт на e-mail" button → Existing Auth Service → Single Method Result Email Delivery
+
+## New Components and Extensions
+
+### 1. Post-Optimization Email Button
+
+#### New UI Component
+- **Location**: Appears after optimization completion in two scenarios
+- **Trigger 1**: After successful follow-up optimization process completion
+- **Trigger 2**: After user declines follow-up optimization (but completed CRAFT/LYRA/GGL)
+- **Button Text**: "Отправить промпт на e-mail" (Russian)
+- **Behavior**: Triggers existing email authentication flow
+
+#### Integration Points
+- **Bot Handler**: New message handlers for post-optimization email requests
+- **Messages**: New button definition alongside existing buttons
+- **Email Flow**: New entry point that reuses existing authentication and email infrastructure
+
+### 2. Email Content Adaptation
+
+#### New Email Templates
+- **Single Result Template**: For sending one optimization result (follow-up or single method)
+- **Content Structure**: Original prompt + single optimization result (vs. existing 3-result template)
+- **Reuse**: Leverages existing email template infrastructure and multilingual support
+
+#### Email Flow Extensions
+- **New Entry Point**: `send_current_result_email()` function in email_flow.py
+- **Content Selection**: Determines whether to send follow-up result or single method result
+- **Authentication**: Reuses existing OTP and authentication system
+- **Delivery**: Uses existing SMTP service and error handling
+
+## Existing Components (Reused)
 
 ### 1. Database Layer
 

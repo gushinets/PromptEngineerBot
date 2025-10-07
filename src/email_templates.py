@@ -677,3 +677,299 @@ class EmailTemplates:
         )
 
         return subject, html_body, plain_body
+
+    def get_single_result_subject(self) -> str:
+        """Get single optimization result email subject line."""
+        return _(
+            "Ваш оптимизированный промпт готов",
+            "Your Optimized Prompt Is Ready",
+            self.language,
+        )
+
+    def get_single_result_html_body(
+        self,
+        original_prompt: str,
+        method_name: str,
+        optimized_result: str,
+    ) -> str:
+        """
+        Get single optimization result email HTML body.
+
+        Args:
+            original_prompt: User's original prompt
+            method_name: Name of the optimization method used
+            optimized_result: The optimization result
+
+        Returns:
+            HTML formatted email body
+        """
+        title = _(
+            "Ваш оптимизированный промпт", "Your Optimized Prompt", self.language
+        )
+
+        greeting = _(
+            "Отлично! Ваш промпт готов.",
+            "Great! Your prompt is ready.",
+            self.language,
+        )
+
+        intro = _(
+            f"Мы оптимизировали ваш запрос с помощью метода {method_name}:",
+            f"We optimized your request using the {method_name} method:",
+            self.language,
+        )
+
+        original_label = _(
+            "Ваш исходный промпт:", "Your Original Prompt:", self.language
+        )
+
+        optimized_label = _(
+            f"Оптимизированный промпт ({method_name}):",
+            f"Optimized Prompt ({method_name}):",
+            self.language,
+        )
+
+        usage_note = _(
+            "Теперь вы можете использовать этот оптимизированный промпт в любом ИИ-помощнике:",
+            "Now you can use this optimized prompt with any AI assistant:",
+            self.language,
+        )
+
+        ai_list = _(
+            "🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek",
+            "🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek",
+            self.language,
+        )
+
+        signature = _(
+            "Удачи в работе с ИИ!<br><br>С уважением,<br>Prompt Engineering Bot",
+            "Good luck with your AI work!<br><br>Best regards,<br>Prompt Engineering Bot",
+            self.language,
+        )
+
+        return f"""
+<!DOCTYPE html>
+<html lang="{self.language.lower()}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }}
+        .container {{
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+        }}
+        .prompt-section {{
+            margin: 25px 0;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }}
+        .original-prompt {{
+            background-color: #f8f9fa;
+            border-left-color: #6c757d;
+        }}
+        .optimized-prompt {{
+            background-color: #e7f3ff;
+            border-left-color: #007bff;
+        }}
+        .prompt-label {{
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+        }}
+        .prompt-content {{
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+        }}
+        .usage-section {{
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }}
+        .ai-list {{
+            font-size: 18px;
+            text-align: center;
+            margin: 15px 0;
+            font-weight: bold;
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #666;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 {title}</h1>
+            <p>{greeting}</p>
+        </div>
+        
+        <p>{intro}</p>
+        
+        <div class="prompt-section original-prompt">
+            <div class="prompt-label">{original_label}</div>
+            <div class="prompt-content">{self._escape_html(original_prompt)}</div>
+        </div>
+        
+        <div class="prompt-section optimized-prompt">
+            <div class="prompt-label">{optimized_label}</div>
+            <div class="prompt-content">{self._escape_html(optimized_result)}</div>
+        </div>
+        
+        <div class="usage-section">
+            <p><strong>💡 {usage_note}</strong></p>
+            <div class="ai-list">{ai_list}</div>
+        </div>
+        
+        <div class="footer">
+            <p>{signature}</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+    def get_single_result_plain_body(
+        self,
+        original_prompt: str,
+        method_name: str,
+        optimized_result: str,
+    ) -> str:
+        """
+        Get single optimization result email plain text body.
+
+        Args:
+            original_prompt: User's original prompt
+            method_name: Name of the optimization method used
+            optimized_result: The optimization result
+
+        Returns:
+            Plain text formatted email body
+        """
+        title = _(
+            "Ваш оптимизированный промпт", "Your Optimized Prompt", self.language
+        )
+
+        greeting = _(
+            "Отлично! Ваш промпт готов.",
+            "Great! Your prompt is ready.",
+            self.language,
+        )
+
+        intro = _(
+            f"Мы оптимизировали ваш запрос с помощью метода {method_name}:",
+            f"We optimized your request using the {method_name} method:",
+            self.language,
+        )
+
+        original_label = _(
+            "ВАШ ИСХОДНЫЙ ПРОМПТ:", "YOUR ORIGINAL PROMPT:", self.language
+        )
+
+        optimized_label = _(
+            f"ОПТИМИЗИРОВАННЫЙ ПРОМПТ ({method_name}):",
+            f"OPTIMIZED PROMPT ({method_name}):",
+            self.language,
+        )
+
+        usage_note = _(
+            "Теперь вы можете использовать этот оптимизированный промпт в любом ИИ-помощнике:",
+            "Now you can use this optimized prompt with any AI assistant:",
+            self.language,
+        )
+
+        ai_list = _(
+            "🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek",
+            "🧠 ChatGPT | 🤖 Gemini | 🦾 Claude | 🧬 GROK | 🐳 DeepSeek",
+            self.language,
+        )
+
+        signature = _(
+            "Удачи в работе с ИИ!\n\nС уважением,\nPrompt Engineering Bot",
+            "Good luck with your AI work!\n\nBest regards,\nPrompt Engineering Bot",
+            self.language,
+        )
+
+        return f"""
+{title}
+
+{greeting}
+
+{intro}
+
+{"=" * 50}
+{original_label}
+{"=" * 50}
+{self._format_plain_code_block(original_prompt)}
+
+{"=" * 50}
+{optimized_label}
+{"=" * 50}
+{self._format_plain_code_block(optimized_result)}
+
+💡 {usage_note}
+
+{ai_list}
+
+{signature}
+"""
+
+    def compose_single_result_email(
+        self,
+        original_prompt: str,
+        method_name: str,
+        optimized_result: str,
+    ) -> tuple[str, str, str]:
+        """
+        Compose single optimization result email.
+
+        Args:
+            original_prompt: User's original prompt
+            method_name: Name of the optimization method used
+            optimized_result: The optimization result
+
+        Returns:
+            Tuple of (subject, html_body, plain_body)
+        """
+        subject = self.get_single_result_subject()
+        html_body = self.get_single_result_html_body(
+            original_prompt, method_name, optimized_result
+        )
+        plain_body = self.get_single_result_plain_body(
+            original_prompt, method_name, optimized_result
+        )
+
+        return subject, html_body, plain_body

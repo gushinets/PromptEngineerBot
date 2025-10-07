@@ -586,6 +586,107 @@ class EmailService:
                 success=False, error=f"Unexpected error: {str(e)}"
             )
 
+    async def send_single_result_email(
+        self,
+        to_email: str,
+        original_prompt: str,
+        method_name: str,
+        optimized_result: str,
+        telegram_id: int = None,
+    ) -> EmailDeliveryResult:
+        """
+        Send single optimization result email with idempotency protection.
+
+        Args:
+            to_email: Recipient email address
+            original_prompt: User's original prompt
+            method_name: Name of the optimization method used
+            optimized_result: The optimization result
+            telegram_id: User's telegram ID for audit logging (optional)
+
+        Returns:
+            EmailDeliveryResult with delivery status
+        """
+        try:
+            logger.info(
+                f"SINGLE_RESULT_EMAIL_COMPOSE: Preparing single result email for {self.mask_email(to_email)}"
+            )
+
+            # Generate email content using templates
+            subject, html_body, plain_body = self.templates.compose_single_result_email(
+                original_prompt=original_prompt,
+                method_name=method_name,
+                optimized_result=optimized_result,
+            )
+
+            # Check idempotency (prevent duplicate single result emails)
+            content_preview = f"SINGLE_RESULT:{method_name}:{original_prompt[:50]}:{optimized_result[:50]}"
+            email_hash = self._generate_email_hash(to_email, subject, content_preview)
+            if await self._is_email_already_sent(email_hash):
+                logger.info(
+                    f"SINGLE_RESULT_DUPLICATE_BLOCKED: Duplicate single result email blocked for {self.mask_email(to_email)}"
+                )
+                return EmailDeliveryResult(
+                    success=True, message_id="duplicate_blocked", delivery_time_ms=0
+                )
+
+            message = EmailMessage(
+                to_email=to_email,
+                subject=subject,
+                html_body=html_body,
+                plain_body=plain_body,
+            )
+
+            # Send email with queue fallback for SMTP health issues
+            result = await self._send_email_with_queue_fallback(message, email_hash)
+
+            # Log audit event
+            if telegram_id:
+                try:
+                    audit_service = get_audit_service()
+                    if result.success:
+                        logger.info(
+                            f"SINGLE_RESULT_EMAIL_SENT: Email delivered to {self.mask_email(to_email)}"
+                        )
+                        audit_service.log_email_send_success(telegram_id, to_email)
+                    else:
+                        logger.error(
+                            f"SINGLE_RESULT_EMAIL_FAILED: Failed to send single result email to {self.mask_email(to_email)} - {result.error}"
+                        )
+                        # Extract provider error info (non-sensitive)
+                        error_reason = self._extract_provider_error(result.error)
+                        audit_service.log_email_send_failure(
+                            telegram_id, to_email, error_reason
+                        )
+                except Exception as audit_error:
+                    logger.error(
+                        f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
+                    )
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                f"SINGLE_RESULT_EMAIL_ERROR: Unexpected error sending single result email to {self.mask_email(to_email)} - {str(e)}"
+            )
+
+            # Log audit event for unexpected error
+            if telegram_id:
+                try:
+                    audit_service = get_audit_service()
+                    error_reason = self._extract_provider_error(str(e))
+                    audit_service.log_email_send_failure(
+                        telegram_id, to_email, error_reason
+                    )
+                except Exception as audit_error:
+                    logger.error(
+                        f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
+                    )
+
+            return EmailDeliveryResult(
+                success=False, error=f"Unexpected error: {str(e)}"
+            )
+
     def get_fallback_prompts_text(
         self, craft_result: str, lyra_result: str, ggl_result: str
     ) -> str:
