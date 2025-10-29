@@ -268,13 +268,13 @@ ERROR_OTP_ATTEMPTS_EXCEEDED = _(
 )
 
 OTP_VERIFICATION_SUCCESS = _(
-    "✅ Email подтвержден! Переходим к улучшению промпта...",
-    "✅ Email verified! Proceeding to prompt improvement...",
+    "✅ Ваш Email подтвержден",
+    "✅ Your Email verified",
 )
 
 EMAIL_ALREADY_AUTHENTICATED = _(
-    "✅ Вы уже авторизованы! Отправляем промпты на ваш email {email}...",
-    "✅ You're already authenticated! Sending prompts to your email {email}...",
+    "✅ Вы уже авторизованы! Ваш email {email}",
+    "✅ You're already authenticated! Your email {email}",
 )
 
 ERROR_REDIS_UNAVAILABLE = _(
@@ -361,8 +361,8 @@ RESET_CONFIRMATION = _(
 
 # Processing status messages
 INFO_EMAIL_OPTIMIZATION_PROCESSING = _(
-    "🔄 Оптимизируем ваш промпт и отправляем на email...",
-    "🔄 Optimizing your prompt and sending to email...",
+    "🔄 Отправляем промпт на email",
+    "🔄 Sending prompt to email",
 )
 
 INFO_ALL_METHODS_OPTIMIZATION = _(
