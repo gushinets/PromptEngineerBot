@@ -91,10 +91,14 @@ tools/
 
 3. **Run the bot:**
     ```bash
-    # Using the entry point script (recommended)
+    # New CLI entry (recommended)
+    promptbot run
+
+    # Or using the new runner module
+    python -m promptbot.app.runner
+
+    # Legacy (still works during migration)
     python run_bot.py
-    
-    # Or using module execution
     python -m src.main
     ```
 
@@ -171,8 +175,8 @@ The project includes comprehensive test coverage (84% overall):
 # Run all tests
 python -m pytest tests/ -v
 
-# Run with coverage report
-python -m pytest tests/ --cov=src --cov-report=html
+# Run with coverage report (includes new package)
+python -m pytest tests/ --cov=src --cov=promptbot --cov-report=html
 
 # Run specific test categories
 python -m pytest tests/test_config.py -v
@@ -331,6 +335,11 @@ The `User` model stores authentication data and Telegram profile information:
 - User type analytics: `ix_users_bot_premium` (composite)
 
 For detailed information about the user profile system, see [User Profile System Documentation](docs/USER_PROFILE_SYSTEM.md).
+
+### Documentation
+
+- Specifications: see `docs/specs/`
+- ADRs (to be added): `docs/adr/`
 
 ### Error Handling:
 - **Automatic fallbacks** for Markdown parsing errors

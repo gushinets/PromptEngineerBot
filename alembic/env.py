@@ -8,10 +8,18 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Add the src directory to the path so we can import our models
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+# Add project root to sys.path and support both new and legacy model imports
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from database import Base
+try:
+    # Prefer new package path if available
+    from promptbot.infrastructure.db.models import Base  # type: ignore
+except Exception:
+    # Fallback to legacy src path
+    sys.path.insert(0, os.path.join(project_root, "src"))
+    from database import Base  # type: ignore
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

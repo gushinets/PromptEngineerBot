@@ -23,6 +23,7 @@ COPY google_service_key.json* ./
 COPY alembic.ini .
 COPY alembic ./alembic
 COPY src ./src
+COPY promptbot ./promptbot
 COPY run_bot.py .
 
 # Change ownership to app user
@@ -38,5 +39,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port (if needed, e.g. for webhook)
 # EXPOSE 8080
 
-# Run the bot using the new entry point
-CMD ["python", "run_bot.py"]
+# Run the bot using the new entry point (module)
+CMD ["python", "-m", "promptbot.app.runner"]

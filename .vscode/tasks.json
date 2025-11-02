@@ -37,12 +37,28 @@
             "problemMatcher": []
         },
         {
-            "label": "Run Telegram Bot (Module)",
+            "label": "Run PromptBot (Module)",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
             "args": [
                 "-m",
-                "src.main"
+                "promptbot.app.runner"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run PromptBot CLI",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": [
+                "-m",
+                "promptbot.app.cli",
+                "run"
             ],
             "group": "build",
             "presentation": {
@@ -77,6 +93,7 @@
                 "pytest",
                 "tests/",
                 "--cov=src",
+                "--cov=promptbot",
                 "--cov-report=html",
                 "--cov-report=term"
             ],
@@ -109,6 +126,7 @@
                 "-m",
                 "black",
                 "src/",
+                "promptbot/",
                 "tests/",
                 "--line-length",
                 "88"
@@ -128,6 +146,7 @@
                 "-m",
                 "flake8",
                 "src/",
+                "promptbot/",
                 "tests/",
                 "--max-line-length=88",
                 "--extend-ignore=E203,W503"

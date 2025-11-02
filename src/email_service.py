@@ -6,6 +6,7 @@ connection pooling, retry logic, and comprehensive error handling.
 """
 
 import asyncio
+import inspect
 import hashlib
 import logging
 import smtplib
@@ -420,7 +421,10 @@ class EmailService:
 
             # Check idempotency (prevent duplicate OTP sends)
             email_hash = self._generate_email_hash(to_email, subject, f"OTP:{otp}")
-            if await self._is_email_already_sent(email_hash):
+            already_sent = self._is_email_already_sent(email_hash)
+            if inspect.isawaitable(already_sent):
+                already_sent = await already_sent
+            if already_sent:
                 logger.info(
                     f"OTP_DUPLICATE_BLOCKED: Duplicate OTP email blocked for {self.mask_email(to_email)}"
                 )
@@ -436,7 +440,8 @@ class EmailService:
             )
 
             # Send email with queue fallback for SMTP health issues
-            result = await self._send_email_with_queue_fallback(message, email_hash)
+            send_result = self._send_email_with_queue_fallback(message, email_hash)
+            result = await send_result if inspect.isawaitable(send_result) else send_result
 
             # Log audit event
             try:
@@ -523,7 +528,10 @@ class EmailService:
             # Check idempotency (prevent duplicate optimization emails)
             content_preview = f"OPTIMIZATION:{original_prompt[:50]}:{improved_prompt[:50] if improved_prompt else 'direct'}"
             email_hash = self._generate_email_hash(to_email, subject, content_preview)
-            if await self._is_email_already_sent(email_hash):
+            already_sent = self._is_email_already_sent(email_hash)
+            if inspect.isawaitable(already_sent):
+                already_sent = await already_sent
+            if already_sent:
                 logger.info(
                     f"OPTIMIZATION_DUPLICATE_BLOCKED: Duplicate optimization email blocked for {self.mask_email(to_email)}"
                 )
@@ -539,7 +547,8 @@ class EmailService:
             )
 
             # Send email with queue fallback for SMTP health issues
-            result = await self._send_email_with_queue_fallback(message, email_hash)
+            send_result = self._send_email_with_queue_fallback(message, email_hash)
+            result = await send_result if inspect.isawaitable(send_result) else send_result
 
             # Log audit event
             try:
@@ -622,7 +631,10 @@ class EmailService:
             # Check idempotency (prevent duplicate single result emails)
             content_preview = f"SINGLE_RESULT:{method_name}:{original_prompt[:50]}:{optimized_result[:50]}"
             email_hash = self._generate_email_hash(to_email, subject, content_preview)
-            if await self._is_email_already_sent(email_hash):
+            already_sent = self._is_email_already_sent(email_hash)
+            if inspect.isawaitable(already_sent):
+                already_sent = await already_sent
+            if already_sent:
                 logger.info(
                     f"SINGLE_RESULT_DUPLICATE_BLOCKED: Duplicate single result email blocked for {self.mask_email(to_email)}"
                 )
@@ -638,7 +650,8 @@ class EmailService:
             )
 
             # Send email with queue fallback for SMTP health issues
-            result = await self._send_email_with_queue_fallback(message, email_hash)
+            send_result = self._send_email_with_queue_fallback(message, email_hash)
+            result = await send_result if inspect.isawaitable(send_result) else send_result
 
             # Log audit event
             if telegram_id:

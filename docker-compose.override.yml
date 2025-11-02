@@ -12,6 +12,7 @@ services:
     volumes:
       # Mount source code for development (uncomment for live reload)
       # - ./src:/app/src:ro
+      # - ./promptbot:/app/promptbot:ro
       # - ./tests:/app/tests:ro
       - ./bot.db:/app/bot.db # Persist SQLite database
     # Expose ports for debugging

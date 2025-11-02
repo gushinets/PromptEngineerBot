@@ -30,6 +30,8 @@ dependencies = [
     "gspread>=6.0.0",
     "google-auth>=2.29.0",
     "tenacity>=8.2.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.4.0",
 ]
 
 [project.optional-dependencies]
@@ -44,10 +46,13 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "ruff>=0.5.0",
+    "pre-commit>=3.5.0",
 ]
 
 [project.scripts]
 telegram-bot = "run_bot:main"
+promptbot = "promptbot.app.cli:main"
 
 [tool.black]
 line-length = 88
@@ -97,9 +102,18 @@ python_functions = [
 ]
 asyncio_mode = "auto"
 timeout = 300
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+src = ["src", "promptbot", "tests"]
+
+[tool.ruff.lint]
+extend-select = ["E", "F", "I", "UP"]
+ignore = ["E203", "W503"]
+
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "promptbot"]
 omit = [
     "tests/*",
     "test_*.py",

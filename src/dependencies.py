@@ -1,57 +1,37 @@
 """
 Dependency injection container for managing shared instances.
+
+Bridges legacy container calls to the new `promptbot.app.container.AppContainer`.
 """
 
 from typing import Optional
 
-from .config import BotConfig
-from .conversation_manager import ConversationManager
-from .llm_client_base import LLMClientBase
-from .prompt_loader import PromptLoader
-from .state_manager import StateManager
+from promptbot.app.container import AppContainer
 
 
 class DependencyContainer:
-    """Container for managing shared instances across the application."""
+    """Adapter delegating to the new AppContainer."""
 
     def __init__(self):
-        self._state_manager: Optional[StateManager] = None
-        self._prompt_loader: Optional[PromptLoader] = None
-        self._conversation_manager: Optional[ConversationManager] = None
+        self._app_container = AppContainer.from_env()
 
-    def get_state_manager(self) -> StateManager:
-        """Get or create StateManager instance."""
-        if self._state_manager is None:
-            self._state_manager = StateManager()
-        return self._state_manager
+    # Legacy interface expected by callers
+    def get_state_manager(self):
+        return self._app_container.get_state_manager()
 
-    def get_prompt_loader(self) -> PromptLoader:
-        """Get or create PromptLoader instance."""
-        if self._prompt_loader is None:
-            self._prompt_loader = PromptLoader()
-        return self._prompt_loader
+    def get_prompt_loader(self):
+        return self._app_container.get_prompt_loader()
 
-    def get_conversation_manager(self) -> ConversationManager:
-        """Get or create ConversationManager instance."""
-        if self._conversation_manager is None:
-            self._conversation_manager = ConversationManager(
-                self.get_prompt_loader(), self.get_state_manager()
-            )
-        return self._conversation_manager
+    def get_conversation_manager(self):
+        return self._app_container.get_conversation_manager()
 
+    # Test helpers
     def reset(self):
-        """Reset all instances (useful for testing)."""
-        self._state_manager = None
-        self._prompt_loader = None
-        self._conversation_manager = None
+        self._app_container = AppContainer.from_env()
 
     def create_fresh_instances(self):
-        """Create fresh instances, replacing any existing ones."""
-        self._state_manager = StateManager()
-        self._prompt_loader = PromptLoader()
-        self._conversation_manager = ConversationManager(
-            self._prompt_loader, self._state_manager
-        )
+        # Rebuild container to clear caches
+        self._app_container = AppContainer.from_env()
 
 
 # Global container instance
@@ -59,7 +39,7 @@ _container: Optional[DependencyContainer] = None
 
 
 def get_container() -> DependencyContainer:
-    """Get the global dependency container."""
+    """Get the global dependency container (adapter)."""
     global _container
     if _container is None:
         _container = DependencyContainer()

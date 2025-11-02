@@ -1270,6 +1270,35 @@ class EmailFlowOrchestrator:
                     "content": improved_prompt,
                 }
 
+            # Detect single-method result directly from the current conversation transcript
+            try:
+                method_name = self.conversation_manager.get_current_method(user_id)
+                transcript = self.conversation_manager.get_transcript(user_id)
+                if method_name and transcript:
+                    # Find the last assistant message content
+                    last_assistant = next(
+                        (m for m in reversed(transcript) if m.get("role") == "assistant"),
+                        None,
+                    )
+                    if last_assistant and last_assistant.get("content"):
+                        original_prompt = self.conversation_manager.get_user_prompt(user_id)
+                        detected = {
+                            "type": "single_method",
+                            "method_name": method_name,
+                            "content": last_assistant["content"],
+                        }
+                        # Include original prompt when available for downstream templates
+                        if original_prompt:
+                            detected["original_prompt"] = original_prompt
+                        logger.info(
+                            f"post_optimization_detected_single_method_result | user_id={mask_telegram_id(user_id)} | method={method_name}"
+                        )
+                        return detected
+            except Exception as detect_err:  # pragma: no cover - best-effort detection
+                logger.debug(
+                    f"post_optimization_detection_skipped | user_id={mask_telegram_id(user_id)} | error={detect_err}"
+                )
+
             # If we reach here, no optimization result is available
             logger.warning(
                 f"no_current_optimization_result | user_id={mask_telegram_id(user_id)}"

@@ -26,31 +26,26 @@ from telegram.ext import (
     filters,
 )
 
-from .background_tasks import (
+from promptbot.services.background.scheduler import (
     init_background_tasks,
     start_background_tasks,
     stop_background_tasks,
 )
-from .bot_handler import BotHandler
+# Prefer new package re-exports (bridged to legacy)
+from promptbot.telegram.handlers import BotHandler
 from .config import BotConfig
 from .database import init_database_from_config
-from .graceful_degradation import init_degradation_manager
-from .gsheets_logging import build_google_sheets_handler_from_env
-from .health_checks import init_health_monitor
-from .llm_factory import LLMClientFactory
-from .logging_utils import setup_application_logging
+from promptbot.services.degradation.manager import init_degradation_manager
+from promptbot.infrastructure.gsheets.handler import (
+    build_google_sheets_handler_from_env,
+)
+from promptbot.services.health.monitor import init_health_monitor
+from promptbot.llm.factory import LLMClientFactory
+from promptbot.infrastructure.logging.setup import setup_application_logging
 
 # NOTE: Specific message constants are imported where needed inside handlers
-from .redis_client import get_redis_client, init_redis_client
+from promptbot.infrastructure.redis.client import get_redis_client, init_redis_client
 
-# Load env early so Sheets handler sees variables from .env
-load_dotenv()
-
-# Centralized logging with PII-protected formatting and quieter third-party libs
-setup_application_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
-
-
-# Optional file logging (disabled by default in containers)
 def _maybe_add_file_logging() -> None:
     """
     Optionally add a file handler if explicitly enabled via environment.
@@ -80,93 +75,96 @@ def _maybe_add_file_logging() -> None:
         logging.getLogger("application").warning(
             "FILE_LOGGING_DISABLED: Could not add file handler: %s", str(e)
         )
-
-
-_maybe_add_file_logging()
 logger = logging.getLogger(__name__)
-
-# Dedicated Google Sheets logger (only for selected events)
-_sheets_logger = None
-try:
-    _gsheets_handler = build_google_sheets_handler_from_env(os.getenv)
-    if _gsheets_handler:
-        _sheets_logger = logging.getLogger("sheets")
-        _sheets_logger.setLevel(logging.INFO)
-        _sheets_logger.propagate = False
-        _sheets_logger.addHandler(_gsheets_handler)
-        logger.info("Google Sheets logging enabled successfully")
-    else:
-        logger.warning(
-            "Google Sheets handler not created - check environment variables"
-        )
-except Exception as e:
-    # Do not fail if gsheets handler cannot be created
-    logger.error(f"Failed to initialize Google Sheets logging: {e}", exc_info=True)
-    _sheets_logger = None
-
-
-def log_sheets(event: str, payload: dict) -> None:
-    """Log only conversation_totals events to Google Sheets. All other events are logged to bot.log only."""
-    # Only log conversation_totals events to Google Sheets
-    if event != "conversation_totals":
-        logger.debug(
-            f"Event '{event}' not logged to sheets - only conversation_totals are logged to sheets"
-        )
-        return
-
-    if not _sheets_logger or not _sheets_logger.handlers:
-        logger.debug(f"Sheets logging disabled, skipping event: {event}")
-        return
-    try:
-        message = json.dumps({"event": event, **payload}, ensure_ascii=False)
-        _sheets_logger.info(message)
-        logger.debug(f"Successfully logged to sheets: {event}")
-    except Exception as e:
-        logger.error(
-            f"Failed to log to Google Sheets for event '{event}': {e}", exc_info=True
-        )
-        # Fallback to string format
-        try:
-            message = str({"event": event, **payload})
-            _sheets_logger.info(message)
-            logger.debug(f"Logged to sheets with fallback format: {event}")
-        except Exception as e2:
-            logger.error(
-                f"Failed to log to sheets even with fallback format for event '{event}': {e2}"
-            )
-
-
-# Initialize configuration and components
-
-# Load and validate configuration
-config = BotConfig.from_env()
-config.validate()
-
-logger.info("Configuration loaded successfully")
-logger.info(f"LLM Backend: {config.llm_backend}")
-logger.info(f"Model: {config.model_name}")
-
-# Create LLM client
-llm_client = LLMClientFactory.create_client(config)
-
-# Email flow orchestrator will be initialized later in main() after all services are ready
-
-# Create bot handler
-bot_handler = BotHandler(config, llm_client, log_sheets)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle the /start command or New Prompt button."""
-    await bot_handler.handle_start(update, context)
-
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle incoming messages from users."""
-    await bot_handler.handle_message(update, context)
 
 
 async def main():
     """Start the bot."""
+    # Load env early so dependent components see variables
+    load_dotenv()
+
+    # Centralized logging with PII-protected formatting and quieter third-party libs
+    setup_application_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+    _maybe_add_file_logging()
+
+    # Dedicated Google Sheets logger (only for selected events)
+    _sheets_logger = None
+    try:
+        _gsheets_handler = build_google_sheets_handler_from_env(os.getenv)
+        if _gsheets_handler:
+            _sheets_logger = logging.getLogger("sheets")
+            _sheets_logger.setLevel(logging.INFO)
+            _sheets_logger.propagate = False
+            _sheets_logger.addHandler(_gsheets_handler)
+            logger.info("Google Sheets logging enabled successfully")
+        else:
+            logger.warning(
+                "Google Sheets handler not created - check environment variables"
+            )
+    except Exception as e:
+        # Do not fail if gsheets handler cannot be created
+        logger.error(
+            f"Failed to initialize Google Sheets logging: {e}", exc_info=True
+        )
+        _sheets_logger = None
+
+    def log_sheets(event: str, payload: dict) -> None:
+        """Log only conversation_totals events to Google Sheets; else skip."""
+        if event != "conversation_totals":
+            logger.debug(
+                f"Event '{event}' not logged to sheets - only conversation_totals are logged to sheets"
+            )
+            return
+        if not _sheets_logger or not _sheets_logger.handlers:
+            logger.debug(f"Sheets logging disabled, skipping event: {event}")
+            return
+        try:
+            message = json.dumps({"event": event, **payload}, ensure_ascii=False)
+            _sheets_logger.info(message)
+            logger.debug(f"Successfully logged to sheets: {event}")
+        except Exception as e:
+            logger.error(
+                f"Failed to log to Google Sheets for event '{event}': {e}",
+                exc_info=True,
+            )
+            try:
+                message = str({"event": event, **payload})
+                _sheets_logger.info(message)
+                logger.debug(
+                    f"Logged to sheets with fallback format: {event}"
+                )
+            except Exception as e2:
+                logger.error(
+                    f"Failed to log to sheets even with fallback for event '{event}': {e2}"
+                )
+
+    # Load and validate configuration
+    config = BotConfig.from_env()
+    config.validate()
+
+    logger.info("Configuration loaded successfully")
+    logger.info(f"LLM Backend: {config.llm_backend}")
+    logger.info(f"Model: {config.model_name}")
+
+    # Sync i18n to settings (messages module uses runtime-set language)
+    try:
+        from . import messages as _messages
+
+        _messages.set_language("ru" if config.language.upper() == "RU" else "en")
+    except Exception:
+        pass
+
+    # Create LLM client and bot handler
+    llm_client = LLMClientFactory.create_client(config)
+    bot_handler = BotHandler(config, llm_client, log_sheets)
+
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle the /start command or New Prompt button."""
+        await bot_handler.handle_start(update, context)
+
+    async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle incoming messages from users."""
+        await bot_handler.handle_message(update, context)
     # Get the token
     token = os.getenv("TELEGRAM_TOKEN")
     if not token:
@@ -185,8 +183,16 @@ async def main():
     background_scheduler = None
 
     try:
-        # Initialize database (if email feature is enabled)
-        if config.email_enabled:
+        # Determine if email feature prerequisites are satisfied
+        email_prereqs_ok = bool(
+            config.smtp_host
+            and config.smtp_username
+            and config.smtp_password
+            and config.smtp_from_email
+        )
+
+        # Initialize database (if email feature is enabled and prerequisites are present)
+        if config.email_enabled and email_prereqs_ok:
             logger.info("Initializing email feature components...")
 
             # Initialize database
@@ -212,13 +218,13 @@ async def main():
                 raise
 
             # Initialize auth service
-            from .auth_service import init_auth_service
+            from promptbot.services.auth.service import init_auth_service
 
             init_auth_service(config)
             logger.info("Auth service initialized successfully")
 
             # Initialize audit service
-            from .audit_service import init_audit_service
+            from promptbot.services.audit.service import init_audit_service
 
             init_audit_service()
             logger.info("Audit service initialized successfully")
@@ -237,13 +243,15 @@ async def main():
             logger.info("Background tasks started")
 
             # Initialize email service
-            from .email_service import init_email_service
+            from promptbot.services.email.service import init_email_service
 
             init_email_service(config)
             logger.info("Email service initialized successfully")
 
             # Initialize email flow orchestrator after all services are ready
-            from .email_flow import init_email_flow_orchestrator
+            from promptbot.features.email_flow.orchestrator import (
+                init_email_flow_orchestrator,
+            )
 
             # Initialize email flow orchestrator using shared dependencies
             orchestrator = init_email_flow_orchestrator(
@@ -256,7 +264,7 @@ async def main():
             logger.info("Email flow orchestrator initialized successfully")
         else:
             logger.info(
-                "Email feature disabled - skipping email component initialization"
+                "Email feature disabled or prerequisites missing - skipping email component initialization"
             )
 
         # Create the Application with connection pool settings

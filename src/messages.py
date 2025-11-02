@@ -6,10 +6,17 @@ for consistent messaging and easier maintenance.
 """
 
 from telegram import ReplyKeyboardMarkup
+import os
 
 # ===== Language Settings =====
-# Set to 'ru' for Russian or 'en' for English
-LANGUAGE = "ru"
+# Language is settings-driven; default from environment (LANGUAGE), fallback to 'ru'
+LANGUAGE = os.getenv("LANGUAGE", "ru").lower()
+
+
+def set_language(lang: str) -> None:
+    """Set active language (expects 'ru' or 'en', case-insensitive)."""
+    global LANGUAGE
+    LANGUAGE = "ru" if str(lang).lower().startswith("ru") else "en"
 
 
 def _(text_ru, text_en):

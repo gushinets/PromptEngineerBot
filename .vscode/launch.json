@@ -11,10 +11,22 @@
             "cwd": "${workspaceFolder}"
         },
         {
-            "name": "Run Telegram Bot (Module)",
+            "name": "Run PromptBot (Module)",
             "type": "debugpy",
             "request": "launch",
-            "module": "src.main",
+            "module": "promptbot.app.runner",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Run PromptBot CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "promptbot.app.cli",
+            "args": [
+                "run"
+            ],
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}"
@@ -55,6 +67,7 @@
             "args": [
                 "-v",
                 "--cov=src",
+                "--cov=promptbot",
                 "--cov-report=html",
                 "--cov-report=term",
                 "tests/"
