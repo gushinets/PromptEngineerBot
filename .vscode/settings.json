@@ -61,5 +61,5 @@
     },
     
     // Kiro Configuration
-    "kiroAgent.configureMCP": "Enabled"
+    "kiroAgent.configureMCP": "Disabled"
 }
