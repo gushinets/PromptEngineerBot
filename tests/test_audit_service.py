@@ -10,13 +10,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.audit_service import (
+from telegram_prompt_bot.monitoring.audit_service import (
     AuditEventType,
     AuditService,
     get_audit_service,
     init_audit_service,
 )
-from src.database import AuthEvent, get_db_session, init_database
+from telegram_prompt_bot.database.models import AuthEvent, get_db_session, init_database
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ class TestAuditService:
             assert event is not None
             assert event.email == "test@example.com"  # Normalized
 
-    @patch("src.audit_service.get_db_session")
+    @patch("telegram_prompt_bot.audit_service.get_db_session")
     def test_log_event_database_error(self, mock_session, audit_service):
         """Test audit event logging handles database errors gracefully."""
         mock_session.side_effect = Exception("Database connection failed")
@@ -416,7 +416,7 @@ class TestAuditService:
 
         assert purged_count == 0
 
-    @patch("src.audit_service.get_db_session")
+    @patch("telegram_prompt_bot.audit_service.get_db_session")
     def test_purge_old_events_database_error(self, mock_session, audit_service):
         """Test purge old events handles database errors gracefully."""
         mock_session.side_effect = Exception("Database connection failed")
@@ -439,9 +439,9 @@ class TestAuditServiceGlobal:
     def test_get_audit_service_not_initialized(self):
         """Test getting audit service when not initialized."""
         # Reset global service
-        import src.audit_service
+        import telegram_prompt_bot.audit_service
 
-        src.audit_service.audit_service = None
+        telegram_prompt_bot.audit_service.audit_service = None
 
         with pytest.raises(RuntimeError, match="Audit service not initialized"):
             get_audit_service()

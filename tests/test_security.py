@@ -12,10 +12,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.auth_service import AuthService
-from src.database import mask_email, mask_telegram_id, normalize_email
-from src.email_service import EmailService
-from src.redis_client import RedisClient
+from telegram_prompt_bot.auth.service import AuthService
+from telegram_prompt_bot.database.models import mask_email, mask_telegram_id, normalize_email
+from telegram_prompt_bot.email.service import EmailService
+from telegram_prompt_bot.infrastructure.redis_client import RedisClient
 
 
 class TestOTPSecurity:
@@ -49,7 +49,7 @@ class TestOTPSecurity:
     @pytest.fixture
     def auth_service(self, mock_redis_client, mock_config):
         """Create AuthService with mocked dependencies."""
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis_client):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis_client):
             return AuthService(mock_config)
 
     def test_otp_brute_force_protection(self, auth_service, mock_redis_client):
@@ -204,7 +204,7 @@ class TestRateLimitingSecurity:
         mock_config.user_rate_limit_per_hour = 5
         mock_config.otp_spacing_seconds = 60
 
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis):
             service = AuthService(mock_config)
             service.redis_client = mock_redis
             return service, mock_redis
@@ -403,7 +403,7 @@ class TestDataProtectionSecurity:
 
     def test_database_data_protection(self):
         """Test database data protection."""
-        from src.database import AuthEvent, User
+        from telegram_prompt_bot.database.models import AuthEvent, User
 
         # Test user data
         user = User(
@@ -452,7 +452,7 @@ class TestEmailSecurityVulnerabilities:
         ]
 
         # Import and create a real AuthService instance
-        from src.auth_service import AuthService
+        from telegram_prompt_bot.auth.service import AuthService
 
         # Mock dependencies
         mock_redis = MagicMock()
@@ -461,13 +461,13 @@ class TestEmailSecurityVulnerabilities:
         # Ensure we're not using any global mocks by importing directly
         import importlib
 
-        import src.auth_service
+        import telegram_prompt_bot.auth_service
 
-        importlib.reload(src.auth_service)
+        importlib.reload(telegram_prompt_bot.auth.service)
 
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis):
             # Create a real AuthService instance (not mocked)
-            auth_service = src.auth_service.AuthService(mock_config)
+            auth_service = telegram_prompt_bot.auth.service.AuthService(mock_config)
 
             # Ensure validate_email_format is the real method
             assert hasattr(auth_service, "validate_email_format")
@@ -484,7 +484,7 @@ class TestEmailSecurityVulnerabilities:
 
     def test_email_content_sanitization(self):
         """Test email content sanitization for security."""
-        from src.email_templates import EmailTemplates
+        from telegram_prompt_bot.email.templates import EmailTemplates
 
         templates = EmailTemplates("en")
 
@@ -512,7 +512,7 @@ class TestEmailSecurityVulnerabilities:
 
     def test_smtp_credential_protection(self):
         """Test SMTP credential protection."""
-        from src.config import BotConfig
+        from telegram_prompt_bot.config.settings import BotConfig
 
         # Mock config with SMTP credentials
         config = MagicMock(spec=BotConfig)
@@ -545,7 +545,7 @@ class TestAccessControlSecurity:
 
     def test_user_isolation(self):
         """Test that users cannot access each other's data."""
-        from src.state_manager import StateManager
+        from telegram_prompt_bot.core.state_manager import StateManager
 
         state_manager = StateManager()
 
@@ -566,8 +566,8 @@ class TestAccessControlSecurity:
 
     def test_session_security(self):
         """Test session security and state management."""
-        from src.conversation_manager import ConversationManager
-        from src.state_manager import StateManager
+        from telegram_prompt_bot.core.conversation_manager import ConversationManager
+        from telegram_prompt_bot.core.state_manager import StateManager
 
         state_manager = StateManager()
         conv_manager = ConversationManager(state_manager)
@@ -605,9 +605,9 @@ class TestAccessControlSecurity:
         """Test attempts to bypass authentication."""
         import importlib
 
-        import src.auth_service
+        import telegram_prompt_bot.auth_service
 
-        importlib.reload(src.auth_service)
+        importlib.reload(telegram_prompt_bot.auth.service)
 
         mock_redis = MagicMock()
         mock_config = MagicMock()
@@ -615,8 +615,8 @@ class TestAccessControlSecurity:
         # Configure mock config
         mock_config.otp_max_attempts = 3
 
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis):
-            auth_service = src.auth_service.AuthService(mock_config)
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis):
+            auth_service = telegram_prompt_bot.auth.service.AuthService(mock_config)
 
             # Test various bypass attempts
             bypass_attempts = [
@@ -642,16 +642,16 @@ class TestCryptographicSecurity:
         """Test that secure hash algorithms are used."""
         import importlib
 
-        import src.auth_service
+        import telegram_prompt_bot.auth_service
 
-        importlib.reload(src.auth_service)
+        importlib.reload(telegram_prompt_bot.auth.service)
 
         mock_redis = MagicMock()
         mock_config = MagicMock()
 
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis):
             # Create a real AuthService instance (not mocked)
-            auth_service = src.auth_service.AuthService(mock_config)
+            auth_service = telegram_prompt_bot.auth.service.AuthService(mock_config)
 
             otp = "123456"
             # Call the real hash_otp method
@@ -677,16 +677,16 @@ class TestCryptographicSecurity:
         """Test cryptographically secure random number generation."""
         import importlib
 
-        import src.auth_service
+        import telegram_prompt_bot.auth_service
 
-        importlib.reload(src.auth_service)
+        importlib.reload(telegram_prompt_bot.auth.service)
 
         mock_redis = MagicMock()
         mock_config = MagicMock()
 
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis):
             # Create a real AuthService instance (not mocked)
-            auth_service = src.auth_service.AuthService(mock_config)
+            auth_service = telegram_prompt_bot.auth.service.AuthService(mock_config)
 
             # Generate many OTPs and test randomness
             otps = []
@@ -724,15 +724,15 @@ class TestCryptographicSecurity:
         """Test resistance to timing attacks."""
         import importlib
 
-        import src.auth_service
+        import telegram_prompt_bot.auth_service
 
-        importlib.reload(src.auth_service)
+        importlib.reload(telegram_prompt_bot.auth.service)
 
         mock_redis = MagicMock()
         mock_config = MagicMock()
 
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis):
-            auth_service = src.auth_service.AuthService(mock_config)
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis):
+            auth_service = telegram_prompt_bot.auth.service.AuthService(mock_config)
 
             # Test hash verification timing
             correct_otp = "123456"

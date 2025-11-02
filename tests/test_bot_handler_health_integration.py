@@ -11,9 +11,9 @@ import pytest
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from src.bot_handler import BotHandler
-from src.config import BotConfig
-from src.messages import BTN_EMAIL_DELIVERY, BTN_RESET, ERROR_REDIS_UNAVAILABLE
+from telegram_prompt_bot.core.bot_handler import BotHandler
+from telegram_prompt_bot.config.settings import BotConfig
+from telegram_prompt_bot.utils.messages import BTN_EMAIL_DELIVERY, BTN_RESET, ERROR_REDIS_UNAVAILABLE
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def mock_health_monitor():
 @pytest.fixture
 def bot_handler(mock_config, mock_llm_client, mock_email_flow_orchestrator):
     """Create bot handler with mocked dependencies."""
-    with patch("src.bot_handler.get_container") as mock_container:
+    with patch("telegram_prompt_bot.core.bot_handler.get_container") as mock_container:
         # Mock container dependencies
         container = MagicMock()
         container.get_state_manager.return_value = MagicMock()
@@ -111,7 +111,7 @@ class TestBotHandlerHealthGating:
         )
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -144,7 +144,7 @@ class TestBotHandlerHealthGating:
         )
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -172,7 +172,7 @@ class TestBotHandlerHealthGating:
         mock_health_monitor.is_service_healthy.return_value = True
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -198,7 +198,7 @@ class TestBotHandlerHealthGating:
 
         # Mock health monitor as unavailable (raises exception)
         with patch(
-            "src.health_checks.get_health_monitor",
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor",
             side_effect=RuntimeError("Health monitor not initialized"),
         ):
             await bot_handler._handle_method_selection(
@@ -225,7 +225,7 @@ class TestBotHandlerHealthGating:
         )
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -271,7 +271,7 @@ class TestHealthCheckTransitions:
         mock_health_monitor.is_service_healthy.return_value = True
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -290,7 +290,7 @@ class TestHealthCheckTransitions:
         )
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -312,7 +312,7 @@ class TestHealthCheckTransitions:
         )
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY
@@ -328,7 +328,7 @@ class TestHealthCheckTransitions:
         mock_health_monitor.is_service_healthy.return_value = True
 
         with patch(
-            "src.health_checks.get_health_monitor", return_value=mock_health_monitor
+            "telegram_prompt_bot.infrastructure.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
             await bot_handler._handle_method_selection(
                 mock_update, mock_context, user_id, BTN_EMAIL_DELIVERY

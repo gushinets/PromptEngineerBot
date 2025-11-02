@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.config import BotConfig
-from src.graceful_degradation import (
+from telegram_prompt_bot.config.settings import BotConfig
+from telegram_prompt_bot.utils.graceful_degradation import (
     DegradationLevel,
     DegradationRule,
     DegradationState,
@@ -179,7 +179,7 @@ class TestGracefulDegradationManager:
         level = degradation_manager._calculate_degradation_level([ServiceType.DATABASE])
         assert level == DegradationLevel.EMERGENCY
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_check_and_update_degradation_no_change(
         self, mock_get_monitor, degradation_manager
     ):
@@ -194,7 +194,7 @@ class TestGracefulDegradationManager:
         assert len(state.degraded_services) == 0
         assert len(state.active_fallbacks) == 0
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_check_and_update_degradation_redis_failed(
         self, mock_get_monitor, degradation_manager
     ):
@@ -209,7 +209,7 @@ class TestGracefulDegradationManager:
         assert ServiceType.REDIS in state.degraded_services
         assert len(state.active_fallbacks) > 0
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_check_and_update_degradation_exception(
         self, mock_get_monitor, degradation_manager
     ):
@@ -397,7 +397,7 @@ class TestGracefulDegradationManager:
         # Clean up
         await degradation_manager.stop_monitoring()
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_monitoring_loop_integration(
         self, mock_get_monitor, degradation_manager
     ):
@@ -490,9 +490,9 @@ class TestGlobalFunctions:
     def test_get_degradation_manager_not_initialized(self):
         """Test getting degradation manager when not initialized."""
         # Reset global state
-        import src.graceful_degradation
+        import telegram_prompt_bot.graceful_degradation
 
-        src.graceful_degradation.degradation_manager = None
+        telegram_prompt_bot.graceful_degradation.degradation_manager = None
 
         with pytest.raises(RuntimeError, match="Degradation manager not initialized"):
             get_degradation_manager()
@@ -522,9 +522,9 @@ class TestGlobalFunctions:
     def test_convenience_functions_manager_not_initialized(self):
         """Test convenience functions without initialized manager."""
         # Reset global state
-        import src.graceful_degradation
+        import telegram_prompt_bot.graceful_degradation
 
-        src.graceful_degradation.degradation_manager = None
+        telegram_prompt_bot.graceful_degradation.degradation_manager = None
 
         # Should return safe defaults
         assert is_email_auth_available() is True
@@ -554,9 +554,9 @@ class TestGlobalFunctions:
     def test_get_user_degradation_message_manager_not_initialized(self):
         """Test user degradation message without initialized manager."""
         # Reset global state
-        import src.graceful_degradation
+        import telegram_prompt_bot.graceful_degradation
 
-        src.graceful_degradation.degradation_manager = None
+        telegram_prompt_bot.graceful_degradation.degradation_manager = None
 
         message = get_user_degradation_message("EN")
         assert message is None
@@ -570,7 +570,7 @@ class TestDegradationScenarios:
         """Create GracefulDegradationManager instance for testing."""
         return GracefulDegradationManager(mock_config)
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_redis_failure_scenario(self, mock_get_monitor, degradation_manager):
         """Test complete Redis failure scenario."""
         mock_monitor = MagicMock()
@@ -593,7 +593,7 @@ class TestDegradationScenarios:
         assert message is not None
         assert "temporarily unavailable" in message
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_smtp_failure_scenario(self, mock_get_monitor, degradation_manager):
         """Test complete SMTP failure scenario."""
         mock_monitor = MagicMock()
@@ -615,7 +615,7 @@ class TestDegradationScenarios:
         assert message is not None
         assert "Email delivery" in message
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_database_failure_scenario(
         self, mock_get_monitor, degradation_manager
     ):
@@ -641,7 +641,7 @@ class TestDegradationScenarios:
         assert message is not None
         assert "limited mode" in message
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_multiple_service_failure_scenario(
         self, mock_get_monitor, degradation_manager
     ):
@@ -665,7 +665,7 @@ class TestDegradationScenarios:
         assert degradation_manager.should_use_chat_fallback()
         assert degradation_manager.should_skip_rate_limiting()
 
-    @patch("src.graceful_degradation.get_health_monitor")
+    @patch("telegram_prompt_bot.graceful_degradation.get_health_monitor")
     async def test_service_recovery_scenario(
         self, mock_get_monitor, degradation_manager
     ):

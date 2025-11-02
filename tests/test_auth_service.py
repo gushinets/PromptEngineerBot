@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.auth_service import AuthService, get_auth_service, init_auth_service
+from telegram_prompt_bot.auth.service import AuthService, get_auth_service, init_auth_service
 
 
 class TestAuthService:
@@ -43,7 +43,7 @@ class TestAuthService:
     @pytest.fixture
     def auth_service(self, mock_redis_client, mock_config):
         """Create AuthService instance with mocked dependencies."""
-        with patch("src.auth_service.get_redis_client", return_value=mock_redis_client):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client", return_value=mock_redis_client):
             return AuthService(mock_config)
 
     def test_validate_email_format_valid(self, auth_service):
@@ -427,7 +427,7 @@ class TestAuthService:
             telegram_id, "attempt_limit_exceeded"
         )
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_verify_otp_success_new_user_first_verification(
         self, mock_get_session, auth_service, mock_redis_client
     ):
@@ -497,7 +497,7 @@ class TestAuthService:
 
         mock_session.commit.assert_called()
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_verify_otp_success_existing_user_first_verification(
         self, mock_get_session, auth_service, mock_redis_client
     ):
@@ -552,7 +552,7 @@ class TestAuthService:
         assert mock_user.last_authenticated_at is not None
         assert mock_session.commit.call_count == 2  # User update + audit event
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_verify_otp_success_existing_user_subsequent_verification(
         self, mock_get_session, auth_service, mock_redis_client
     ):
@@ -614,7 +614,7 @@ class TestAuthService:
         assert mock_user.last_authenticated_at is not None  # Should be updated
         assert mock_session.commit.call_count == 2  # User update + audit event
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_persist_authentication_email_conflict(
         self, mock_get_session, auth_service, mock_redis_client
     ):
@@ -665,7 +665,7 @@ class TestAuthService:
             telegram_id, "verification_success"
         )
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_is_user_authenticated_true(self, mock_get_session, auth_service):
         """Test checking authentication status for authenticated user."""
         telegram_id = 123456789
@@ -682,7 +682,7 @@ class TestAuthService:
 
         assert result == True, "Should return True for authenticated user"
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_is_user_authenticated_false(self, mock_get_session, auth_service):
         """Test checking authentication status for non-authenticated user."""
         telegram_id = 123456789
@@ -696,7 +696,7 @@ class TestAuthService:
 
         assert result == False, "Should return False for non-authenticated user"
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_get_user_email_success(self, mock_get_session, auth_service):
         """Test getting user email for authenticated user."""
         telegram_id = 123456789
@@ -715,7 +715,7 @@ class TestAuthService:
 
         assert result == expected_email, f"Should return user email, got: {result}"
 
-    @patch("src.auth_service.get_db_session")
+    @patch("telegram_prompt_bot.auth.service.get_db_session")
     def test_get_user_email_not_found(self, mock_get_session, auth_service):
         """Test getting user email for non-authenticated user."""
         telegram_id = 123456789
@@ -813,7 +813,7 @@ class TestAuthService:
         mock_redis_client.increment_otp_attempts.return_value = 1
 
         # Mock successful database persistence
-        with patch("src.auth_service.get_db_session") as mock_get_session:
+        with patch("telegram_prompt_bot.auth.service.get_db_session") as mock_get_session:
             mock_session = Mock()
             mock_get_session.return_value.__enter__.return_value = mock_session
             mock_session.query.return_value.filter_by.return_value.first.side_effect = [
@@ -893,7 +893,7 @@ class TestAuthServiceGlobals:
 
     def test_init_auth_service(self):
         """Test auth service initialization."""
-        from src.config import BotConfig
+        from telegram_prompt_bot.config.settings import BotConfig
 
         mock_config = Mock()
         mock_config.otp_ttl_seconds = 300
@@ -902,7 +902,7 @@ class TestAuthServiceGlobals:
         mock_config.user_rate_limit_per_hour = 5
         mock_config.otp_spacing_seconds = 60
 
-        with patch("src.auth_service.get_redis_client"):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client"):
             service = init_auth_service(mock_config)
             assert service is not None
             assert isinstance(service, AuthService)
@@ -910,16 +910,16 @@ class TestAuthServiceGlobals:
     def test_get_auth_service_not_initialized(self):
         """Test getting auth service when not initialized."""
         # Reset global state
-        import src.auth_service
+        import telegram_prompt_bot.auth_service
 
-        src.auth_service.auth_service = None
+        telegram_prompt_bot.auth.service.auth_service = None
 
         with pytest.raises(RuntimeError, match="Auth service not initialized"):
             get_auth_service()
 
     def test_get_auth_service_initialized(self):
         """Test getting auth service when initialized."""
-        from src.config import BotConfig
+        from telegram_prompt_bot.config.settings import BotConfig
 
         mock_config = Mock()
         mock_config.otp_ttl_seconds = 300
@@ -928,7 +928,7 @@ class TestAuthServiceGlobals:
         mock_config.user_rate_limit_per_hour = 5
         mock_config.otp_spacing_seconds = 60
 
-        with patch("src.auth_service.get_redis_client"):
+        with patch("telegram_prompt_bot.auth.service.get_redis_client"):
             service = init_auth_service(mock_config)
             retrieved_service = get_auth_service()
             assert retrieved_service is service

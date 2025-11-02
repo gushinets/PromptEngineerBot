@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.metrics import (
+from telegram_prompt_bot.monitoring.metrics import (
     MetricsCollector,
     get_metrics_collector,
     init_metrics_collector,
@@ -351,9 +351,9 @@ class TestMetricsCollectorGlobal:
     def test_get_metrics_collector_not_initialized(self):
         """Test getting metrics collector when not initialized."""
         # Reset global collector
-        import src.metrics
+        import telegram_prompt_bot.metrics
 
-        src.metrics.metrics_collector = None
+        telegram_prompt_bot.metrics.metrics_collector = None
 
         with pytest.raises(RuntimeError, match="Metrics collector not initialized"):
             get_metrics_collector()

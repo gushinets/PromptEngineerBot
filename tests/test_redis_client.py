@@ -6,13 +6,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.redis_client import RedisClient, get_redis_client, init_redis
+from telegram_prompt_bot.infrastructure.redis_client import RedisClient, get_redis_client, init_redis
 
 
 @pytest.fixture
 def mock_redis():
     """Mock Redis client for testing."""
-    with patch("src.redis_client.redis.Redis") as mock_redis_class:
+    with patch("telegram_prompt_bot.redis_client.redis.Redis") as mock_redis_class:
         mock_client = Mock()
         mock_redis_class.return_value = mock_client
 
@@ -431,15 +431,15 @@ class TestGlobalRedisClient:
         # Import and reload to avoid global mocks
         import importlib
 
-        import src.redis_client
+        import telegram_prompt_bot.redis_client
 
-        importlib.reload(src.redis_client)
+        importlib.reload(telegram_prompt_bot.redis_client)
 
         # Only mock the underlying Redis connection
-        with patch("src.redis_client.redis.Redis"):
-            client = src.redis_client.init_redis("redis://localhost:6379")
+        with patch("telegram_prompt_bot.redis_client.redis.Redis"):
+            client = telegram_prompt_bot.redis_client.init_redis("redis://localhost:6379")
 
-            assert isinstance(client, src.redis_client.RedisClient)
+            assert isinstance(client, telegram_prompt_bot.redis_client.RedisClient)
             assert client.redis_url == "redis://localhost:6379"
 
     def test_get_redis_client(self):
@@ -453,16 +453,16 @@ class TestGlobalRedisClient:
         assert retrieved_client is original_client
 
         # Reset global state for other tests
-        import src.redis_client
+        import telegram_prompt_bot.redis_client
 
-        src.redis_client.redis_client = None
+        telegram_prompt_bot.redis_client.redis_client = None
 
     def test_get_redis_client_not_initialized(self):
         """Test getting Redis client when not initialized."""
         # Ensure global state is clean
-        import src.redis_client
+        import telegram_prompt_bot.redis_client
 
-        src.redis_client.redis_client = None
+        telegram_prompt_bot.redis_client.redis_client = None
 
         with pytest.raises(RuntimeError, match="Redis client not initialized"):
             get_redis_client()

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.background_tasks import (
+from telegram_prompt_bot.background.tasks import (
     BackgroundTaskScheduler,
     audit_purge_task,
     get_background_scheduler,
@@ -60,8 +60,8 @@ class TestBackgroundTaskScheduler:
 class TestAuditPurgeTask:
     """Test audit purge task functionality."""
 
-    @patch("src.background_tasks.get_audit_service")
-    @patch("src.background_tasks.BotConfig.from_env")
+    @patch("telegram_prompt_bot.background_tasks.get_audit_service")
+    @patch("telegram_prompt_bot.background_tasks.BotConfig.from_env")
     def test_audit_purge_task_success(self, mock_from_env, mock_get_audit_service):
         """Test successful audit purge task execution."""
         # Mock config

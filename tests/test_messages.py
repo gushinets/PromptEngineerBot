@@ -3,7 +3,7 @@
 import pytest
 from telegram import ForceReply
 
-from src.messages import (
+from telegram_prompt_bot.utils.messages import (
     BTN_CRAFT,
     BTN_GENERATE_PROMPT,
     BTN_GGL,
@@ -461,7 +461,7 @@ class TestFollowUpFeatureMessages:
         # Second row should have reset button
         assert len(keyboard.keyboard[1]) == 1
         # Import BTN_RESET to check
-        from src.messages import BTN_RESET
+        from telegram_prompt_bot.utils.messages import BTN_RESET
 
         assert keyboard.keyboard[1][0].text == BTN_RESET
 
@@ -527,7 +527,7 @@ class TestFollowupResponseErrorHandling:
         # Mock _extract_tag_block to raise an exception
         from unittest.mock import patch
 
-        with patch("src.messages._extract_tag_block") as mock_extract:
+        with patch("telegram_prompt_bot.messages._extract_tag_block") as mock_extract:
             mock_extract.side_effect = Exception("Parsing error")
 
             parsed, is_refined = parse_followup_response(response)

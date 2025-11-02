@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.user_profile_utils import (
+from telegram_prompt_bot.utils.user_profile_utils import (
     extract_user_profile,
     has_meaningful_profile_changes,
     should_update_user_profile,

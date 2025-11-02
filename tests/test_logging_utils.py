@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.logging_utils import (
+from telegram_prompt_bot.monitoring.logging_utils import (
     EmailFlowLogger,
     PIIProtectedFormatter,
     StructuredLogger,

@@ -6,7 +6,7 @@ import tempfile
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.database import (
+from telegram_prompt_bot.database.models import (
     AuthEvent,
     DatabaseManager,
     User,
@@ -746,6 +746,6 @@ class TestDatabaseManager:
         assert retrieved_manager is manager
 
         # Reset global state for other tests
-        import src.database
+        import telegram_prompt_bot.database
 
-        src.database.db_manager = None
+        telegram_prompt_bot.database.models.db_manager = None

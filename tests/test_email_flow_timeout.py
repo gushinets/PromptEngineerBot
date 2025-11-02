@@ -10,11 +10,11 @@ import pytest
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.config import BotConfig
-from src.conversation_manager import ConversationManager
-from src.email_flow import EmailFlowOrchestrator
-from src.llm_client_base import LLMClientBase
-from src.state_manager import StateManager
+from telegram_prompt_bot.config.settings import BotConfig
+from telegram_prompt_bot.core.conversation_manager import ConversationManager
+from telegram_prompt_bot.email.flow import EmailFlowOrchestrator
+from telegram_prompt_bot.llm.base import LLMClientBase
+from telegram_prompt_bot.core.state_manager import StateManager
 
 
 class MockLLMClient(LLMClientBase):
@@ -95,9 +95,9 @@ async def email_flow_orchestrator(
 ):
     """Create email flow orchestrator with mocked dependencies."""
     with (
-        patch("src.email_flow.get_auth_service"),
-        patch("src.email_flow.get_email_service"),
-        patch("src.email_flow.get_redis_client") as mock_redis,
+        patch("telegram_prompt_bot.email_flow.get_auth_service"),
+        patch("telegram_prompt_bot.email_flow.get_email_service"),
+        patch("telegram_prompt_bot.email_flow.get_redis_client") as mock_redis,
     ):
         # Mock Redis client
         mock_redis_client = MagicMock()
@@ -307,9 +307,9 @@ class TestEmailFlowTimeout:
         mock_config.followup_timeout_seconds = 120  # 2 minutes
 
         with (
-            patch("src.email_flow.get_auth_service"),
-            patch("src.email_flow.get_email_service"),
-            patch("src.email_flow.get_redis_client"),
+            patch("telegram_prompt_bot.email_flow.get_auth_service"),
+            patch("telegram_prompt_bot.email_flow.get_email_service"),
+            patch("telegram_prompt_bot.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 mock_config,

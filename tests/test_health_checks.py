@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.config import BotConfig
-from src.health_checks import (
+from telegram_prompt_bot.config.settings import BotConfig
+from telegram_prompt_bot.infrastructure.health_checks import (
     HealthCheckResult,
     HealthMonitor,
     HealthStatus,
@@ -95,7 +95,7 @@ class TestHealthMonitor:
             assert service.current_status == HealthStatus.UNKNOWN
             assert service.consecutive_failures == 0
 
-    @patch("src.health_checks.get_db_manager")
+    @patch("telegram_prompt_bot.infrastructure.health_checks.get_db_manager")
     async def test_check_database_health_success(
         self, mock_get_db_manager, health_monitor
     ):
@@ -114,7 +114,7 @@ class TestHealthMonitor:
         assert result.error is None
         assert result.details == {"connection_pool": "active"}
 
-    @patch("src.health_checks.get_db_manager")
+    @patch("telegram_prompt_bot.infrastructure.health_checks.get_db_manager")
     async def test_check_database_health_failure(
         self, mock_get_db_manager, health_monitor
     ):
@@ -130,7 +130,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert result.error == "Database connectivity test failed"
 
-    @patch("src.health_checks.get_db_manager")
+    @patch("telegram_prompt_bot.infrastructure.health_checks.get_db_manager")
     async def test_check_database_health_exception(
         self, mock_get_db_manager, health_monitor
     ):
@@ -144,7 +144,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert "Connection error" in result.error
 
-    @patch("src.health_checks.get_redis_client")
+    @patch("telegram_prompt_bot.infrastructure.health_checks.get_redis_client")
     async def test_check_redis_health_success(
         self, mock_get_redis_client, health_monitor
     ):
@@ -163,7 +163,7 @@ class TestHealthMonitor:
         assert result.error is None
         assert result.details == {"connection_pool": "active"}
 
-    @patch("src.health_checks.get_redis_client")
+    @patch("telegram_prompt_bot.infrastructure.health_checks.get_redis_client")
     async def test_check_redis_health_failure(
         self, mock_get_redis_client, health_monitor
     ):
@@ -179,7 +179,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert result.error == "Redis connectivity test failed"
 
-    @patch("src.health_checks.get_redis_client")
+    @patch("telegram_prompt_bot.infrastructure.health_checks.get_redis_client")
     async def test_check_redis_health_exception(
         self, mock_get_redis_client, health_monitor
     ):
@@ -193,7 +193,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert "Redis connection error" in result.error
 
-    @patch("src.email_service.EmailService")
+    @patch("telegram_prompt_bot.email.service.EmailService")
     async def test_check_smtp_health_success(
         self, mock_email_service_class, health_monitor
     ):
@@ -213,7 +213,7 @@ class TestHealthMonitor:
         assert "host" in result.details
         assert "port" in result.details
 
-    @patch("src.email_service.EmailService")
+    @patch("telegram_prompt_bot.email.service.EmailService")
     async def test_check_smtp_health_failure(
         self, mock_email_service_class, health_monitor
     ):
@@ -229,7 +229,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert result.error == "SMTP connectivity test failed"
 
-    @patch("src.email_service.EmailService")
+    @patch("telegram_prompt_bot.email.service.EmailService")
     async def test_check_smtp_health_exception(
         self, mock_email_service_class, health_monitor
     ):
@@ -504,9 +504,9 @@ class TestHealthMonitorGlobalFunctions:
     def test_get_health_monitor_not_initialized(self):
         """Test getting health monitor when not initialized."""
         # Reset global state
-        import src.health_checks
+        import telegram_prompt_bot.health_checks
 
-        src.health_checks.health_monitor = None
+        telegram_prompt_bot.infrastructure.health_checks.health_monitor = None
 
         with pytest.raises(RuntimeError, match="Health monitor not initialized"):
             get_health_monitor()

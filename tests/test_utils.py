@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.dependencies import reset_container
+from telegram_prompt_bot.config.dependencies import reset_container
 
 
 @pytest.fixture(autouse=True)
 def reset_dependency_container():
     """Reset the dependency container before each test to ensure isolation."""
-    from src.dependencies import get_container, reset_all_globals
+    from telegram_prompt_bot.config.dependencies import get_container, reset_all_globals
 
     # Reset all global state
     reset_all_globals()

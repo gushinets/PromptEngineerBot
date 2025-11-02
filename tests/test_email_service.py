@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from src.config import BotConfig
-from src.email_service import EmailDeliveryResult, EmailService
+from telegram_prompt_bot.config.settings import BotConfig
+from telegram_prompt_bot.email.service import EmailDeliveryResult, EmailService
 
 
 def create_mock_config():
@@ -29,7 +29,7 @@ def create_mock_config():
 def create_email_service():
     """Create email service instance for testing."""
     mock_config = create_mock_config()
-    with patch("src.email_service.EmailTemplates"):
+    with patch("telegram_prompt_bot.email.service.EmailTemplates"):
         return EmailService(mock_config)
 
 
@@ -122,7 +122,7 @@ class TestProviderErrorExtraction:
 class TestEmailFailureAuditLogging:
     """Test email failure audit logging with provider error info."""
 
-    @patch("src.email_service.get_audit_service")
+    @patch("telegram_prompt_bot.email.service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
     async def test_otp_email_failure_logs_provider_error(
         self, mock_send, mock_get_audit
@@ -150,9 +150,9 @@ class TestEmailFailureAuditLogging:
         )
         assert not result.success
 
-    @patch("src.email_service.get_audit_service")
+    @patch("telegram_prompt_bot.email.service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
-    @patch("src.email_service.EmailTemplates")
+    @patch("telegram_prompt_bot.email.service.EmailTemplates")
     async def test_optimization_email_failure_logs_provider_error(
         self, mock_templates_class, mock_send, mock_get_audit
     ):
@@ -197,7 +197,7 @@ class TestEmailFailureAuditLogging:
         )
         assert not result.success
 
-    @patch("src.email_service.get_audit_service")
+    @patch("telegram_prompt_bot.email.service.get_audit_service")
     async def test_unexpected_error_logs_provider_error(self, mock_get_audit):
         """Test that unexpected errors during email sending log provider error info."""
         # Setup mocks
@@ -222,7 +222,7 @@ class TestEmailFailureAuditLogging:
         )
         assert not result.success
 
-    @patch("src.email_service.get_audit_service")
+    @patch("telegram_prompt_bot.email.service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
     async def test_email_success_logs_without_error_reason(
         self, mock_send, mock_get_audit
@@ -251,7 +251,7 @@ class TestEmailFailureAuditLogging:
         mock_audit.log_email_send_failure.assert_not_called()
         assert result.success
 
-    @patch("src.email_service.get_audit_service")
+    @patch("telegram_prompt_bot.email.service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
     async def test_audit_service_failure_does_not_break_email_flow(
         self, mock_send, mock_get_audit

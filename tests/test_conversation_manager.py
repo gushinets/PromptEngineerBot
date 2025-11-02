@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.conversation_manager import ConversationManager
-from src.state_manager import StateManager
+from telegram_prompt_bot.core.conversation_manager import ConversationManager
+from telegram_prompt_bot.core.state_manager import StateManager
 
 
 class TestConversationManager:
@@ -263,7 +263,7 @@ class TestConversationManager:
         improved_prompt = "Test improved prompt"
 
         # Mock PromptLoader to raise FileNotFoundError during initialization
-        with patch("src.conversation_manager.PromptLoader") as mock_prompt_loader_class:
+        with patch("telegram_prompt_bot.conversation_manager.PromptLoader") as mock_prompt_loader_class:
             mock_prompt_loader_class.side_effect = FileNotFoundError(
                 "Prompt file not found"
             )
@@ -396,7 +396,7 @@ class TestConversationManager:
 
     def test_is_in_followup_conversation_with_state_manager(self):
         """Test is_in_followup_conversation with StateManager integration."""
-        from src.state_manager import StateManager
+        from telegram_prompt_bot.core.state_manager import StateManager
 
         state_manager = StateManager()
         manager = ConversationManager(state_manager=state_manager)

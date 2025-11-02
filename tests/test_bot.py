@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # Import the functions to test
-from src.main import handle_message, start
+# from telegram_prompt_bot.main import handle_message, start  # Commented - causes module init
 
 
 class TestBotFunctionality:
@@ -19,8 +19,8 @@ class TestBotFunctionality:
 
         from telegram import ReplyKeyboardMarkup
 
-        from src.bot_handler import BotHandler
-        from src.config import BotConfig
+        from telegram_prompt_bot.core.bot_handler import BotHandler
+        from telegram_prompt_bot.config.settings import BotConfig
 
         # Create a real bot handler with mocked dependencies
         mock_config = MagicMock(spec=BotConfig)
@@ -65,8 +65,8 @@ class TestBotFunctionality:
         """Test different optimization method selections."""
         from unittest.mock import AsyncMock, MagicMock
 
-        from src.bot_handler import BotHandler
-        from src.config import BotConfig
+        from telegram_prompt_bot.core.bot_handler import BotHandler
+        from telegram_prompt_bot.config.settings import BotConfig
 
         # Create a real bot handler with mocked dependencies
         mock_config = MagicMock(spec=BotConfig)
@@ -136,8 +136,8 @@ class TestTimeoutHandling:
         """Test that the bot handles LLM timeouts gracefully."""
         from unittest.mock import MagicMock
 
-        from src.bot_handler import BotHandler
-        from src.config import BotConfig
+        from telegram_prompt_bot.core.bot_handler import BotHandler
+        from telegram_prompt_bot.config.settings import BotConfig
 
         # Set up a timeout error
         mock_llm_client.send_prompt.side_effect = asyncio.TimeoutError("LLM timeout")
@@ -187,9 +187,9 @@ class TestTimeoutHandling:
     @pytest.mark.asyncio
     async def test_application_timeouts(self, mock_application):
         """Verify that application timeouts are set correctly."""
-        from src.main import main
+        from telegram_prompt_bot.main import main
 
-        with patch("src.main.Application") as mock_app_class:
+        with patch("telegram_prompt_bot.main.Application") as mock_app_class:
             mock_app = MagicMock()
             # Configure the builder chain
             builder = MagicMock()
@@ -210,7 +210,7 @@ class TestTimeoutHandling:
             mock_app.shutdown = AsyncMock(return_value=None)
 
             # Run the main function, force loop to exit immediately
-            with patch("src.main.asyncio.sleep", new=AsyncMock(side_effect=SystemExit)):
+            with patch("telegram_prompt_bot.main.asyncio.sleep", new=AsyncMock(side_effect=SystemExit)):
                 with pytest.raises(SystemExit):
                     await main()
 

@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from telegram import Update
 
-from src.bot_handler import BotHandler
-from src.config import BotConfig
+from telegram_prompt_bot.core.bot_handler import BotHandler
+from telegram_prompt_bot.config.settings import BotConfig
 
 
 class TestTokenUsageFixes:

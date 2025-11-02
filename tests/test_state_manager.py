@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.state_manager import StateManager, UserState
+from telegram_prompt_bot.core.state_manager import StateManager, UserState
 
 
 class TestUserState:

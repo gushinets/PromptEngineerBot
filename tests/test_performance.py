@@ -12,11 +12,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.auth_service import AuthService
-from src.database import AuthEvent, DatabaseManager, User
-from src.email_service import EmailService
-from src.metrics import MetricsCollector
-from src.redis_client import RedisClient
+from telegram_prompt_bot.auth.service import AuthService
+from telegram_prompt_bot.database.models import AuthEvent, DatabaseManager, User
+from telegram_prompt_bot.email.service import EmailService
+from telegram_prompt_bot.monitoring.metrics import MetricsCollector
+from telegram_prompt_bot.infrastructure.redis_client import RedisClient
 
 
 class TestDatabasePerformance:
@@ -303,7 +303,7 @@ class TestEmailServicePerformance:
 
     async def test_email_template_rendering_performance(self):
         """Test email template rendering performance."""
-        from src.email_templates import EmailTemplates
+        from telegram_prompt_bot.email.templates import EmailTemplates
 
         templates = EmailTemplates("en")
 
@@ -416,9 +416,9 @@ class TestSystemLoadTesting:
             try:
                 # Mock services
                 with (
-                    patch("src.auth_service.AuthService") as mock_auth_class,
-                    patch("src.email_service.EmailService") as mock_email_class,
-                    patch("src.redis_client.RedisClient") as mock_redis_class,
+                    patch("telegram_prompt_bot.auth.service.AuthService") as mock_auth_class,
+                    patch("telegram_prompt_bot.email.service.EmailService") as mock_email_class,
+                    patch("telegram_prompt_bot.redis_client.RedisClient") as mock_redis_class,
                 ):
                     # Set up mocks
                     mock_auth = MagicMock()

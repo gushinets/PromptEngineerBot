@@ -11,8 +11,8 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 
 # Import the clients to test
-from src.openai_client import OpenAIClient
-from src.openrouter_client import OpenRouterClient
+from telegram_prompt_bot.llm.openai_client import OpenAIClient
+from telegram_prompt_bot.llm.openrouter_client import OpenRouterClient
 
 
 class TestOpenAIClient:
@@ -37,7 +37,7 @@ class TestOpenAIClient:
     @pytest.mark.asyncio
     async def test_send_prompt_success(self, mock_openai_response):
         """Test successful prompt sending to OpenAI."""
-        with patch("src.openai_client.OpenAIClient._call_openai_api") as mock_call:
+        with patch("telegram_prompt_bot.openai_client.OpenAIClient._call_openai_api") as mock_call:
             # Mock underlying API call
             mock_call.return_value = ("Mocked response", None)
 
@@ -59,7 +59,7 @@ class TestOpenAIClient:
     async def test_send_prompt_timeout(self):
         """Test timeout handling in OpenAI client."""
         with patch(
-            "src.openai_client.OpenAIClient._call_openai_api",
+            "telegram_prompt_bot.openai_client.OpenAIClient._call_openai_api",
             side_effect=asyncio.TimeoutError("API timeout"),
         ):
             client = OpenAIClient(
@@ -72,7 +72,7 @@ class TestOpenAIClient:
             messages = [{"role": "user", "content": "Test prompt"}]
 
             with patch(
-                "src.openai_client.OpenAIClient._call_openai_api",
+                "telegram_prompt_bot.openai_client.OpenAIClient._call_openai_api",
                 side_effect=asyncio.TimeoutError("API timeout"),
             ):
                 with pytest.raises(Exception) as exc_info:
@@ -179,7 +179,7 @@ class TestLLMClientIntegration:
                 # Also stub the OpenAI call to raise a timeout to avoid real API call
                 if client_class is OpenAIClient:
                     with patch(
-                        "src.openai_client.OpenAIClient._call_openai_api",
+                        "telegram_prompt_bot.openai_client.OpenAIClient._call_openai_api",
                         side_effect=asyncio.TimeoutError("API timeout"),
                     ):
                         # Initialize client before invoking send_prompt

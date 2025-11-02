@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.email_service import EmailDeliveryResult, EmailService
-from src.email_templates import EmailTemplates
+from telegram_prompt_bot.email.service import EmailDeliveryResult, EmailService
+from telegram_prompt_bot.email.templates import EmailTemplates
 
 
 class TestEmailServiceSingleResult:
@@ -29,7 +29,7 @@ class TestEmailServiceSingleResult:
         config.smtp_use_tls = True
         config.smtp_use_ssl = False
 
-        with patch("src.email_service.get_audit_service"):
+        with patch("telegram_prompt_bot.email.service.get_audit_service"):
             service = EmailService(config)
             return service
 

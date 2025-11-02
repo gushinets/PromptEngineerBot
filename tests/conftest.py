@@ -41,7 +41,7 @@ def mock_context():
 @pytest.fixture
 def mock_application():
     """Create a mock Application object."""
-    with patch("src.main.Application.builder") as mock_builder:
+    with patch("telegram_prompt_bot.main.Application.builder") as mock_builder:
         mock_app = MagicMock()
         mock_builder.return_value = MagicMock(
             token=MagicMock(return_value=MagicMock()),

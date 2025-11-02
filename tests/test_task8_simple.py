@@ -14,21 +14,21 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.config import BotConfig
-from src.graceful_degradation import (
+from telegram_prompt_bot.config.settings import BotConfig
+from telegram_prompt_bot.utils.graceful_degradation import (
     DegradationLevel,
     DegradationRule,
     DegradationState,
     GracefulDegradationManager,
     ServiceType,
 )
-from src.health_checks import (
+from telegram_prompt_bot.infrastructure.health_checks import (
     HealthCheckResult,
     HealthMonitor,
     HealthStatus,
     ServiceHealth,
 )
-from src.logging_utils import PIIProtectedFormatter, StructuredLogger, get_logger
+from telegram_prompt_bot.monitoring.logging_utils import PIIProtectedFormatter, StructuredLogger, get_logger
 
 
 def test_health_monitoring_basic():

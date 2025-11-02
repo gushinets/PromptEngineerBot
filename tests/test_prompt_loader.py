@@ -5,7 +5,7 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
-from src.prompt_loader import PromptLoader
+from telegram_prompt_bot.core.prompt_loader import PromptLoader
 
 
 class TestPromptLoader:
@@ -13,7 +13,7 @@ class TestPromptLoader:
 
     def test_init_default_directory(self):
         """Test PromptLoader initialization with default directory."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts") as mock_load:
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts") as mock_load:
             loader = PromptLoader()
 
             expected_dir = os.path.join(
@@ -26,7 +26,7 @@ class TestPromptLoader:
         """Test PromptLoader initialization with custom directory."""
         custom_dir = "/custom/prompts"
 
-        with patch("src.prompt_loader.PromptLoader._load_prompts") as mock_load:
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts") as mock_load:
             loader = PromptLoader(custom_dir)
 
             assert loader.prompts_dir == custom_dir
@@ -96,7 +96,7 @@ class TestPromptLoader:
 
     def test_craft_prompt_property(self):
         """Test craft_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"craft": "CRAFT content"}
 
@@ -104,7 +104,7 @@ class TestPromptLoader:
 
     def test_lyra_prompt_property(self):
         """Test lyra_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"lyra": "LYRA content"}
 
@@ -112,7 +112,7 @@ class TestPromptLoader:
 
     def test_ggl_prompt_property(self):
         """Test ggl_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"ggl": "GGL content"}
 
@@ -120,7 +120,7 @@ class TestPromptLoader:
 
     def test_followup_prompt_property(self):
         """Test followup_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"followup": "Follow-up content"}
 
@@ -128,7 +128,7 @@ class TestPromptLoader:
 
     def test_craft_email_prompt_property(self):
         """Test craft_email_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"craft_email": "CRAFT email content"}
 
@@ -136,7 +136,7 @@ class TestPromptLoader:
 
     def test_lyra_email_prompt_property(self):
         """Test lyra_email_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"lyra_email": "LYRA email content"}
 
@@ -144,7 +144,7 @@ class TestPromptLoader:
 
     def test_ggl_email_prompt_property(self):
         """Test ggl_email_prompt property."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"ggl_email": "GGL email content"}
 
@@ -152,7 +152,7 @@ class TestPromptLoader:
 
     def test_get_prompt_success(self):
         """Test get_prompt method with valid method name."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"craft": "CRAFT content", "lyra": "LYRA content"}
 
@@ -162,7 +162,7 @@ class TestPromptLoader:
 
     def test_get_prompt_unknown_method(self):
         """Test get_prompt method with unknown method name."""
-        with patch("src.prompt_loader.PromptLoader._load_prompts"):
+        with patch("telegram_prompt_bot.prompt_loader.PromptLoader._load_prompts"):
             loader = PromptLoader()
             loader._prompts = {"craft": "CRAFT content"}
 

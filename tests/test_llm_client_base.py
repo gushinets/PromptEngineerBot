@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from src.llm_client_base import LLMClientBase, TokenUsage
+from telegram_prompt_bot.llm.base import LLMClientBase, TokenUsage
 
 
 class TestTokenUsage:
