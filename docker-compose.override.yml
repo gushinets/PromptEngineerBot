@@ -11,8 +11,7 @@ services:
       - LANGUAGE=RU
     volumes:
       # Mount source code for development (uncomment for live reload)
-      # - ./src:/app/src:ro
-      # - ./tests:/app/tests:ro
+      # - ./telegram_bot:/app/telegram_bot:ro
       - ./bot.db:/app/bot.db # Persist SQLite database
     # Expose ports for debugging
     # ports:

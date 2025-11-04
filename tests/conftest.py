@@ -8,11 +8,10 @@ import pytest
 from dotenv import load_dotenv
 
 # Import test utilities to ensure autouse fixtures are loaded
-from tests.test_utils import reset_dependency_container
+from tests.unit.test_utils import reset_dependency_container
 
-# Add the project root and src folder to the Python path
+# Add the project root to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Load environment variables from .env file
 load_dotenv()
@@ -41,7 +40,7 @@ def mock_context():
 @pytest.fixture
 def mock_application():
     """Create a mock Application object."""
-    with patch("src.main.Application.builder") as mock_builder:
+    with patch("telegram_bot.main.Application.builder") as mock_builder:
         mock_app = MagicMock()
         mock_builder.return_value = MagicMock(
             token=MagicMock(return_value=MagicMock()),
@@ -75,3 +74,6 @@ def mock_llm_client():
     )
 
     return mock_client
+
+
+

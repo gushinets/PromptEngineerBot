@@ -3,8 +3,9 @@
 Entry point for the Telegram bot.
 This script ensures proper module imports and runs the bot.
 """
-import sys
+
 import os
+import sys
 
 # Add the project root to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -13,9 +14,10 @@ if project_root not in sys.path:
 
 # Now we can import and run the bot
 if __name__ == "__main__":
-    from src.main import main
     import asyncio
-    
+
+    from telegram_bot.main import main
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

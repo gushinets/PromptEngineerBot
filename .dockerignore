@@ -38,17 +38,17 @@ bot.db
 
 # Test files
 tests/
-test_imports.py
-test_token_flow.py
 
 # Documentation
 README.md
 docs/
 
+# Scripts
+scripts/
+
 # Development files
 .env.example
-docker-compose.yml
-Dockerfile
+docker-compose.override.yml
 
 # Build artifacts
 build/

@@ -18,28 +18,65 @@ A professional Telegram bot that helps users optimize their prompts using differ
 The bot follows clean architecture principles with clear separation of concerns:
 
 ```
-src/
-├── llm_client_base.py      # Abstract base for LLM clients
-├── openai_client.py        # OpenAI API client
-├── openrouter_client.py    # OpenRouter API client
-├── llm_factory.py          # Factory for creating LLM clients
-├── config.py               # Configuration management with validation
-├── bot_handler.py          # Core bot logic and conversation handling
-├── conversation_manager.py # Conversation state and token tracking
-├── state_manager.py        # User state management
-├── prompt_loader.py        # Prompt file management
-├── messages.py             # Message formatting and parsing
-├── gsheets_logging.py      # Google Sheets integration
-└── prompts/                # Optimization method prompts
-    ├── CRAFT_prompt.txt
-    ├── LYRA_prompt.txt
-    └── GGL_prompt.txt
+telegram_bot/
+├── core/                   # Core business logic
+│   ├── bot_handler.py     # Bot conversation orchestration
+│   ├── conversation_manager.py  # Conversation state and token tracking
+│   └── state_manager.py   # User state management
+├── services/              # External service integrations
+│   ├── llm/              # LLM client implementations
+│   │   ├── base.py       # Abstract base for LLM clients
+│   │   ├── factory.py    # Factory for creating LLM clients
+│   │   ├── openai_client.py    # OpenAI API client
+│   │   └── openrouter_client.py # OpenRouter API client
+│   ├── email_service.py  # Email delivery service
+│   ├── gsheets_logging.py # Google Sheets integration
+│   └── redis_client.py   # Redis caching service
+├── auth/                  # Authentication and user management
+│   ├── auth_service.py   # Email-based authentication
+│   └── user_profile_utils.py # User profile management
+├── data/                  # Data layer
+│   └── database.py       # Database models and operations
+├── utils/                 # Utility modules
+│   ├── config.py         # Configuration management
+│   ├── messages.py       # Message formatting and parsing
+│   ├── prompt_loader.py  # Prompt file management
+│   ├── email_templates.py # Email template rendering
+│   ├── logging_utils.py  # Structured logging with PII protection
+│   ├── metrics.py        # Metrics collection
+│   ├── health_checks.py  # Service health monitoring
+│   ├── audit_service.py  # Audit logging
+│   └── graceful_degradation.py # Service degradation handling
+├── flows/                 # Complex workflows
+│   ├── email_flow.py     # Email authentication flow
+│   └── background_tasks.py # Background task management
+├── prompts/              # Optimization method prompts
+│   ├── CRAFT_prompt.txt
+│   ├── CRAFT_email_prompt.txt
+│   ├── LYRA_prompt.txt
+│   ├── LYRA_email_prompt.txt
+│   ├── GGL_prompt.txt
+│   ├── GGL_email_prompt.txt
+│   └── Follow_up_questions_prompt.txt
+├── main.py               # Application entry point
+└── dependencies.py       # Dependency injection container
 
-tools/
-├── diagnose_gsheets.py     # Google Sheets diagnostic tool
-├── repair_gsheets.py       # Google Sheets repair tool
-└── README.md               # Tools documentation
+scripts/
+└── tools/                # Utility scripts
+    ├── diagnose_gsheets.py  # Google Sheets diagnostic tool
+    ├── repair_gsheets.py    # Google Sheets repair tool
+    └── README.md            # Tools documentation
+
+docs/                     # Documentation
+├── INDEX.md             # Documentation index
+├── architecture/        # Architecture documentation
+├── deployment/          # Deployment guides
+├── guides/              # User guides
+├── guidelines/          # Development guidelines
+└── development/         # Development notes
 ```
+
+For detailed documentation, see [docs/INDEX.md](docs/INDEX.md).
 
 ## 📦 Setup
 
@@ -95,7 +132,7 @@ tools/
     python run_bot.py
     
     # Or using module execution
-    python -m src.main
+    python -m telegram_bot.main
     ```
 
 ### Docker Deployment
@@ -172,14 +209,19 @@ The project includes comprehensive test coverage (84% overall):
 python -m pytest tests/ -v
 
 # Run with coverage report
-python -m pytest tests/ --cov=src --cov-report=html
+python -m pytest tests/ --cov=telegram_bot --cov-report=html
 
 # Run specific test categories
-python -m pytest tests/test_config.py -v
-python -m pytest tests/test_bot_handler.py -v
+python -m pytest tests/unit/ -v          # Unit tests
+python -m pytest tests/integration/ -v   # Integration tests
+python -m pytest tests/e2e/ -v           # End-to-end tests
+
+# Run specific test files
+python -m pytest tests/unit/test_config.py -v
+python -m pytest tests/integration/test_bot_handler.py -v
 
 # Test imports and architecture
-python test_imports.py
+python scripts/test_imports.py
 ```
 
 ### Test Coverage by Module:
@@ -285,6 +327,17 @@ And then you can tail the file in the container:
 docker exec -it prompt-improver-bot sh -lc 'tail -f /app/bot.log'
 ```
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the [docs/](docs/) directory:
+
+- **[Documentation Index](docs/INDEX.md)** - Complete documentation overview
+- **[Migration Guide](docs/MIGRATION_GUIDE.md)** - Guide for migrating to the new project structure
+- **[Architecture](docs/architecture/)** - System architecture and design
+- **[Deployment](docs/deployment/)** - Deployment guides and best practices
+- **[User Guides](docs/guides/)** - End-to-end user documentation
+- **[Guidelines](docs/guidelines/)** - Development and contribution guidelines
+
 ## 🏛️ Architecture Details
 
 ### Design Patterns Used:
@@ -330,7 +383,7 @@ The `User` model stores authentication data and Telegram profile information:
 - Premium user filtering: `ix_users_is_premium`  
 - User type analytics: `ix_users_bot_premium` (composite)
 
-For detailed information about the user profile system, see [User Profile System Documentation](docs/USER_PROFILE_SYSTEM.md).
+For detailed information about the user profile system, see [User Profile System Documentation](docs/architecture/USER_PROFILE_SYSTEM.md).
 
 ### Error Handling:
 - **Automatic fallbacks** for Markdown parsing errors
