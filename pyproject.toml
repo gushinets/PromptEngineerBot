@@ -99,7 +99,7 @@ asyncio_mode = "auto"
 timeout = 300
 
 [tool.coverage.run]
-source = ["src"]
+source = ["telegram_bot"]
 omit = [
     "tests/*",
     "test_*.py",

@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+telegram_bot/__pycache__/
 
 # Virtual environment
 .venv/
@@ -23,5 +24,4 @@ bot.db
 # Test coverage and cache
 .coverage
 .pytest_cache/
-__pycache__/
 htmlcov/

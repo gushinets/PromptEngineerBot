@@ -14,7 +14,7 @@
             "name": "Run Telegram Bot (Module)",
             "type": "debugpy",
             "request": "launch",
-            "module": "src.main",
+            "module": "telegram_bot.main",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}"
@@ -54,7 +54,7 @@
             "module": "pytest",
             "args": [
                 "-v",
-                "--cov=src",
+                "--cov=telegram_bot",
                 "--cov-report=html",
                 "--cov-report=term",
                 "tests/"
@@ -81,7 +81,7 @@
             "name": "Test Imports",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/test_imports.py",
+            "program": "${workspaceFolder}/scripts/test_imports.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}"

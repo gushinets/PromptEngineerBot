@@ -22,7 +22,7 @@ COPY .env* ./
 COPY google_service_key.json* ./
 COPY alembic.ini .
 COPY alembic ./alembic
-COPY src ./src
+COPY telegram_bot ./telegram_bot
 COPY run_bot.py .
 
 # Change ownership to app user
