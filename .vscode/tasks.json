@@ -102,44 +102,6 @@
             "problemMatcher": []
         },
         {
-            "label": "Format Code (Black)",
-            "type": "shell",
-            "command": "${command:python.interpreterPath}",
-            "args": [
-                "-m",
-                "black",
-                "telegram_bot/",
-                "tests/",
-                "--line-length",
-                "88"
-            ],
-            "group": "build",
-            "presentation": {
-                "reveal": "silent",
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Lint Code (Flake8)",
-            "type": "shell",
-            "command": "${command:python.interpreterPath}",
-            "args": [
-                "-m",
-                "flake8",
-                "telegram_bot/",
-                "tests/",
-                "--max-line-length=88",
-                "--extend-ignore=E203,W503"
-            ],
-            "group": "build",
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
             "label": "Build Docker Image",
             "type": "shell",
             "command": "docker",
@@ -185,6 +147,103 @@
             "group": "build",
             "presentation": {
                 "reveal": "silent",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Security Scan",
+            "type": "shell",
+            "command": "pre-commit",
+            "args": [
+                "run",
+                "--all-files"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Ruff Lint",
+            "type": "shell",
+            "command": "ruff",
+            "args": [
+                "check",
+                ".",
+                "--fix"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Ruff Format",
+            "type": "shell",
+            "command": "ruff",
+            "args": [
+                "format",
+                "."
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run GitLeaks",
+            "type": "shell",
+            "command": "pre-commit",
+            "args": [
+                "run",
+                "gitleaks",
+                "--all-files"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Bandit",
+            "type": "shell",
+            "command": "pre-commit",
+            "args": [
+                "run",
+                "bandit",
+                "--all-files"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Safety",
+            "type": "shell",
+            "command": "pre-commit",
+            "args": [
+                "run",
+                "safety",
+                "--all-files"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
                 "panel": "shared"
             },
             "problemMatcher": []

@@ -25,3 +25,11 @@ bot.db
 .coverage
 .pytest_cache/
 htmlcov/
+
+# Security scan results (temporary files)
+*-scan-results.json
+*-scan.json
+*_benchmark_results.json
+*_verification.json
+*_analysis.json
+docs/security/scan-results/*.json

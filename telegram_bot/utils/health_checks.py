@@ -9,13 +9,13 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 from telegram_bot.data.database import get_db_manager
 from telegram_bot.services.redis_client import get_redis_client
 from telegram_bot.utils.config import BotConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +34,14 @@ class HealthCheckResult:
 
     service: str
     status: HealthStatus
-    response_time_ms: Optional[int] = None
-    error: Optional[str] = None
-    timestamp: Optional[datetime] = None
-    details: Optional[Dict] = None
+    response_time_ms: int | None = None
+    error: str | None = None
+    timestamp: datetime | None = None
+    details: dict | None = None
 
     def __post_init__(self):
         if self.timestamp is None:
-            from datetime import timezone
-
-            self.timestamp = datetime.now(timezone.utc)
+            self.timestamp = datetime.now(UTC)
 
 
 @dataclass
@@ -52,12 +50,12 @@ class ServiceHealth:
 
     service: str
     current_status: HealthStatus
-    last_healthy: Optional[datetime] = None
-    last_unhealthy: Optional[datetime] = None
+    last_healthy: datetime | None = None
+    last_unhealthy: datetime | None = None
     consecutive_failures: int = 0
     total_checks: int = 0
     total_failures: int = 0
-    average_response_time_ms: Optional[float] = None
+    average_response_time_ms: float | None = None
 
 
 class HealthMonitor:
@@ -73,8 +71,8 @@ class HealthMonitor:
 
     def __init__(self, config: BotConfig):
         self.config = config
-        self._services: Dict[str, ServiceHealth] = {}
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._services: dict[str, ServiceHealth] = {}
+        self._monitoring_task: asyncio.Task | None = None
         self._monitoring_running = False
         self._check_interval = 30  # seconds
         self._failure_threshold = 3  # consecutive failures before alerting
@@ -117,21 +115,18 @@ class HealthMonitor:
                     response_time_ms=response_time_ms,
                     details={"connection_pool": "active"},
                 )
-            else:
-                logger.warning("DB_HEALTH_CHECK: Database unhealthy")
-                return HealthCheckResult(
-                    service="database",
-                    status=HealthStatus.UNHEALTHY,
-                    response_time_ms=response_time_ms,
-                    error="Database connectivity test failed",
-                )
+            logger.warning("DB_HEALTH_CHECK: Database unhealthy")
+            return HealthCheckResult(
+                service="database",
+                status=HealthStatus.UNHEALTHY,
+                response_time_ms=response_time_ms,
+                error="Database connectivity test failed",
+            )
 
         except Exception as e:
             response_time_ms = max(1, int((time.time() - start_time) * 1000))
             error_msg = str(e)
-            logger.error(
-                f"DB_HEALTH_CHECK_ERROR: Database health check failed - {error_msg}"
-            )
+            logger.error(f"DB_HEALTH_CHECK_ERROR: Database health check failed - {error_msg}")
 
             return HealthCheckResult(
                 service="database",
@@ -167,21 +162,18 @@ class HealthMonitor:
                     response_time_ms=response_time_ms,
                     details={"connection_pool": "active"},
                 )
-            else:
-                logger.warning("REDIS_HEALTH_CHECK: Redis unhealthy")
-                return HealthCheckResult(
-                    service="redis",
-                    status=HealthStatus.UNHEALTHY,
-                    response_time_ms=response_time_ms,
-                    error="Redis connectivity test failed",
-                )
+            logger.warning("REDIS_HEALTH_CHECK: Redis unhealthy")
+            return HealthCheckResult(
+                service="redis",
+                status=HealthStatus.UNHEALTHY,
+                response_time_ms=response_time_ms,
+                error="Redis connectivity test failed",
+            )
 
         except Exception as e:
             response_time_ms = max(1, int((time.time() - start_time) * 1000))
             error_msg = str(e)
-            logger.error(
-                f"REDIS_HEALTH_CHECK_ERROR: Redis health check failed - {error_msg}"
-            )
+            logger.error(f"REDIS_HEALTH_CHECK_ERROR: Redis health check failed - {error_msg}")
 
             return HealthCheckResult(
                 service="redis",
@@ -211,9 +203,7 @@ class HealthMonitor:
             response_time_ms = max(1, int((time.time() - start_time) * 1000))
 
             if is_healthy:
-                logger.debug(
-                    f"SMTP_HEALTH_CHECK: SMTP healthy, response time {response_time_ms}ms"
-                )
+                logger.debug(f"SMTP_HEALTH_CHECK: SMTP healthy, response time {response_time_ms}ms")
                 return HealthCheckResult(
                     service="smtp",
                     status=HealthStatus.HEALTHY,
@@ -225,21 +215,18 @@ class HealthMonitor:
                         "ssl": self.config.smtp_use_ssl,
                     },
                 )
-            else:
-                logger.warning("SMTP_HEALTH_CHECK: SMTP unhealthy")
-                return HealthCheckResult(
-                    service="smtp",
-                    status=HealthStatus.UNHEALTHY,
-                    response_time_ms=response_time_ms,
-                    error="SMTP connectivity test failed",
-                )
+            logger.warning("SMTP_HEALTH_CHECK: SMTP unhealthy")
+            return HealthCheckResult(
+                service="smtp",
+                status=HealthStatus.UNHEALTHY,
+                response_time_ms=response_time_ms,
+                error="SMTP connectivity test failed",
+            )
 
         except Exception as e:
             response_time_ms = max(1, int((time.time() - start_time) * 1000))
             error_msg = str(e)
-            logger.error(
-                f"SMTP_HEALTH_CHECK_ERROR: SMTP health check failed - {error_msg}"
-            )
+            logger.error(f"SMTP_HEALTH_CHECK_ERROR: SMTP health check failed - {error_msg}")
 
             return HealthCheckResult(
                 service="smtp",
@@ -248,7 +235,7 @@ class HealthMonitor:
                 error=error_msg,
             )
 
-    async def check_all_services(self) -> Dict[str, HealthCheckResult]:
+    async def check_all_services(self) -> dict[str, HealthCheckResult]:
         """
         Check health of all services.
 
@@ -269,13 +256,11 @@ class HealthMonitor:
                 result = await task
                 results[service_name] = result
             except Exception as e:
-                logger.error(
-                    f"HEALTH_CHECK_ERROR: Failed to check {service_name} health - {str(e)}"
-                )
+                logger.error(f"HEALTH_CHECK_ERROR: Failed to check {service_name} health - {e!s}")
                 results[service_name] = HealthCheckResult(
                     service=service_name,
                     status=HealthStatus.UNHEALTHY,
-                    error=f"Health check failed: {str(e)}",
+                    error=f"Health check failed: {e!s}",
                 )
 
         return results
@@ -303,8 +288,7 @@ class HealthMonitor:
                 else:
                     # Simple moving average
                     service.average_response_time_ms = (
-                        service.average_response_time_ms * 0.8
-                        + result.response_time_ms * 0.2
+                        service.average_response_time_ms * 0.8 + result.response_time_ms * 0.2
                     )
         else:
             service.last_unhealthy = result.timestamp
@@ -340,18 +324,14 @@ class HealthMonitor:
                     self._update_service_health(result)
 
                 # Log summary
-                healthy_count = sum(
-                    1 for r in results.values() if r.status == HealthStatus.HEALTHY
-                )
+                healthy_count = sum(1 for r in results.values() if r.status == HealthStatus.HEALTHY)
                 total_count = len(results)
 
                 if healthy_count == total_count:
                     logger.debug(f"HEALTH_SUMMARY: All {total_count} services healthy")
                 else:
                     unhealthy_services = [
-                        r.service
-                        for r in results.values()
-                        if r.status != HealthStatus.HEALTHY
+                        r.service for r in results.values() if r.status != HealthStatus.HEALTHY
                     ]
                     logger.warning(
                         f"HEALTH_SUMMARY: {healthy_count}/{total_count} services healthy. "
@@ -364,7 +344,7 @@ class HealthMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"HEALTH_MONITOR_ERROR: Monitoring loop error - {str(e)}")
+                logger.error(f"HEALTH_MONITOR_ERROR: Monitoring loop error - {e!s}")
                 await asyncio.sleep(self._check_interval)
 
         logger.info("HEALTH_MONITOR_STOP: Health monitoring stopped")
@@ -377,18 +357,14 @@ class HealthMonitor:
             check_interval: Interval between health checks in seconds
         """
         if self._monitoring_running:
-            logger.warning(
-                "HEALTH_MONITOR_ALREADY_RUNNING: Health monitoring is already running"
-            )
+            logger.warning("HEALTH_MONITOR_ALREADY_RUNNING: Health monitoring is already running")
             return
 
         self._check_interval = check_interval
         self._monitoring_running = True
         self._monitoring_task = asyncio.create_task(self._monitoring_loop())
 
-        logger.info(
-            f"HEALTH_MONITOR_STARTED: Monitoring started with {check_interval}s interval"
-        )
+        logger.info(f"HEALTH_MONITOR_STARTED: Monitoring started with {check_interval}s interval")
 
     async def stop_monitoring(self) -> None:
         """Stop periodic health monitoring."""
@@ -407,7 +383,7 @@ class HealthMonitor:
 
         logger.info("HEALTH_MONITOR_STOPPED: Health monitoring stopped")
 
-    def get_service_health(self, service: str) -> Optional[ServiceHealth]:
+    def get_service_health(self, service: str) -> ServiceHealth | None:
         """
         Get health information for a specific service.
 
@@ -419,7 +395,7 @@ class HealthMonitor:
         """
         return self._services.get(service)
 
-    def get_all_service_health(self) -> Dict[str, ServiceHealth]:
+    def get_all_service_health(self) -> dict[str, ServiceHealth]:
         """
         Get health information for all services.
 
@@ -439,11 +415,7 @@ class HealthMonitor:
             True if service is healthy, False otherwise
         """
         service_health = self._services.get(service)
-        return (
-            service_health.current_status == HealthStatus.HEALTHY
-            if service_health
-            else False
-        )
+        return service_health.current_status == HealthStatus.HEALTHY if service_health else False
 
     def are_all_services_healthy(self) -> bool:
         """
@@ -453,11 +425,10 @@ class HealthMonitor:
             True if all services are healthy, False otherwise
         """
         return all(
-            service.current_status == HealthStatus.HEALTHY
-            for service in self._services.values()
+            service.current_status == HealthStatus.HEALTHY for service in self._services.values()
         )
 
-    def get_health_summary(self) -> Dict:
+    def get_health_summary(self) -> dict:
         """
         Get comprehensive health summary for all services.
 
@@ -484,12 +455,12 @@ class HealthMonitor:
             "total_services": len(self._services),
             "healthy_count": len(healthy_services),
             "unhealthy_count": len(unhealthy_services),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
 
 # Global health monitor instance
-health_monitor: Optional[HealthMonitor] = None
+health_monitor: HealthMonitor | None = None
 
 
 def init_health_monitor(config: BotConfig) -> HealthMonitor:
@@ -518,7 +489,5 @@ def get_health_monitor() -> HealthMonitor:
         RuntimeError: If health monitor is not initialized
     """
     if health_monitor is None:
-        raise RuntimeError(
-            "Health monitor not initialized. Call init_health_monitor() first."
-        )
+        raise RuntimeError("Health monitor not initialized. Call init_health_monitor() first.")
     return health_monitor

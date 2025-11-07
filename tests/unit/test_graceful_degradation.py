@@ -398,9 +398,7 @@ class TestGracefulDegradationManager:
         await degradation_manager.stop_monitoring()
 
     @patch("telegram_bot.graceful_degradation.get_health_monitor")
-    async def test_monitoring_loop_integration(
-        self, mock_get_monitor, degradation_manager
-    ):
+    async def test_monitoring_loop_integration(self, mock_get_monitor, degradation_manager):
         """Test monitoring loop integration."""
         mock_monitor = MagicMock()
         mock_monitor.is_service_healthy.return_value = True
@@ -616,14 +614,10 @@ class TestDegradationScenarios:
         assert "Email delivery" in message
 
     @patch("telegram_bot.utils.graceful_degradation.get_health_monitor")
-    async def test_database_failure_scenario(
-        self, mock_get_monitor, degradation_manager
-    ):
+    async def test_database_failure_scenario(self, mock_get_monitor, degradation_manager):
         """Test complete database failure scenario."""
         mock_monitor = MagicMock()
-        mock_monitor.is_service_healthy.side_effect = (
-            lambda service: service != "database"
-        )
+        mock_monitor.is_service_healthy.side_effect = lambda service: service != "database"
         mock_get_monitor.return_value = mock_monitor
 
         state = await degradation_manager.check_and_update_degradation()
@@ -642,14 +636,10 @@ class TestDegradationScenarios:
         assert "limited mode" in message
 
     @patch("telegram_bot.utils.graceful_degradation.get_health_monitor")
-    async def test_multiple_service_failure_scenario(
-        self, mock_get_monitor, degradation_manager
-    ):
+    async def test_multiple_service_failure_scenario(self, mock_get_monitor, degradation_manager):
         """Test multiple service failure scenario."""
         mock_monitor = MagicMock()
-        mock_monitor.is_service_healthy.side_effect = (
-            lambda service: service == "database"
-        )
+        mock_monitor.is_service_healthy.side_effect = lambda service: service == "database"
         mock_get_monitor.return_value = mock_monitor
 
         state = await degradation_manager.check_and_update_degradation()
@@ -666,9 +656,7 @@ class TestDegradationScenarios:
         assert degradation_manager.should_skip_rate_limiting()
 
     @patch("telegram_bot.utils.graceful_degradation.get_health_monitor")
-    async def test_service_recovery_scenario(
-        self, mock_get_monitor, degradation_manager
-    ):
+    async def test_service_recovery_scenario(self, mock_get_monitor, degradation_manager):
         """Test service recovery scenario."""
         mock_monitor = MagicMock()
 
@@ -687,6 +675,3 @@ class TestDegradationScenarios:
         assert ServiceType.REDIS not in state2.degraded_services
         assert state2.level == DegradationLevel.NORMAL
         assert len(state2.active_fallbacks) == 0
-
-
-

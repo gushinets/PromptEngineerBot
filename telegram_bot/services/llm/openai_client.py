@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List
 
 import openai
 from openai import OpenAI, Timeout
@@ -69,9 +68,7 @@ class OpenAIClient(LLMClientBase):
         return self._log_retry(retry_state)
 
     @retry(
-        stop=lambda retry_state: stop_after_attempt(retry_state.args[0].max_retries)(
-            retry_state
-        ),
+        stop=lambda retry_state: stop_after_attempt(retry_state.args[0].max_retries)(retry_state),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type(
             (
@@ -91,7 +88,7 @@ class OpenAIClient(LLMClientBase):
         ),
     )
     async def _call_openai_api(
-        self, messages: List[Dict[str, str]], log_prefix: str = "[OpenAI]"
+        self, messages: list[dict[str, str]], log_prefix: str = "[OpenAI]"
     ) -> tuple:
         """Make the actual API call with retry logic."""
         response = await asyncio.get_event_loop().run_in_executor(
@@ -113,7 +110,7 @@ class OpenAIClient(LLMClientBase):
         return response.choices[0].message.content, token_usage
 
     async def send_prompt(
-        self, messages: List[Dict[str, str]], log_prefix: str = "[OpenAI]"
+        self, messages: list[dict[str, str]], log_prefix: str = "[OpenAI]"
     ) -> str:
         """
         Send a list of messages to the OpenAI chat completion API asynchronously.
@@ -149,7 +146,7 @@ class OpenAIClient(LLMClientBase):
 
         except Exception as e:
             total_time = (datetime.now() - self.start_time).total_seconds()
-            logging.error(
-                f"{log_prefix} OpenAI API request failed after {total_time:.2f}s: {str(e)}"
+            logging.exception(
+                f"{log_prefix} OpenAI API request failed after {total_time:.2f}s: {e!s}"
             )
             raise

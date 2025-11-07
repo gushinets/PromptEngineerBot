@@ -6,12 +6,11 @@ Standalone test for audit service functionality.
 import os
 import sys
 
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from telegram_bot.data.database import AuthEvent, get_db_session, init_database
 from telegram_bot.utils.audit_service import (
-    AuditEventType,
-    AuditService,
     init_audit_service,
 )
 
@@ -38,11 +37,7 @@ def test_audit_service():
 
     # Verify event was stored
     with get_db_session() as session:
-        event = (
-            session.query(AuthEvent)
-            .filter(AuthEvent.telegram_id == telegram_id)
-            .first()
-        )
+        event = session.query(AuthEvent).filter(AuthEvent.telegram_id == telegram_id).first()
 
         if event:
             print(f"✓ Event stored: {event.event_type}, success: {event.success}")

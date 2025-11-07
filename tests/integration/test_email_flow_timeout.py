@@ -148,14 +148,10 @@ class TestEmailFlowTimeout:
         cached_prompt = "This is a cached improved prompt"
 
         # Mock state manager to return cached prompt
-        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = (
-            cached_prompt
-        )
+        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = cached_prompt
 
         # Mock the optimization and delivery method
-        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(
-            return_value=True
-        )
+        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(return_value=True)
 
         # Handle timeout
         result = await email_flow_orchestrator._handle_followup_timeout(
@@ -169,9 +165,7 @@ class TestEmailFlowTimeout:
         email_flow_orchestrator.state_manager.set_in_followup_conversation.assert_called_with(
             user_id, False
         )
-        email_flow_orchestrator.redis_client.delete_flow_state.assert_called_with(
-            user_id
-        )
+        email_flow_orchestrator.redis_client.delete_flow_state.assert_called_with(user_id)
 
         # Verify optimization was called with cached prompt
         email_flow_orchestrator._run_optimization_and_email_delivery.assert_called_once_with(
@@ -186,17 +180,13 @@ class TestEmailFlowTimeout:
         original_prompt = "Original user prompt"
 
         # Mock state manager to return no cached prompt but email flow data
-        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = (
-            None
-        )
+        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = None
         email_flow_orchestrator.state_manager.get_email_flow_data.return_value = {
             "original_prompt": original_prompt
         }
 
         # Mock the optimization and delivery method
-        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(
-            return_value=True
-        )
+        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(return_value=True)
 
         # Handle timeout
         result = await email_flow_orchestrator._handle_followup_timeout(
@@ -265,14 +255,10 @@ class TestEmailFlowTimeout:
         cached_prompt = "Cached improved prompt"
 
         # Mock state manager to return cached prompt
-        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = (
-            cached_prompt
-        )
+        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = cached_prompt
 
         # Mock the optimization and delivery method
-        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(
-            return_value=True
-        )
+        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(return_value=True)
 
         # Handle error
         result = await email_flow_orchestrator._handle_followup_error(
@@ -286,9 +272,7 @@ class TestEmailFlowTimeout:
         email_flow_orchestrator.state_manager.set_in_followup_conversation.assert_called_with(
             user_id, False
         )
-        email_flow_orchestrator.redis_client.delete_flow_state.assert_called_with(
-            user_id
-        )
+        email_flow_orchestrator.redis_client.delete_flow_state.assert_called_with(user_id)
 
         # Verify optimization was called with cached prompt
         email_flow_orchestrator._run_optimization_and_email_delivery.assert_called_once_with(
@@ -329,14 +313,10 @@ class TestEmailFlowTimeout:
         cached_prompt = "Cached prompt"
 
         # Mock state manager
-        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = (
-            cached_prompt
-        )
+        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = cached_prompt
 
         # Mock optimization method to succeed
-        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(
-            return_value=True
-        )
+        email_flow_orchestrator._run_optimization_and_email_delivery = AsyncMock(return_value=True)
 
         # Handle timeout
         result = await email_flow_orchestrator._handle_followup_timeout(
@@ -353,6 +333,3 @@ class TestEmailFlowTimeout:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

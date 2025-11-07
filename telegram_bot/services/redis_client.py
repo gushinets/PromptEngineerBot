@@ -8,10 +8,11 @@ rate limiting counters, and flow state operations.
 import json
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 import redis
 from redis.connection import ConnectionPool
+
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +74,7 @@ class RedisClient:
 
     # OTP Storage Operations
 
-    def store_otp(
-        self, telegram_id: int, otp_hash: str, email: str, ttl: int = 300
-    ) -> bool:
+    def store_otp(self, telegram_id: int, otp_hash: str, email: str, ttl: int = 300) -> bool:
         """
         Store OTP hash with metadata in Redis.
 
@@ -105,9 +104,7 @@ class RedisClient:
             pipe.expire(key, ttl)
             pipe.execute()
 
-            logger.debug(
-                f"OTP hash stored for telegram_id {telegram_id}, expires in {ttl}s"
-            )
+            logger.debug(f"OTP hash stored for telegram_id {telegram_id}, expires in {ttl}s")
             return True
 
         except Exception as e:
@@ -163,7 +160,7 @@ class RedisClient:
             logger.error(f"Failed to store OTP for telegram_id {telegram_id}: {e}")
             return False
 
-    def get_otp_data(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+    def get_otp_data(self, telegram_id: int) -> dict[str, Any] | None:
         """
         Retrieve OTP data from Redis.
 
@@ -226,16 +223,12 @@ class RedisClient:
             new_count = client.hincrby(key, "attempts", 1)
 
             # Log the attempt increment for audit purposes
-            logger.debug(
-                f"OTP attempts incremented to {new_count} for telegram_id {telegram_id}"
-            )
+            logger.debug(f"OTP attempts incremented to {new_count} for telegram_id {telegram_id}")
 
             return new_count
 
         except Exception as e:
-            logger.error(
-                f"Failed to increment OTP attempts for telegram_id {telegram_id}: {e}"
-            )
+            logger.error(f"Failed to increment OTP attempts for telegram_id {telegram_id}: {e}")
             return -1
 
     def delete_otp(self, telegram_id: int, reason: str = "cleanup") -> bool:
@@ -254,9 +247,7 @@ class RedisClient:
             key = f"otp:{telegram_id}"
 
             result = client.delete(key)
-            logger.debug(
-                f"OTP key deleted for telegram_id {telegram_id}, reason: {reason}"
-            )
+            logger.debug(f"OTP key deleted for telegram_id {telegram_id}, reason: {reason}")
             return result > 0
 
         except Exception as e:
@@ -326,14 +317,10 @@ class RedisClient:
             return is_allowed, current_count
 
         except Exception as e:
-            logger.error(
-                f"Failed to check user rate limit for telegram_id {telegram_id}: {e}"
-            )
+            logger.error(f"Failed to check user rate limit for telegram_id {telegram_id}: {e}")
             return False, 0
 
-    def check_spacing_limit(
-        self, telegram_id: int, min_spacing: int = 60
-    ) -> tuple[bool, int]:
+    def check_spacing_limit(self, telegram_id: int, min_spacing: int = 60) -> tuple[bool, int]:
         """
         Check minimum spacing between OTP sends.
 
@@ -364,14 +351,10 @@ class RedisClient:
             return is_allowed, seconds_since_last
 
         except Exception as e:
-            logger.error(
-                f"Failed to check spacing limit for telegram_id {telegram_id}: {e}"
-            )
+            logger.error(f"Failed to check spacing limit for telegram_id {telegram_id}: {e}")
             return False, 0
 
-    def increment_rate_limits(
-        self, telegram_id: int, email: str, window: int = 3600
-    ) -> bool:
+    def increment_rate_limits(self, telegram_id: int, email: str, window: int = 3600) -> bool:
         """
         Increment rate limiting counters after successful OTP send.
 
@@ -412,15 +395,13 @@ class RedisClient:
             return True
 
         except Exception as e:
-            logger.error(
-                f"Failed to increment rate limits for telegram_id {telegram_id}: {e}"
-            )
+            logger.error(f"Failed to increment rate limits for telegram_id {telegram_id}: {e}")
             return False
 
     # Flow State Management
 
     def set_flow_state(
-        self, telegram_id: int, state: str, data: Dict[str, Any], ttl: int = 86400
+        self, telegram_id: int, state: str, data: dict[str, Any], ttl: int = 86400
     ) -> bool:
         """
         Set user flow state in Redis.
@@ -448,7 +429,7 @@ class RedisClient:
             logger.error(f"Failed to set flow state for telegram_id {telegram_id}: {e}")
             return False
 
-    def get_flow_state(self, telegram_id: int) -> Optional[Dict[str, Any]]:
+    def get_flow_state(self, telegram_id: int) -> dict[str, Any] | None:
         """
         Get user flow state from Redis.
 
@@ -491,14 +472,12 @@ class RedisClient:
             return result > 0
 
         except Exception as e:
-            logger.error(
-                f"Failed to delete flow state for telegram_id {telegram_id}: {e}"
-            )
+            logger.error(f"Failed to delete flow state for telegram_id {telegram_id}: {e}")
             return False
 
 
 # Global Redis client instance
-redis_client: Optional[RedisClient] = None
+redis_client: RedisClient | None = None
 
 
 def init_redis(redis_url: str, max_connections: int = 10) -> RedisClient:

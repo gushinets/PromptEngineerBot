@@ -19,6 +19,7 @@ import os
 import sys
 from pathlib import Path
 
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -51,10 +52,8 @@ def repair_gsheets():
     # Get expected fields
     fields_env = os.getenv("GSHEETS_FIELDS")
     if fields_env:
-        expected_fields = [
-            item.strip() for item in fields_env.split(",") if item.strip()
-        ]
-        print(f"Using custom fields from GSHEETS_FIELDS")
+        expected_fields = [item.strip() for item in fields_env.split(",") if item.strip()]
+        print("Using custom fields from GSHEETS_FIELDS")
     else:
         expected_fields = [
             "DateTime",
@@ -68,7 +67,7 @@ def repair_gsheets():
             "completion_tokens",
             "total_tokens",
         ]
-        print(f"Using default fields")
+        print("Using default fields")
 
     print(f"Expected fields: {expected_fields}")
 
@@ -79,9 +78,7 @@ def repair_gsheets():
                 json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
             )
         else:
-            client = gspread.service_account(
-                filename=os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            )
+            client = gspread.service_account(filename=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
         # Open spreadsheet
         if os.getenv("GSHEETS_SPREADSHEET_ID"):
@@ -109,19 +106,13 @@ def repair_gsheets():
 
                 # Check if expected headers are just shifted
                 if (
-                    current_headers[
-                        extra_columns : extra_columns + len(expected_fields)
-                    ]
+                    current_headers[extra_columns : extra_columns + len(expected_fields)]
                     == expected_fields
                 ):
-                    print(
-                        f"🔧 Detected {extra_columns} extra empty columns at the beginning"
-                    )
+                    print(f"🔧 Detected {extra_columns} extra empty columns at the beginning")
 
                     response = (
-                        input(f"Remove the first {extra_columns} columns? (y/N): ")
-                        .strip()
-                        .lower()
+                        input(f"Remove the first {extra_columns} columns? (y/N): ").strip().lower()
                     )
                     if response == "y":
                         # Delete extra columns
@@ -144,9 +135,7 @@ def repair_gsheets():
             else:
                 # Different issue - replace headers
                 response = (
-                    input("Replace the header row with correct headers? (y/N): ")
-                    .strip()
-                    .lower()
+                    input("Replace the header row with correct headers? (y/N): ").strip().lower()
                 )
                 if response == "y":
                     # Clear and set new headers

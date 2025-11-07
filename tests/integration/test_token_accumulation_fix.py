@@ -7,7 +7,6 @@ Google Sheets payload population according to requirements 7.1-7.7.
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from telegram import Update
 
 from telegram_bot.core.bot_handler import BotHandler
 from telegram_bot.utils.config import BotConfig
@@ -60,18 +59,14 @@ class TestTokenUsageFixes:
         )
 
         # Verify tokens are accumulated
-        tokens_before_logging = bot_handler.conversation_manager.get_token_totals(
-            user_id
-        )
+        tokens_before_logging = bot_handler.conversation_manager.get_token_totals(user_id)
         assert tokens_before_logging["total_tokens"] == 150
 
         # Log initial optimization (this should reset tokens)
         bot_handler._log_conversation_totals(user_id, "CRAFT", "Optimized prompt")
 
         # Verify tokens are reset after logging
-        tokens_after_logging = bot_handler.conversation_manager.get_token_totals(
-            user_id
-        )
+        tokens_after_logging = bot_handler.conversation_manager.get_token_totals(user_id)
         assert tokens_after_logging["total_tokens"] == 0
 
         # Call reset_to_followup_ready (should preserve the already-reset tokens)
@@ -111,9 +106,7 @@ class TestTokenUsageFixes:
 
         # Log follow-up tokens with optimized prompt as UserRequest
         improved_prompt = bot_handler.state_manager.get_improved_prompt_cache(user_id)
-        bot_handler._log_conversation_totals(
-            user_id, "FOLLOWUP", "Refined prompt", improved_prompt
-        )
+        bot_handler._log_conversation_totals(user_id, "FOLLOWUP", "Refined prompt", improved_prompt)
 
         # Verify follow-up was logged correctly
         assert len(sheets_calls) == 1
@@ -159,9 +152,7 @@ class TestTokenUsageFixes:
 
         # Log follow-up tokens
         improved_prompt = bot_handler.state_manager.get_improved_prompt_cache(user_id)
-        bot_handler._log_conversation_totals(
-            user_id, "FOLLOWUP", "Refined prompt", improved_prompt
-        )
+        bot_handler._log_conversation_totals(user_id, "FOLLOWUP", "Refined prompt", improved_prompt)
 
         # === Verify Results ===
         assert len(sheets_calls) == 2
@@ -294,9 +285,7 @@ class TestTokenUsageFixes:
         bot_handler._log_conversation_totals(user_id, "CRAFT", "Optimized prompt")
 
         # Verify tokens are reset after initial logging
-        tokens_after_initial = bot_handler.conversation_manager.get_token_totals(
-            user_id
-        )
+        tokens_after_initial = bot_handler.conversation_manager.get_token_totals(user_id)
         assert tokens_after_initial["total_tokens"] == 0
 
         # === Follow-up phase starts ===
@@ -304,9 +293,7 @@ class TestTokenUsageFixes:
         bot_handler.conversation_manager.reset_to_followup_ready(user_id)
 
         # Verify tokens remain at zero (follow-up starts with clean slate)
-        tokens_at_followup_start = bot_handler.conversation_manager.get_token_totals(
-            user_id
-        )
+        tokens_at_followup_start = bot_handler.conversation_manager.get_token_totals(user_id)
         assert tokens_at_followup_start["prompt_tokens"] == 0
         assert tokens_at_followup_start["completion_tokens"] == 0
         assert tokens_at_followup_start["total_tokens"] == 0
@@ -352,9 +339,7 @@ class TestTokenUsageFixes:
 
         # Log follow-up completion
         improved_prompt = bot_handler.state_manager.get_improved_prompt_cache(user_id)
-        bot_handler._log_conversation_totals(
-            user_id, "FOLLOWUP", "Refined prompt", improved_prompt
-        )
+        bot_handler._log_conversation_totals(user_id, "FOLLOWUP", "Refined prompt", improved_prompt)
 
         # Verify two separate logging calls
         assert len(sheets_calls) == 2
@@ -462,9 +447,7 @@ class TestTokenUsageFixes:
 
         # Test follow-up payload
         bot_handler.conversation_manager.reset_to_followup_ready(user_id)
-        bot_handler.state_manager.set_improved_prompt_cache(
-            user_id, "Test optimized prompt"
-        )
+        bot_handler.state_manager.set_improved_prompt_cache(user_id, "Test optimized prompt")
 
         bot_handler.conversation_manager.accumulate_token_usage(
             user_id,
@@ -580,9 +563,7 @@ class TestTokenUsageFixes:
             assert payload["total_tokens"] == 15 + i
 
     @pytest.mark.asyncio
-    async def test_handle_followup_choice_decline_no_logging(
-        self, bot_handler, mock_update
-    ):
+    async def test_handle_followup_choice_decline_no_logging(self, bot_handler, mock_update):
         """Test that _handle_followup_choice with НЕТ doesn't cause additional logging."""
         user_id = 12345
         sheets_calls = []
@@ -623,9 +604,7 @@ class TestTokenUsageFixes:
         assert bot_handler.state_manager.get_improved_prompt_cache(user_id) is None
 
     @pytest.mark.asyncio
-    async def test_handle_followup_choice_accept_resets_tokens(
-        self, bot_handler, mock_update
-    ):
+    async def test_handle_followup_choice_accept_resets_tokens(self, bot_handler, mock_update):
         """Test that _handle_followup_choice with ДА resets token counters for new session."""
         user_id = 12345
         sheets_calls = []
@@ -648,9 +627,7 @@ class TestTokenUsageFixes:
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Optimized prompt")
 
         # Verify tokens are reset after initial logging
-        tokens_before_followup = bot_handler.conversation_manager.get_token_totals(
-            user_id
-        )
+        tokens_before_followup = bot_handler.conversation_manager.get_token_totals(user_id)
         assert tokens_before_followup["total_tokens"] == 0
 
         # Mock the LLM processing to avoid actual LLM calls
@@ -674,6 +651,3 @@ class TestTokenUsageFixes:
 
         # Restore original method
         bot_handler._process_followup_llm_request = original_process_followup_llm
-
-
-

@@ -2,10 +2,7 @@
 Tests for email service functionality including provider error extraction.
 """
 
-import smtplib
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import Mock, patch
 
 from telegram_bot.services.email_service import EmailDeliveryResult, EmailService
 from telegram_bot.utils.config import BotConfig
@@ -124,9 +121,7 @@ class TestEmailFailureAuditLogging:
 
     @patch("telegram_bot.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
-    async def test_otp_email_failure_logs_provider_error(
-        self, mock_send, mock_get_audit
-    ):
+    async def test_otp_email_failure_logs_provider_error(self, mock_send, mock_get_audit):
         """Test that OTP email failures log provider error info to audit."""
         # Setup mocks
         mock_audit = Mock()
@@ -140,9 +135,7 @@ class TestEmailFailureAuditLogging:
         email_service = create_email_service()
 
         # Call method
-        result = await email_service.send_otp_email(
-            "test@example.com", "123456", 123456789
-        )
+        result = await email_service.send_otp_email("test@example.com", "123456", 123456789)
 
         # Verify audit logging was called with extracted error reason
         mock_audit.log_email_send_failure.assert_called_once_with(
@@ -212,9 +205,7 @@ class TestEmailFailureAuditLogging:
             "get_otp_subject",
             side_effect=Exception("DNS lookup failed"),
         ):
-            result = await email_service.send_otp_email(
-                "test@example.com", "123456", 123456789
-            )
+            result = await email_service.send_otp_email("test@example.com", "123456", 123456789)
 
         # Verify audit logging was called with extracted error reason
         mock_audit.log_email_send_failure.assert_called_once_with(
@@ -224,9 +215,7 @@ class TestEmailFailureAuditLogging:
 
     @patch("telegram_bot.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
-    async def test_email_success_logs_without_error_reason(
-        self, mock_send, mock_get_audit
-    ):
+    async def test_email_success_logs_without_error_reason(self, mock_send, mock_get_audit):
         """Test that successful email sending logs success without error reason."""
         # Setup mocks
         mock_audit = Mock()
@@ -240,22 +229,16 @@ class TestEmailFailureAuditLogging:
         email_service = create_email_service()
 
         # Call method
-        result = await email_service.send_otp_email(
-            "test@example.com", "123456", 123456789
-        )
+        result = await email_service.send_otp_email("test@example.com", "123456", 123456789)
 
         # Verify success audit logging was called (no error reason)
-        mock_audit.log_email_send_success.assert_called_once_with(
-            123456789, "test@example.com"
-        )
+        mock_audit.log_email_send_success.assert_called_once_with(123456789, "test@example.com")
         mock_audit.log_email_send_failure.assert_not_called()
         assert result.success
 
     @patch("telegram_bot.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
-    async def test_audit_service_failure_does_not_break_email_flow(
-        self, mock_send, mock_get_audit
-    ):
+    async def test_audit_service_failure_does_not_break_email_flow(self, mock_send, mock_get_audit):
         """Test that audit service failures don't break the email flow."""
         # Setup mocks
         mock_audit = Mock()
@@ -270,13 +253,8 @@ class TestEmailFailureAuditLogging:
         email_service = create_email_service()
 
         # Call method - should not raise exception despite audit failure
-        result = await email_service.send_otp_email(
-            "test@example.com", "123456", 123456789
-        )
+        result = await email_service.send_otp_email("test@example.com", "123456", 123456789)
 
         # Verify the email result is still returned correctly
         assert not result.success
         assert "Connection refused by server" in result.error
-
-
-

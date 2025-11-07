@@ -5,7 +5,7 @@ Tests profile data extraction, storage, and update logic during authentication.
 """
 
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -43,7 +43,9 @@ class TestAuthServiceProfileIntegration:
     @pytest.fixture
     def auth_service(self, mock_redis_client, mock_config):
         """Create AuthService instance with mocked dependencies."""
-        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis_client):
+        with patch(
+            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis_client
+        ):
             return AuthService(mock_config)
 
     @pytest.fixture
@@ -131,9 +133,7 @@ class TestAuthServiceProfileIntegration:
         ]
 
         # Execute verification
-        success, message = auth_service.verify_otp(
-            telegram_id, otp, mock_effective_user
-        )
+        success, message = auth_service.verify_otp(telegram_id, otp, mock_effective_user)
 
         # Verify success
         assert success, f"Should succeed with profile data, got message: {message}"
@@ -213,14 +213,10 @@ class TestAuthServiceProfileIntegration:
         ]
 
         # Execute verification
-        success, message = auth_service.verify_otp(
-            telegram_id, otp, mock_effective_user_partial
-        )
+        success, message = auth_service.verify_otp(telegram_id, otp, mock_effective_user_partial)
 
         # Verify success
-        assert success, (
-            f"Should succeed with partial profile data, got message: {message}"
-        )
+        assert success, f"Should succeed with partial profile data, got message: {message}"
 
         # Verify user creation with partial profile data
         user_call = mock_session.add.call_args_list[0]
@@ -289,14 +285,10 @@ class TestAuthServiceProfileIntegration:
         mock_user.is_bot = False
         mock_user.is_premium = True
         mock_user.language_code = "en"
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         # Execute verification
-        success, message = auth_service.verify_otp(
-            telegram_id, otp, mock_effective_user
-        )
+        success, message = auth_service.verify_otp(telegram_id, otp, mock_effective_user)
 
         # Verify success
         assert success, f"Should succeed with profile update, got message: {message}"
@@ -363,14 +355,10 @@ class TestAuthServiceProfileIntegration:
         mock_user.is_bot = False
         mock_user.is_premium = True
         mock_user.language_code = "en"
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         # Execute verification
-        success, message = auth_service.verify_otp(
-            telegram_id, otp, mock_effective_user
-        )
+        success, message = auth_service.verify_otp(telegram_id, otp, mock_effective_user)
 
         # Verify success
         assert success, f"Should succeed without profile update, got message: {message}"
@@ -427,9 +415,7 @@ class TestAuthServiceProfileIntegration:
         success, message = auth_service.verify_otp(telegram_id, otp, Mock())
 
         # Verify success despite profile extraction failure
-        assert success, (
-            f"Should succeed despite profile extraction failure, got message: {message}"
-        )
+        assert success, f"Should succeed despite profile extraction failure, got message: {message}"
         assert message == "verification_successful"
 
         # Verify user was still created with safe defaults
@@ -477,17 +463,13 @@ class TestAuthServiceProfileIntegration:
         mock_session = Mock()
         mock_get_session.return_value.__enter__.return_value = mock_session
         mock_user = Mock()
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         # Execute verification
         success, message = auth_service.verify_otp(telegram_id, otp, Mock())
 
         # Verify success despite profile update failure
-        assert success, (
-            f"Should succeed despite profile update failure, got message: {message}"
-        )
+        assert success, f"Should succeed despite profile update failure, got message: {message}"
         assert message == "verification_successful"
 
         # Verify authentication fields were still updated
@@ -546,9 +528,7 @@ class TestAuthServiceProfileIntegration:
         ]
 
         # Execute verification
-        success, message = auth_service.verify_otp(
-            telegram_id, otp, mock_effective_user_bot
-        )
+        success, message = auth_service.verify_otp(telegram_id, otp, mock_effective_user_bot)
 
         # Verify success
         assert success, f"Should succeed with bot profile, got message: {message}"
@@ -602,9 +582,7 @@ class TestAuthServiceProfileIntegration:
         success, message = auth_service.verify_otp(telegram_id, otp, None)
 
         # Verify success despite None effective_user
-        assert success, (
-            f"Should succeed with None effective_user, got message: {message}"
-        )
+        assert success, f"Should succeed with None effective_user, got message: {message}"
 
         # Verify user creation with safe defaults
         user_call = mock_session.add.call_args_list[0]
@@ -670,14 +648,10 @@ class TestAuthServiceProfileIntegration:
         mock_user = Mock()
         original_updated_at = Mock()
         mock_user.updated_at = original_updated_at
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         # Execute verification
-        success, message = auth_service.verify_otp(
-            telegram_id, otp, mock_effective_user
-        )
+        success, message = auth_service.verify_otp(telegram_id, otp, mock_effective_user)
 
         # Verify success
         assert success, f"Should succeed with timestamp update, got message: {message}"
@@ -685,6 +659,3 @@ class TestAuthServiceProfileIntegration:
         # Verify updated_at timestamp was changed (set to new value)
         assert mock_user.updated_at != original_updated_at
         assert mock_user.updated_at is not None
-
-
-

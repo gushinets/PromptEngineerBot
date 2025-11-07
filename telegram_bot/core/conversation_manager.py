@@ -8,9 +8,7 @@ class ConversationManager:
     temporary user prompts, and prompt optimization method selection.
     """
 
-    def __init__(
-        self, prompt_loader_or_state_manager=None, state_manager: StateManager = None
-    ):
+    def __init__(self, prompt_loader_or_state_manager=None, state_manager: StateManager = None):
         """
         Initialize conversation storage for all users.
 

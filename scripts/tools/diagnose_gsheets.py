@@ -19,6 +19,7 @@ import os
 import sys
 from pathlib import Path
 
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -31,9 +32,7 @@ try:
     )
 except ImportError as e:
     print(f"Error importing required modules: {e}")
-    print(
-        "Make sure you are running this from the project root and have installed dependencies."
-    )
+    print("Make sure you are running this from the project root and have installed dependencies.")
     sys.exit(1)
 
 
@@ -59,9 +58,7 @@ def diagnose_gsheets():
         "GSHEETS_WORKSHEET": os.getenv("GSHEETS_WORKSHEET", "Logs"),
         "GSHEETS_FIELDS": os.getenv("GSHEETS_FIELDS"),
         "GSHEETS_BATCH_SIZE": os.getenv("GSHEETS_BATCH_SIZE", "20"),
-        "GSHEETS_FLUSH_INTERVAL_SECONDS": os.getenv(
-            "GSHEETS_FLUSH_INTERVAL_SECONDS", "5.0"
-        ),
+        "GSHEETS_FLUSH_INTERVAL_SECONDS": os.getenv("GSHEETS_FLUSH_INTERVAL_SECONDS", "5.0"),
     }
 
     for key, value in env_vars.items():
@@ -75,21 +72,19 @@ def diagnose_gsheets():
         "yes",
     )
     if not enabled:
-        print(f'\n❌ GSHEETS_LOGGING_ENABLED is not set to "true"')
+        print('\n❌ GSHEETS_LOGGING_ENABLED is not set to "true"')
         print("   Set GSHEETS_LOGGING_ENABLED=true to enable Google Sheets logging")
         return
 
     # 2. Credentials Check
-    print(f"\n2. CREDENTIALS CHECK")
+    print("\n2. CREDENTIALS CHECK")
     print("-" * 40)
 
     try:
         if env_vars["GOOGLE_SERVICE_ACCOUNT_JSON"]:
             print("✓ Using GOOGLE_SERVICE_ACCOUNT_JSON")
             creds_data = json.loads(env_vars["GOOGLE_SERVICE_ACCOUNT_JSON"])
-            print(
-                f"  Service account email: {creds_data.get('client_email', 'Unknown')}"
-            )
+            print(f"  Service account email: {creds_data.get('client_email', 'Unknown')}")
         elif env_vars["GOOGLE_APPLICATION_CREDENTIALS"]:
             print(
                 f"✓ Using GOOGLE_APPLICATION_CREDENTIALS: {env_vars['GOOGLE_APPLICATION_CREDENTIALS']}"
@@ -98,24 +93,20 @@ def diagnose_gsheets():
                 print("  ✓ Credentials file exists")
                 with open(env_vars["GOOGLE_APPLICATION_CREDENTIALS"]) as f:
                     creds_data = json.load(f)
-                    print(
-                        f"  Service account email: {creds_data.get('client_email', 'Unknown')}"
-                    )
+                    print(f"  Service account email: {creds_data.get('client_email', 'Unknown')}")
             else:
                 print("  ❌ Credentials file not found")
                 return
         else:
             print("❌ No credentials configured")
-            print(
-                "   Set either GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS"
-            )
+            print("   Set either GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS")
             return
     except Exception as e:
         print(f"❌ Error reading credentials: {e}")
         return
 
     # 3. Spreadsheet Access Check
-    print(f"\n3. SPREADSHEET ACCESS CHECK")
+    print("\n3. SPREADSHEET ACCESS CHECK")
     print("-" * 40)
 
     try:
@@ -125,18 +116,14 @@ def diagnose_gsheets():
                 json.loads(env_vars["GOOGLE_SERVICE_ACCOUNT_JSON"])
             )
         else:
-            client = gspread.service_account(
-                filename=env_vars["GOOGLE_APPLICATION_CREDENTIALS"]
-            )
+            client = gspread.service_account(filename=env_vars["GOOGLE_APPLICATION_CREDENTIALS"])
 
         # Open spreadsheet
         if env_vars["GSHEETS_SPREADSHEET_ID"]:
             print(f"Opening spreadsheet by ID: {env_vars['GSHEETS_SPREADSHEET_ID']}")
             spreadsheet = client.open_by_key(env_vars["GSHEETS_SPREADSHEET_ID"])
         elif env_vars["GSHEETS_SPREADSHEET_NAME"]:
-            print(
-                f"Opening spreadsheet by name: {env_vars['GSHEETS_SPREADSHEET_NAME']}"
-            )
+            print(f"Opening spreadsheet by name: {env_vars['GSHEETS_SPREADSHEET_NAME']}")
             spreadsheet = client.open(env_vars["GSHEETS_SPREADSHEET_NAME"])
         else:
             print("❌ No spreadsheet ID or name configured")
@@ -150,7 +137,7 @@ def diagnose_gsheets():
         return
 
     # 4. Worksheet Check
-    print(f"\n4. WORKSHEET CHECK")
+    print("\n4. WORKSHEET CHECK")
     print("-" * 40)
 
     worksheet_title = env_vars["GSHEETS_WORKSHEET"]
@@ -164,16 +151,14 @@ def diagnose_gsheets():
         return
 
     # 5. Header Analysis
-    print(f"\n5. HEADER ANALYSIS")
+    print("\n5. HEADER ANALYSIS")
     print("-" * 40)
 
     # Get expected fields
     fields_env = env_vars["GSHEETS_FIELDS"]
     if fields_env:
-        expected_fields = [
-            item.strip() for item in fields_env.split(",") if item.strip()
-        ]
-        print(f"Using custom fields from GSHEETS_FIELDS")
+        expected_fields = [item.strip() for item in fields_env.split(",") if item.strip()]
+        print("Using custom fields from GSHEETS_FIELDS")
     else:
         expected_fields = [
             "DateTime",
@@ -187,7 +172,7 @@ def diagnose_gsheets():
             "completion_tokens",
             "total_tokens",
         ]
-        print(f"Using default fields")
+        print("Using default fields")
 
     print(f"Expected fields ({len(expected_fields)}): {expected_fields}")
 
@@ -209,16 +194,9 @@ def diagnose_gsheets():
                     print(f"   Sheet has {extra} extra columns")
 
                     # Check if expected headers are shifted
-                    if (
-                        actual_headers[extra : extra + len(expected_fields)]
-                        == expected_fields
-                    ):
-                        print(
-                            f"   ✓ Expected headers found starting at column {extra + 1}"
-                        )
-                        print(
-                            f"   🔧 SOLUTION: Delete the first {extra} columns from your sheet"
-                        )
+                    if actual_headers[extra : extra + len(expected_fields)] == expected_fields:
+                        print(f"   ✓ Expected headers found starting at column {extra + 1}")
+                        print(f"   🔧 SOLUTION: Delete the first {extra} columns from your sheet")
                         print(
                             f"      OR set GSHEETS_FIELDS to: {','.join(['EmptyCol' + str(i + 1) for i in range(extra)] + expected_fields)}"
                         )
@@ -228,13 +206,11 @@ def diagnose_gsheets():
                     print(f"   Sheet is missing {missing} columns")
 
                 # Show column-by-column comparison
-                print(f"\n   Column-by-column comparison:")
+                print("\n   Column-by-column comparison:")
                 max_len = max(len(actual_headers), len(expected_fields))
                 for i in range(max_len):
                     actual = actual_headers[i] if i < len(actual_headers) else "MISSING"
-                    expected = (
-                        expected_fields[i] if i < len(expected_fields) else "EXTRA"
-                    )
+                    expected = expected_fields[i] if i < len(expected_fields) else "EXTRA"
                     match = "✓" if actual == expected else "✗"
                     print(f'   {match} Column {i + 1:2d}: "{actual}" vs "{expected}"')
         else:
@@ -243,12 +219,10 @@ def diagnose_gsheets():
         print(f"Error reading headers: {e}")
 
     # 6. Test Data Write (optional)
-    print(f"\n6. TEST DATA WRITE")
+    print("\n6. TEST DATA WRITE")
     print("-" * 40)
 
-    response = (
-        input("Do you want to test writing a sample row? (y/N): ").strip().lower()
-    )
+    response = input("Do you want to test writing a sample row? (y/N): ").strip().lower()
     if response == "y":
         try:
             # Create sample data
@@ -281,7 +255,7 @@ def diagnose_gsheets():
         except Exception as e:
             print(f"❌ Error writing test data: {e}")
 
-    print(f"\n" + "=" * 60)
+    print("\n" + "=" * 60)
     print("DIAGNOSIS COMPLETE")
     print("=" * 60)
 

@@ -2,8 +2,8 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 
 class GoogleSheetsHandler(logging.Handler):
@@ -19,21 +19,19 @@ class GoogleSheetsHandler(logging.Handler):
     def __init__(
         self,
         *,
-        credentials_json: Optional[str] = None,
-        credentials_file: Optional[str] = None,
-        spreadsheet_id: Optional[str] = None,
-        spreadsheet_name: Optional[str] = None,
+        credentials_json: str | None = None,
+        credentials_file: str | None = None,
+        spreadsheet_id: str | None = None,
+        spreadsheet_name: str | None = None,
         worksheet_title: str = "Logs",
         batch_size: int = 20,
         flush_interval_seconds: float = 5.0,
-        include_fields: Optional[List[str]] = None,
+        include_fields: list[str] | None = None,
     ) -> None:
         super().__init__()
 
         if not spreadsheet_id and not spreadsheet_name:
-            raise ValueError(
-                "Either spreadsheet_id or spreadsheet_name must be provided"
-            )
+            raise ValueError("Either spreadsheet_id or spreadsheet_name must be provided")
 
         self._credentials_json = credentials_json
         self._credentials_file = credentials_file
@@ -59,7 +57,7 @@ class GoogleSheetsHandler(logging.Handler):
         # Fields that represent timestamp and should not alone justify a row write
         self._datetime_field_names = {"DateTime", "time"}
 
-        self._buffer: List[List[Any]] = []
+        self._buffer: list[list[Any]] = []
         self._buffer_lock = threading.Lock()
         self._flush_event = threading.Event()
         self._stop_event = threading.Event()
@@ -78,11 +76,9 @@ class GoogleSheetsHandler(logging.Handler):
 
         if self._credentials_json:
             try:
-                data: Dict[str, Any] = json.loads(self._credentials_json)
+                data: dict[str, Any] = json.loads(self._credentials_json)
             except json.JSONDecodeError as exc:
-                raise ValueError(
-                    "Invalid GOOGLE_SERVICE_ACCOUNT_JSON provided"
-                ) from exc
+                raise ValueError("Invalid GOOGLE_SERVICE_ACCOUNT_JSON provided") from exc
             self._client = gspread.service_account_from_dict(data)
         elif self._credentials_file:
             self._client = gspread.service_account(filename=self._credentials_file)
@@ -113,8 +109,8 @@ class GoogleSheetsHandler(logging.Handler):
                 # Do not fail logging if header can't be written
                 pass
 
-    def format_record_as_row(self, record: logging.LogRecord) -> List[Any]:
-        created = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
+    def format_record_as_row(self, record: logging.LogRecord) -> list[Any]:
+        created = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
         message_text = self.format(record) if self.formatter else record.getMessage()
         field_map = {
             "time": created,
@@ -130,7 +126,7 @@ class GoogleSheetsHandler(logging.Handler):
             "thread": record.threadName,
         }
 
-        json_data: Optional[Dict[str, Any]] = None
+        json_data: dict[str, Any] | None = None
         try:
             json_data = json.loads(message_text)
             if not isinstance(json_data, dict):
@@ -138,7 +134,7 @@ class GoogleSheetsHandler(logging.Handler):
         except Exception:
             json_data = None
 
-        row: List[Any] = []
+        row: list[Any] = []
         for key in self._include_fields:
             if key in field_map:
                 row.append(field_map[key])
@@ -158,9 +154,7 @@ class GoogleSheetsHandler(logging.Handler):
                     for idx, value in enumerate(row)
                     if self._include_fields[idx] not in self._datetime_field_names
                 ]
-                has_non_time_content = any(
-                    (str(v).strip() != "") for v in non_time_values
-                )
+                has_non_time_content = any((str(v).strip() != "") for v in non_time_values)
                 if not has_non_time_content:
                     return
             except Exception:
@@ -291,7 +285,7 @@ class GoogleSheetsHandler(logging.Handler):
             super().close()
 
 
-def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHandler]:
+def build_google_sheets_handler_from_env(env_getter) -> GoogleSheetsHandler | None:
     """
     Create a GoogleSheetsHandler if GSHEETS_LOGGING_ENABLED is truthy.
 
@@ -326,9 +320,7 @@ def build_google_sheets_handler_from_env(env_getter) -> Optional[GoogleSheetsHan
     fields_env = env_getter("GSHEETS_FIELDS")
     include_fields = None
     if fields_env:
-        include_fields = [
-            item.strip() for item in str(fields_env).split(",") if item.strip()
-        ]
+        include_fields = [item.strip() for item in str(fields_env).split(",") if item.strip()]
     else:
         include_fields = [
             "DateTime",

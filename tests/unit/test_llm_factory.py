@@ -61,13 +61,9 @@ class TestLLMClientFactory:
 
     def test_create_client_missing_openai_key(self):
         """Test creating OpenAI client without API key."""
-        config = BotConfig(
-            telegram_token="test_token", llm_backend="OPENAI", model_name="gpt-4"
-        )
+        config = BotConfig(telegram_token="test_token", llm_backend="OPENAI", model_name="gpt-4")
 
-        with pytest.raises(
-            ValueError, match="OpenAI API key is required for OpenAI backend"
-        ):
+        with pytest.raises(ValueError, match="OpenAI API key is required for OpenAI backend"):
             LLMClientFactory.create_client(config)
 
     def test_create_client_missing_openrouter_key(self):
@@ -93,6 +89,3 @@ class TestLLMClientFactory:
 
         with pytest.raises(ValueError, match="Unsupported LLM backend: UNSUPPORTED"):
             LLMClientFactory.create_client(config)
-
-
-

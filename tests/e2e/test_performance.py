@@ -27,7 +27,7 @@ class TestDatabasePerformance:
         """Create test database with in-memory SQLite."""
         db_manager = DatabaseManager("sqlite:///:memory:")
         db_manager.create_tables()
-        yield db_manager
+        return db_manager
 
     async def test_database_query_performance(self, test_database):
         """Test database query response times under load."""
@@ -49,9 +49,7 @@ class TestDatabasePerformance:
             session.commit()
 
         creation_time = time.time() - start_time
-        assert creation_time < 5.0, (
-            f"User creation took {creation_time:.2f}s, should be < 5s"
-        )
+        assert creation_time < 5.0, f"User creation took {creation_time:.2f}s, should be < 5s"
 
         # Test query performance
         start_time = time.time()
@@ -72,15 +70,11 @@ class TestDatabasePerformance:
         start_time = time.time()
 
         with test_database.get_session() as session:
-            authenticated_users = (
-                session.query(User).filter_by(is_authenticated=True).all()
-            )
+            authenticated_users = session.query(User).filter_by(is_authenticated=True).all()
             assert len(authenticated_users) == 1000
 
         bulk_query_time = time.time() - start_time
-        assert bulk_query_time < 1.0, (
-            f"Bulk query took {bulk_query_time:.2f}s, should be < 1s"
-        )
+        assert bulk_query_time < 1.0, f"Bulk query took {bulk_query_time:.2f}s, should be < 1s"
 
     async def test_concurrent_database_operations(self, test_database):
         """Test database performance under concurrent load."""
@@ -154,9 +148,7 @@ class TestDatabasePerformance:
         successful_ops = sum(1 for r in results if r is True)
 
         assert successful_ops >= 15, f"Only {successful_ops}/50 operations succeeded"
-        assert pool_time < 5.0, (
-            f"Connection pool operations took {pool_time:.2f}s, should be < 5s"
-        )
+        assert pool_time < 5.0, f"Connection pool operations took {pool_time:.2f}s, should be < 5s"
 
 
 class TestRedisPerformance:
@@ -220,7 +212,7 @@ class TestRedisPerformance:
             await mock_redis_client.set(f"otp:{user_id}", "hashed_otp")
 
             # Check rate limits
-            await mock_redis_client.get(f"rl:email:test@example.com:hour")
+            await mock_redis_client.get("rl:email:test@example.com:hour")
             await mock_redis_client.get(f"rl:tg:{user_id}:hour")
 
             # Retrieve OTP
@@ -240,9 +232,7 @@ class TestRedisPerformance:
         concurrent_time = time.time() - start_time
         successful_ops = sum(1 for r in results if r is True)
 
-        assert successful_ops >= 45, (
-            f"Only {successful_ops}/50 Redis workflows succeeded"
-        )
+        assert successful_ops >= 45, f"Only {successful_ops}/50 Redis workflows succeeded"
         assert concurrent_time < 3.0, (
             f"Concurrent Redis operations took {concurrent_time:.2f}s, should be < 3s"
         )
@@ -276,21 +266,15 @@ class TestEmailServicePerformance:
         # Send multiple emails concurrently
         tasks = []
         for i in range(20):
-            task = mock_email_service.send_otp_email(
-                f"user{i}@example.com", "123456", 100000 + i
-            )
+            task = mock_email_service.send_otp_email(f"user{i}@example.com", "123456", 100000 + i)
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         throughput_time = time.time() - start_time
-        successful_sends = sum(
-            1 for r in results if hasattr(r, "success") and r.success
-        )
+        successful_sends = sum(1 for r in results if hasattr(r, "success") and r.success)
 
-        assert successful_sends >= 18, (
-            f"Only {successful_sends}/20 emails sent successfully"
-        )
+        assert successful_sends >= 18, f"Only {successful_sends}/20 emails sent successfully"
         assert throughput_time < 5.0, (
             f"Email throughput test took {throughput_time:.2f}s, should be < 5s"
         )
@@ -369,16 +353,12 @@ class TestAuthServicePerformance:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         generation_time = time.time() - start_time
-        successful_generations = sum(
-            1 for r in results if isinstance(r, tuple) and r[0]
-        )
+        successful_generations = sum(1 for r in results if isinstance(r, tuple) and r[0])
 
         assert successful_generations >= 95, (
             f"Only {successful_generations}/100 OTPs generated successfully"
         )
-        assert generation_time < 3.0, (
-            f"OTP generation took {generation_time:.2f}s, should be < 3s"
-        )
+        assert generation_time < 3.0, f"OTP generation took {generation_time:.2f}s, should be < 3s"
 
     async def test_otp_verification_performance(self, mock_auth_service):
         """Test OTP verification performance."""
@@ -393,9 +373,7 @@ class TestAuthServicePerformance:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         verification_time = time.time() - start_time
-        successful_verifications = sum(
-            1 for r in results if isinstance(r, tuple) and r[0]
-        )
+        successful_verifications = sum(1 for r in results if isinstance(r, tuple) and r[0])
 
         assert successful_verifications >= 95, (
             f"Only {successful_verifications}/100 OTPs verified successfully"
@@ -422,20 +400,14 @@ class TestSystemLoadTesting:
                 ):
                     # Set up mocks
                     mock_auth = MagicMock()
-                    mock_auth.send_otp = AsyncMock(
-                        return_value=(True, "otp_sent", "123456")
-                    )
-                    mock_auth.verify_otp = AsyncMock(
-                        return_value=(True, "verification_successful")
-                    )
+                    mock_auth.send_otp = AsyncMock(return_value=(True, "otp_sent", "123456"))
+                    mock_auth.verify_otp = AsyncMock(return_value=(True, "verification_successful"))
                     mock_auth_class.return_value = mock_auth
 
                     mock_email = MagicMock()
                     mock_email_result = MagicMock()
                     mock_email_result.success = True
-                    mock_email.send_otp_email = AsyncMock(
-                        return_value=mock_email_result
-                    )
+                    mock_email.send_otp_email = AsyncMock(return_value=mock_email_result)
                     mock_email.send_optimized_prompts_email = AsyncMock(
                         return_value=mock_email_result
                     )
@@ -469,7 +441,7 @@ class TestSystemLoadTesting:
                     return True
 
             except Exception as e:
-                return f"Error for user {user_id}: {str(e)}"
+                return f"Error for user {user_id}: {e!s}"
 
         start_time = time.time()
 
@@ -483,9 +455,7 @@ class TestSystemLoadTesting:
         assert successful_flows >= 45, (
             f"Only {successful_flows}/50 user flows completed successfully"
         )
-        assert load_test_time < 10.0, (
-            f"Load test took {load_test_time:.2f}s, should be < 10s"
-        )
+        assert load_test_time < 10.0, f"Load test took {load_test_time:.2f}s, should be < 10s"
 
         # Calculate throughput
         flows_per_second = successful_flows / load_test_time
@@ -512,17 +482,13 @@ class TestSystemLoadTesting:
         for i in range(10000):
             metrics_collector.increment_counter(f"test_counter_{i % 100}")
             metrics_collector.record_latency(f"test_latency_{i % 50}", 0.001 * i)
-            metrics_collector.record_success_failure(
-                f"test_operation_{i % 25}", i % 2 == 0
-            )
+            metrics_collector.record_success_failure(f"test_operation_{i % 25}", i % 2 == 0)
 
         peak_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_growth = peak_memory - initial_memory
 
         # Memory growth should be reasonable (less than 100MB for this test)
-        assert memory_growth < 100, (
-            f"Memory grew by {memory_growth:.1f}MB, should be < 100MB"
-        )
+        assert memory_growth < 100, f"Memory grew by {memory_growth:.1f}MB, should be < 100MB"
 
     async def test_error_rate_under_load(self):
         """Test error rate remains acceptable under load."""
@@ -585,9 +551,7 @@ class TestLatencyRequirements:
 
         assert result is True
         # Total flow should complete within 3 seconds
-        assert end_to_end_time < 3.0, (
-            f"End-to-end latency {end_to_end_time:.2f}s, should be < 3s"
-        )
+        assert end_to_end_time < 3.0, f"End-to-end latency {end_to_end_time:.2f}s, should be < 3s"
 
     async def test_individual_component_latency(self):
         """Test individual component latency requirements."""
@@ -597,18 +561,14 @@ class TestLatencyRequirements:
         # Simulate database query
         await asyncio.sleep(0.005)  # 5ms
         db_latency = time.time() - start_time
-        assert db_latency < 0.02, (
-            f"Database latency {db_latency:.3f}s, should be < 0.02s"
-        )
+        assert db_latency < 0.02, f"Database latency {db_latency:.3f}s, should be < 0.02s"
 
         # Test Redis operations
         start_time = time.time()
         # Simulate Redis operation
         await asyncio.sleep(0.001)  # 1ms
         redis_latency = time.time() - start_time
-        assert redis_latency < 0.02, (
-            f"Redis latency {redis_latency:.3f}s, should be < 0.02s"
-        )
+        assert redis_latency < 0.02, f"Redis latency {redis_latency:.3f}s, should be < 0.02s"
 
         # Test email sending
         start_time = time.time()
@@ -620,7 +580,3 @@ class TestLatencyRequirements:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-
-

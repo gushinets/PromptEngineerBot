@@ -90,12 +90,8 @@ def bot_handler(mock_config, mock_llm_client, mock_email_flow_orchestrator):
         handler.email_flow_orchestrator = mock_email_flow_orchestrator
 
         # Mock conversation manager methods
-        handler.conversation_manager.is_waiting_for_method = MagicMock(
-            return_value=True
-        )
-        handler.conversation_manager.get_user_prompt = MagicMock(
-            return_value="test prompt"
-        )
+        handler.conversation_manager.is_waiting_for_method = MagicMock(return_value=True)
+        handler.conversation_manager.get_user_prompt = MagicMock(return_value="test prompt")
 
         return handler
 
@@ -110,9 +106,7 @@ class TestBotHandlerHealthGating:
         user_id = 12345
 
         # Mock Redis as unhealthy
-        mock_health_monitor.is_service_healthy.side_effect = (
-            lambda service: service != "redis"
-        )
+        mock_health_monitor.is_service_healthy.side_effect = lambda service: service != "redis"
 
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
@@ -143,9 +137,7 @@ class TestBotHandlerHealthGating:
         user_id = 12345
 
         # Mock SMTP as unhealthy, Redis as healthy
-        mock_health_monitor.is_service_healthy.side_effect = (
-            lambda service: service != "smtp"
-        )
+        mock_health_monitor.is_service_healthy.side_effect = lambda service: service != "smtp"
 
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
@@ -224,9 +216,7 @@ class TestBotHandlerHealthGating:
         user_id = 12345
 
         # Mock health check to raise exception
-        mock_health_monitor.is_service_healthy.side_effect = Exception(
-            "Health check failed"
-        )
+        mock_health_monitor.is_service_healthy.side_effect = Exception("Health check failed")
 
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
@@ -289,9 +279,7 @@ class TestHealthCheckTransitions:
         mock_update.message.reply_text.reset_mock()
 
         # Second request: Redis unhealthy
-        mock_health_monitor.is_service_healthy.side_effect = (
-            lambda service: service != "redis"
-        )
+        mock_health_monitor.is_service_healthy.side_effect = lambda service: service != "redis"
 
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
@@ -311,9 +299,7 @@ class TestHealthCheckTransitions:
         user_id = 12345
 
         # First request: SMTP unhealthy, Redis healthy
-        mock_health_monitor.is_service_healthy.side_effect = (
-            lambda service: service != "smtp"
-        )
+        mock_health_monitor.is_service_healthy.side_effect = lambda service: service != "smtp"
 
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
@@ -344,6 +330,3 @@ class TestHealthCheckTransitions:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

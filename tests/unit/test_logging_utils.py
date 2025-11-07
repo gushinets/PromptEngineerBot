@@ -7,7 +7,6 @@ and security features to ensure no sensitive data appears in logs.
 
 import logging
 from io import StringIO
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,7 +15,6 @@ from telegram_bot.utils.logging_utils import (
     PIIProtectedFormatter,
     StructuredLogger,
     get_email_flow_logger,
-    get_logger,
     log_performance_metric,
     log_pii_safe,
     log_security_event,
@@ -321,8 +319,7 @@ class TestEmailFlowLogger:
         assert "123***789" in output
         # Verify no actual OTP is logged
         assert not any(
-            char.isdigit() and len([c for c in output if c.isdigit()]) == 6
-            for char in output
+            char.isdigit() and len([c for c in output if c.isdigit()]) == 6 for char in output
         )
 
     def test_log_otp_verification_success(self, email_logger_with_stream):
@@ -365,9 +362,7 @@ class TestEmailFlowLogger:
         logger, stream = email_logger_with_stream
 
         # Test failed operation
-        logger.log_database_operation(
-            "USER_CREATE", 123456789, False, "constraint violation"
-        )
+        logger.log_database_operation("USER_CREATE", 123456789, False, "constraint violation")
 
         output = stream.getvalue()
         assert "DB_USER_CREATE_FAILED" in output
@@ -378,9 +373,7 @@ class TestEmailFlowLogger:
         """Test successful email sending logging."""
         logger, stream = email_logger_with_stream
 
-        logger.log_email_sending(
-            123456789, "user@example.com", True, delivery_time_ms=250
-        )
+        logger.log_email_sending(123456789, "user@example.com", True, delivery_time_ms=250)
 
         output = stream.getvalue()
         assert "EMAIL_SEND_SUCCESS" in output
@@ -393,9 +386,7 @@ class TestEmailFlowLogger:
         """Test failed email sending logging."""
         logger, stream = email_logger_with_stream
 
-        logger.log_email_sending(
-            123456789, "user@example.com", False, error_type="smtp_timeout"
-        )
+        logger.log_email_sending(123456789, "user@example.com", False, error_type="smtp_timeout")
 
         output = stream.getvalue()
         assert "EMAIL_SEND_FAILED" in output
@@ -681,6 +672,3 @@ class TestPIIMaskingEdgeCases:
         for original, expected in test_cases:
             masked = formatter._mask_pii(original)
             assert masked == expected
-
-
-

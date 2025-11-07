@@ -17,10 +17,11 @@ from telegram_bot.services.redis_client import (
     init_redis_client,
 )
 
+
 __all__ = [
-    "get_email_service",
-    "init_email_service",
     "build_google_sheets_handler_from_env",
+    "get_email_service",
     "get_redis_client",
+    "init_email_service",
     "init_redis_client",
 ]

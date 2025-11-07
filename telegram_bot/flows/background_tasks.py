@@ -5,15 +5,15 @@ This module provides a background task system for running periodic maintenance
 operations like audit event purging, health checks, and metrics cleanup.
 """
 
-import asyncio
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 from telegram_bot.utils.audit_service import get_audit_service
 from telegram_bot.utils.config import BotConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class BackgroundTaskScheduler:
         """Initialize background task scheduler."""
         self.logger = logging.getLogger(f"{__name__}.BackgroundTaskScheduler")
         self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._tasks: Dict[str, Dict] = {}
+        self._thread: threading.Thread | None = None
+        self._tasks: dict[str, dict] = {}
         self._stop_event = threading.Event()
 
     def add_task(
@@ -48,13 +48,11 @@ class BackgroundTaskScheduler:
         self._tasks[name] = {
             "func": func,
             "interval": timedelta(hours=interval_hours),
-            "last_run": None if run_immediately else datetime.now(timezone.utc),
+            "last_run": None if run_immediately else datetime.now(UTC),
             "run_immediately": run_immediately,
         }
 
-        self.logger.info(
-            f"Added background task '{name}' with {interval_hours}h interval"
-        )
+        self.logger.info(f"Added background task '{name}' with {interval_hours}h interval")
 
     def start(self):
         """Start the background task scheduler."""
@@ -88,17 +86,14 @@ class BackgroundTaskScheduler:
 
         while self._running and not self._stop_event.is_set():
             try:
-                current_time = datetime.now(timezone.utc)
+                current_time = datetime.now(UTC)
 
                 for task_name, task_info in self._tasks.items():
                     try:
                         should_run = False
 
                         # Check if task should run immediately on first iteration
-                        if (
-                            task_info["run_immediately"]
-                            and task_info["last_run"] is None
-                        ):
+                        if task_info["run_immediately"] and task_info["last_run"] is None:
                             should_run = True
                             task_info["run_immediately"] = False
 
@@ -139,9 +134,7 @@ class BackgroundTaskScheduler:
                             task_info["last_run"] = current_time
 
                     except Exception as e:
-                        self.logger.error(
-                            f"Error processing background task '{task_name}': {e}"
-                        )
+                        self.logger.error(f"Error processing background task '{task_name}': {e}")
 
                 # Sleep for 1 hour before next check, but wake up if stop is requested
                 self._stop_event.wait(timeout=3600)  # 1 hour
@@ -153,7 +146,7 @@ class BackgroundTaskScheduler:
 
         self.logger.info("Background task scheduler loop ended")
 
-    def get_task_status(self) -> Dict[str, Dict]:
+    def get_task_status(self) -> dict[str, dict]:
         """
         Get status of all scheduled tasks.
 
@@ -161,7 +154,7 @@ class BackgroundTaskScheduler:
             Dictionary with task status information
         """
         status = {}
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
 
         for task_name, task_info in self._tasks.items():
             last_run = task_info["last_run"]
@@ -180,7 +173,7 @@ class BackgroundTaskScheduler:
         return status
 
 
-def audit_purge_task() -> Dict[str, any]:
+def audit_purge_task() -> dict[str, any]:
     """
     Background task for purging old audit events.
 
@@ -211,7 +204,7 @@ def audit_purge_task() -> Dict[str, any]:
 
 
 # Global background task scheduler instance
-background_scheduler: Optional[BackgroundTaskScheduler] = None
+background_scheduler: BackgroundTaskScheduler | None = None
 
 
 def init_background_tasks() -> BackgroundTaskScheduler:

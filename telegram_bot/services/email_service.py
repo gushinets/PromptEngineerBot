@@ -11,12 +11,12 @@ import logging
 import smtplib
 import ssl
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, AsyncGenerator, Dict, Optional, Set
+from typing import Any
 
 from tenacity import (
     before_sleep_log,
@@ -30,6 +30,7 @@ from telegram_bot.utils.audit_service import get_audit_service
 from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.email_templates import EmailTemplates, _
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,7 +41,7 @@ class EmailMessage:
     to_email: str
     subject: str
     html_body: str
-    plain_body: Optional[str] = None
+    plain_body: str | None = None
 
 
 @dataclass
@@ -48,22 +49,18 @@ class EmailDeliveryResult:
     """Result of email delivery attempt."""
 
     success: bool
-    message_id: Optional[str] = None
-    error: Optional[str] = None
+    message_id: str | None = None
+    error: str | None = None
     retry_count: int = 0
-    delivery_time_ms: Optional[int] = None
+    delivery_time_ms: int | None = None
 
 
 class SMTPConnectionError(Exception):
     """SMTP connection related errors."""
 
-    pass
-
 
 class EmailDeliveryError(Exception):
     """Email delivery related errors."""
-
-    pass
 
 
 class EmailService:
@@ -80,17 +77,17 @@ class EmailService:
     def __init__(self, config: BotConfig):
         self.config = config
         self.templates = EmailTemplates(config.language)
-        self._connection_pool: Dict[str, Any] = {}
+        self._connection_pool: dict[str, Any] = {}
         self._pool_lock = asyncio.Lock()
         self._connection_timeout = 30.0  # seconds
 
         # Idempotency tracking (in-memory for webhook replay protection)
-        self._sent_emails: Set[str] = set()
+        self._sent_emails: set[str] = set()
         self._idempotency_lock = asyncio.Lock()
 
         # Email retry queue for SMTP health issues
         self._email_queue: asyncio.Queue = asyncio.Queue()
-        self._queue_worker_task: Optional[asyncio.Task] = None
+        self._queue_worker_task: asyncio.Task | None = None
         self._queue_worker_running = False
         self._smtp_healthy = True
         self._health_check_lock = asyncio.Lock()
@@ -121,9 +118,7 @@ class EmailService:
             return email[:1] + "***"
         local, domain = email.split("@", 1)
         masked_local = local[:1] + "***" if len(local) > 1 else "***"
-        masked_domain = (
-            domain[:1] + "***." + domain.split(".")[-1] if "." in domain else "***"
-        )
+        masked_domain = domain[:1] + "***." + domain.split(".")[-1] if "." in domain else "***"
         return f"{masked_local}@{masked_domain}"
 
     def _extract_provider_error(self, error_message: str) -> str:
@@ -144,31 +139,26 @@ class EmailService:
         # Common SMTP error patterns (non-sensitive)
         if "timeout" in error_lower or "timed out" in error_lower:
             return "smtp_timeout"
-        elif "connection refused" in error_lower or "connection failed" in error_lower:
+        if "connection refused" in error_lower or "connection failed" in error_lower:
             return "connection_refused"
-        elif "authentication failed" in error_lower or "auth" in error_lower:
+        if "authentication failed" in error_lower or "auth" in error_lower:
             return "authentication_failed"
-        elif "invalid recipient" in error_lower or "recipient rejected" in error_lower:
+        if "invalid recipient" in error_lower or "recipient rejected" in error_lower:
             return "invalid_recipient"
-        elif "quota exceeded" in error_lower or "rate limit" in error_lower:
+        if "quota exceeded" in error_lower or "rate limit" in error_lower:
             return "quota_exceeded"
-        elif "dns" in error_lower or "hostname" in error_lower:
+        if "dns" in error_lower or "hostname" in error_lower:
             return "dns_error"
-        elif "ssl" in error_lower or "tls" in error_lower:
+        if "ssl" in error_lower or "tls" in error_lower:
             return "ssl_tls_error"
-        elif "network" in error_lower:
+        if "network" in error_lower:
             return "network_error"
-        elif (
-            "server unavailable" in error_lower or "service unavailable" in error_lower
-        ):
+        if "server unavailable" in error_lower or "service unavailable" in error_lower:
             return "server_unavailable"
-        else:
-            # Return generic error type without sensitive details
-            return "smtp_error"
+        # Return generic error type without sensitive details
+        return "smtp_error"
 
-    def _generate_email_hash(
-        self, to_email: str, subject: str, content_preview: str
-    ) -> str:
+    def _generate_email_hash(self, to_email: str, subject: str, content_preview: str) -> str:
         """
         Generate unique hash for email idempotency.
 
@@ -251,17 +241,17 @@ class EmailService:
             return smtp
 
         except smtplib.SMTPAuthenticationError as e:
-            logger.error(f"SMTP_AUTH_FAILED: Authentication failed - {str(e)}")
-            raise SMTPConnectionError(f"SMTP authentication failed: {str(e)}")
+            logger.error(f"SMTP_AUTH_FAILED: Authentication failed - {e!s}")
+            raise SMTPConnectionError(f"SMTP authentication failed: {e!s}")
         except smtplib.SMTPConnectError as e:
-            logger.error(f"SMTP_CONNECT_FAILED: Connection failed - {str(e)}")
-            raise SMTPConnectionError(f"SMTP connection failed: {str(e)}")
+            logger.error(f"SMTP_CONNECT_FAILED: Connection failed - {e!s}")
+            raise SMTPConnectionError(f"SMTP connection failed: {e!s}")
         except smtplib.SMTPServerDisconnected as e:
-            logger.error(f"SMTP_DISCONNECTED: Server disconnected - {str(e)}")
-            raise SMTPConnectionError(f"SMTP server disconnected: {str(e)}")
+            logger.error(f"SMTP_DISCONNECTED: Server disconnected - {e!s}")
+            raise SMTPConnectionError(f"SMTP server disconnected: {e!s}")
         except Exception as e:
-            logger.error(f"SMTP_ERROR: Unexpected error - {str(e)}")
-            raise SMTPConnectionError(f"SMTP connection error: {str(e)}")
+            logger.error(f"SMTP_ERROR: Unexpected error - {e!s}")
+            raise SMTPConnectionError(f"SMTP connection error: {e!s}")
 
     @asynccontextmanager
     async def _get_smtp_connection(self) -> AsyncGenerator[smtplib.SMTP, None]:
@@ -327,9 +317,7 @@ class EmailService:
         async with self._get_smtp_connection() as smtp:
             # Create MIME message
             mime_msg = MIMEMultipart("alternative")
-            mime_msg["From"] = (
-                f"{self.config.smtp_from_name} <{self.config.smtp_from_email}>"
-            )
+            mime_msg["From"] = f"{self.config.smtp_from_name} <{self.config.smtp_from_email}>"
             mime_msg["To"] = message.to_email
             mime_msg["Subject"] = message.subject
 
@@ -350,14 +338,10 @@ class EmailService:
 
             return message_id, delivery_time_ms, max(0, attempt_number - 1)
 
-    async def _send_email_with_retry(
-        self, message: EmailMessage
-    ) -> EmailDeliveryResult:
+    async def _send_email_with_retry(self, message: EmailMessage) -> EmailDeliveryResult:
         """Send email with tenacity-based retry logic."""
         try:
-            message_id, delivery_time_ms, retry_count = await self._send_email_core(
-                message
-            )
+            message_id, delivery_time_ms, retry_count = await self._send_email_core(message)
 
             if retry_count > 0:
                 logger.info(
@@ -390,9 +374,7 @@ class EmailService:
                 f"EMAIL_SEND_FAILED: All retries exhausted for {self.mask_email(message.to_email)} after {retry_count} attempts - {error_msg}"
             )
 
-            return EmailDeliveryResult(
-                success=False, error=error_msg, retry_count=retry_count
-            )
+            return EmailDeliveryResult(success=False, error=error_msg, retry_count=retry_count)
 
     async def send_otp_email(
         self, to_email: str, otp: str, telegram_id: int
@@ -409,9 +391,7 @@ class EmailService:
             EmailDeliveryResult with delivery status
         """
         try:
-            logger.info(
-                f"OTP_EMAIL_COMPOSE: Preparing OTP email for {self.mask_email(to_email)}"
-            )
+            logger.info(f"OTP_EMAIL_COMPOSE: Preparing OTP email for {self.mask_email(to_email)}")
 
             # Generate email content using templates
             subject = self.templates.get_otp_subject()
@@ -450,36 +430,26 @@ class EmailService:
                     )
                     # Extract provider error info (non-sensitive)
                     error_reason = self._extract_provider_error(result.error)
-                    audit_service.log_email_send_failure(
-                        telegram_id, to_email, error_reason
-                    )
+                    audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
             except Exception as audit_error:
-                logger.error(
-                    f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
-                )
+                logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
             return result
 
         except Exception as e:
             logger.error(
-                f"OTP_EMAIL_ERROR: Unexpected error sending OTP to {self.mask_email(to_email)} - {str(e)}"
+                f"OTP_EMAIL_ERROR: Unexpected error sending OTP to {self.mask_email(to_email)} - {e!s}"
             )
 
             # Log audit event for unexpected error
             try:
                 audit_service = get_audit_service()
                 error_reason = self._extract_provider_error(str(e))
-                audit_service.log_email_send_failure(
-                    telegram_id, to_email, error_reason
-                )
+                audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
             except Exception as audit_error:
-                logger.error(
-                    f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
-                )
+                logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
-            return EmailDeliveryResult(
-                success=False, error=f"Unexpected error: {str(e)}"
-            )
+            return EmailDeliveryResult(success=False, error=f"Unexpected error: {e!s}")
 
     async def send_optimized_prompts_email(
         self,
@@ -555,36 +525,26 @@ class EmailService:
                     )
                     # Extract provider error info (non-sensitive)
                     error_reason = self._extract_provider_error(result.error)
-                    audit_service.log_email_send_failure(
-                        telegram_id, to_email, error_reason
-                    )
+                    audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
             except Exception as audit_error:
-                logger.error(
-                    f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
-                )
+                logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
             return result
 
         except Exception as e:
             logger.error(
-                f"OPTIMIZATION_EMAIL_ERROR: Unexpected error sending optimization email to {self.mask_email(to_email)} - {str(e)}"
+                f"OPTIMIZATION_EMAIL_ERROR: Unexpected error sending optimization email to {self.mask_email(to_email)} - {e!s}"
             )
 
             # Log audit event for unexpected error
             try:
                 audit_service = get_audit_service()
                 error_reason = self._extract_provider_error(str(e))
-                audit_service.log_email_send_failure(
-                    telegram_id, to_email, error_reason
-                )
+                audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
             except Exception as audit_error:
-                logger.error(
-                    f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
-                )
+                logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
-            return EmailDeliveryResult(
-                success=False, error=f"Unexpected error: {str(e)}"
-            )
+            return EmailDeliveryResult(success=False, error=f"Unexpected error: {e!s}")
 
     async def send_single_result_email(
         self,
@@ -620,7 +580,9 @@ class EmailService:
             )
 
             # Check idempotency (prevent duplicate single result emails)
-            content_preview = f"SINGLE_RESULT:{method_name}:{original_prompt[:50]}:{optimized_result[:50]}"
+            content_preview = (
+                f"SINGLE_RESULT:{method_name}:{original_prompt[:50]}:{optimized_result[:50]}"
+            )
             email_hash = self._generate_email_hash(to_email, subject, content_preview)
             if await self._is_email_already_sent(email_hash):
                 logger.info(
@@ -655,19 +617,15 @@ class EmailService:
                         )
                         # Extract provider error info (non-sensitive)
                         error_reason = self._extract_provider_error(result.error)
-                        audit_service.log_email_send_failure(
-                            telegram_id, to_email, error_reason
-                        )
+                        audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
                 except Exception as audit_error:
-                    logger.error(
-                        f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
-                    )
+                    logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
             return result
 
         except Exception as e:
             logger.error(
-                f"SINGLE_RESULT_EMAIL_ERROR: Unexpected error sending single result email to {self.mask_email(to_email)} - {str(e)}"
+                f"SINGLE_RESULT_EMAIL_ERROR: Unexpected error sending single result email to {self.mask_email(to_email)} - {e!s}"
             )
 
             # Log audit event for unexpected error
@@ -675,17 +633,11 @@ class EmailService:
                 try:
                     audit_service = get_audit_service()
                     error_reason = self._extract_provider_error(str(e))
-                    audit_service.log_email_send_failure(
-                        telegram_id, to_email, error_reason
-                    )
+                    audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
                 except Exception as audit_error:
-                    logger.error(
-                        f"AUDIT_ERROR: Failed to log email audit event - {audit_error}"
-                    )
+                    logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
-            return EmailDeliveryResult(
-                success=False, error=f"Unexpected error: {str(e)}"
-            )
+            return EmailDeliveryResult(success=False, error=f"Unexpected error: {e!s}")
 
     def get_fallback_prompts_text(
         self, craft_result: str, lyra_result: str, ggl_result: str
@@ -716,9 +668,7 @@ class EmailService:
             self.config.language,
         )
 
-        ggl_label = _(
-            "🔍 GGL - Фокус на цели:", "🔍 GGL - Goal-Focused:", self.config.language
-        )
+        ggl_label = _("🔍 GGL - Фокус на цели:", "🔍 GGL - Goal-Focused:", self.config.language)
 
         fallback_note = _(
             "📧 Не удалось отправить на email. Вот ваши оптимизированные промпты:",
@@ -770,7 +720,7 @@ class EmailService:
             await self._smtp_health_check_core()
             return True
         except Exception as e:
-            logger.warning(f"SMTP_HEALTH_CHECK_FAILED: {str(e)}")
+            logger.warning(f"SMTP_HEALTH_CHECK_FAILED: {e!s}")
             return False
 
     async def _update_smtp_health_status(self) -> None:
@@ -801,7 +751,7 @@ class EmailService:
                 f"EMAIL_QUEUED: Email queued for retry - {self.mask_email(message.to_email)}"
             )
         except Exception as e:
-            logger.error(f"EMAIL_QUEUE_ERROR: Failed to enqueue email - {str(e)}")
+            logger.error(f"EMAIL_QUEUE_ERROR: Failed to enqueue email - {e!s}")
 
     async def _start_queue_worker(self) -> None:
         """Start the background queue worker."""
@@ -829,9 +779,7 @@ class EmailService:
         while self._queue_worker_running and self._smtp_healthy:
             try:
                 # Wait for queued email with timeout
-                queue_item = await asyncio.wait_for(
-                    self._email_queue.get(), timeout=5.0
-                )
+                queue_item = await asyncio.wait_for(self._email_queue.get(), timeout=5.0)
 
                 message = queue_item["message"]
                 email_hash = queue_item["email_hash"]
@@ -857,26 +805,23 @@ class EmailService:
                     logger.info(
                         f"EMAIL_QUEUE_SUCCESS: Queued email sent successfully - {self.mask_email(message.to_email)}"
                     )
+                # Re-queue if max attempts not reached
+                elif attempts < 2:  # Max 3 total attempts
+                    queue_item["attempts"] = attempts + 1
+                    await self._email_queue.put(queue_item)
+                    logger.warning(
+                        f"EMAIL_QUEUE_RETRY: Re-queuing email (attempt {attempts + 1}/3) - {self.mask_email(message.to_email)}"
+                    )
                 else:
-                    # Re-queue if max attempts not reached
-                    if attempts < 2:  # Max 3 total attempts
-                        queue_item["attempts"] = attempts + 1
-                        await self._email_queue.put(queue_item)
-                        logger.warning(
-                            f"EMAIL_QUEUE_RETRY: Re-queuing email (attempt {attempts + 1}/3) - {self.mask_email(message.to_email)}"
-                        )
-                    else:
-                        logger.error(
-                            f"EMAIL_QUEUE_FAILED: Max attempts reached, dropping email - {self.mask_email(message.to_email)}"
-                        )
+                    logger.error(
+                        f"EMAIL_QUEUE_FAILED: Max attempts reached, dropping email - {self.mask_email(message.to_email)}"
+                    )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No emails in queue, continue
                 continue
             except Exception as e:
-                logger.error(
-                    f"EMAIL_QUEUE_WORKER_ERROR: Error processing queue - {str(e)}"
-                )
+                logger.error(f"EMAIL_QUEUE_WORKER_ERROR: Error processing queue - {e!s}")
                 await asyncio.sleep(1)  # Brief pause before continuing
 
         logger.info("EMAIL_QUEUE_WORKER: Queue processing stopped")
@@ -903,12 +848,9 @@ class EmailService:
             if result.success:
                 await self._mark_email_as_sent(email_hash)
             return result
-        else:
-            # SMTP is unhealthy, enqueue for later
-            await self._enqueue_email(message, email_hash)
-            return EmailDeliveryResult(
-                success=False, error="SMTP unhealthy, email queued for retry"
-            )
+        # SMTP is unhealthy, enqueue for later
+        await self._enqueue_email(message, email_hash)
+        return EmailDeliveryResult(success=False, error="SMTP unhealthy, email queued for retry")
 
     async def test_smtp_connection(self) -> bool:
         """
@@ -927,7 +869,7 @@ class EmailService:
             return True
 
         except Exception as e:
-            logger.error(f"SMTP_TEST_FAILED: SMTP connection test failed - {str(e)}")
+            logger.error(f"SMTP_TEST_FAILED: SMTP connection test failed - {e!s}")
             return False
 
     async def close_connections(self) -> None:
@@ -943,7 +885,7 @@ class EmailService:
                     logger.debug(f"SMTP_CLOSE: Closed connection {connection_key}")
                 except Exception as e:
                     logger.warning(
-                        f"SMTP_CLOSE_ERROR: Error closing connection {connection_key} - {str(e)}"
+                        f"SMTP_CLOSE_ERROR: Error closing connection {connection_key} - {e!s}"
                     )
 
             self._connection_pool.clear()
@@ -963,7 +905,7 @@ class EmailService:
         """
         return self._smtp_healthy
 
-    async def get_queue_status(self) -> Dict[str, Any]:
+    async def get_queue_status(self) -> dict[str, Any]:
         """Get current queue status for monitoring."""
         return {
             "queue_size": self._email_queue.qsize(),
@@ -980,7 +922,7 @@ class EmailService:
 
 
 # Global email service instance
-email_service: Optional[EmailService] = None
+email_service: EmailService | None = None
 
 
 def init_email_service(config: BotConfig) -> EmailService:
@@ -1009,7 +951,5 @@ def get_email_service() -> EmailService:
         RuntimeError: If email service is not initialized
     """
     if email_service is None:
-        raise RuntimeError(
-            "Email service not initialized. Call init_email_service() first."
-        )
+        raise RuntimeError("Email service not initialized. Call init_email_service() first.")
     return email_service

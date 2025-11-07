@@ -1,7 +1,7 @@
 """Tests for the configuration management module."""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -88,36 +88,38 @@ class TestBotConfig:
 
     def test_from_env_missing_telegram_token(self):
         """Test that missing TELEGRAM_TOKEN raises ValueError."""
-        with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(
-                ValueError, match="TELEGRAM_TOKEN environment variable is required"
-            ):
-                BotConfig.from_env()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="TELEGRAM_TOKEN environment variable is required"),
+        ):
+            BotConfig.from_env()
 
     def test_from_env_missing_openai_key(self):
         """Test that missing OpenAI key raises ValueError when using OpenAI backend."""
-        with patch.dict(
-            os.environ,
-            {"TELEGRAM_TOKEN": "test_token", "LLM_BACKEND": "OPENAI"},
-            clear=True,
+        with (
+            patch.dict(
+                os.environ,
+                {"TELEGRAM_TOKEN": "test_token", "LLM_BACKEND": "OPENAI"},
+                clear=True,
+            ),
+            pytest.raises(ValueError, match="OPENAI_API_KEY is required when using OpenAI backend"),
         ):
-            with pytest.raises(
-                ValueError, match="OPENAI_API_KEY is required when using OpenAI backend"
-            ):
-                BotConfig.from_env()
+            BotConfig.from_env()
 
     def test_from_env_missing_openrouter_key(self):
         """Test that missing OpenRouter key raises ValueError when using OpenRouter backend."""
-        with patch.dict(
-            os.environ,
-            {"TELEGRAM_TOKEN": "test_token", "LLM_BACKEND": "OPENROUTER"},
-            clear=True,
-        ):
-            with pytest.raises(
+        with (
+            patch.dict(
+                os.environ,
+                {"TELEGRAM_TOKEN": "test_token", "LLM_BACKEND": "OPENROUTER"},
+                clear=True,
+            ),
+            pytest.raises(
                 ValueError,
                 match="OPENROUTER_API_KEY is required when using OpenRouter backend",
-            ):
-                BotConfig.from_env()
+            ),
+        ):
+            BotConfig.from_env()
 
     def test_validate_invalid_backend(self):
         """Test validation with invalid LLM backend."""
@@ -193,6 +195,3 @@ class TestBotConfig:
             ):
                 config = BotConfig.from_env()
                 assert config.gsheets_logging_enabled == expected
-
-
-

@@ -10,8 +10,7 @@ import logging
 import re
 import secrets
 import time
-from datetime import datetime, timezone
-from typing import Optional, Tuple
+from datetime import UTC, datetime
 
 from argon2 import PasswordHasher
 from argon2.exceptions import HashingError, VerificationError
@@ -31,6 +30,7 @@ from telegram_bot.data.database import (
 )
 from telegram_bot.services.redis_client import get_redis_client
 from telegram_bot.utils.config import BotConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ class AuthService:
             logger.error(f"Error verifying OTP hash: {e}")
             return False
 
-    def check_rate_limits(self, telegram_id: int, email: str) -> Tuple[bool, str]:
+    def check_rate_limits(self, telegram_id: int, email: str) -> tuple[bool, str]:
         """
         Check all rate limiting rules comprehensively.
 
@@ -155,7 +155,9 @@ class AuthService:
                 email, self.config.email_rate_limit_per_hour
             )
             if not email_allowed:
-                reason = f"email_limit_exceeded_{email_count}/{self.config.email_rate_limit_per_hour}"
+                reason = (
+                    f"email_limit_exceeded_{email_count}/{self.config.email_rate_limit_per_hour}"
+                )
                 logger.warning(
                     f"Email rate limit exceeded for {mask_email(email)}: {email_count}/{self.config.email_rate_limit_per_hour}"
                 )
@@ -194,8 +196,8 @@ class AuthService:
             return False, "rate_check_error"
 
     def send_otp(
-        self, telegram_id: int, email: str, email_original: Optional[str] = None
-    ) -> Tuple[bool, str, Optional[str]]:
+        self, telegram_id: int, email: str, email_original: str | None = None
+    ) -> tuple[bool, str, str | None]:
         """
         Generate and store OTP for user authentication.
 
@@ -217,9 +219,7 @@ class AuthService:
             original_email = email_original if email_original else email
 
             # Check comprehensive rate limits
-            rate_allowed, rate_reason = self.check_rate_limits(
-                telegram_id, normalized_email
-            )
+            rate_allowed, rate_reason = self.check_rate_limits(telegram_id, normalized_email)
             if not rate_allowed:
                 # Log rate limiting event
                 self._log_auth_event(
@@ -245,9 +245,7 @@ class AuthService:
             )
 
             if not success:
-                logger.error(
-                    f"Failed to store OTP in Redis for {mask_telegram_id(telegram_id)}"
-                )
+                logger.error(f"Failed to store OTP in Redis for {mask_telegram_id(telegram_id)}")
                 self._log_auth_event(
                     telegram_id,
                     normalized_email,
@@ -272,14 +270,10 @@ class AuthService:
 
         except Exception as e:
             logger.error(f"Error sending OTP: {e}")
-            self._log_auth_event(
-                telegram_id, email, "OTP_GENERATION_ERROR", False, str(e)
-            )
+            self._log_auth_event(telegram_id, email, "OTP_GENERATION_ERROR", False, str(e))
             return False, "generation_error", None
 
-    def verify_otp(
-        self, telegram_id: int, otp: str, effective_user=None
-    ) -> Tuple[bool, str]:
+    def verify_otp(self, telegram_id: int, otp: str, effective_user=None) -> tuple[bool, str]:
         """
         Verify OTP with attempt counting and comprehensive error handling.
 
@@ -296,9 +290,7 @@ class AuthService:
             otp_data = self.redis_client.get_otp_data(telegram_id)
             if not otp_data:
                 logger.warning(f"No OTP found for {mask_telegram_id(telegram_id)}")
-                self._log_auth_event(
-                    telegram_id, None, "OTP_NOT_FOUND", False, "no_otp_stored"
-                )
+                self._log_auth_event(telegram_id, None, "OTP_NOT_FOUND", False, "no_otp_stored")
                 return False, "otp_not_found_or_expired"
 
             # Check if OTP has expired
@@ -317,9 +309,7 @@ class AuthService:
             # Increment attempt counter
             attempts = self.redis_client.increment_otp_attempts(telegram_id)
             if attempts == -1:
-                logger.error(
-                    f"Failed to increment attempts for {mask_telegram_id(telegram_id)}"
-                )
+                logger.error(f"Failed to increment attempts for {mask_telegram_id(telegram_id)}")
                 return False, "attempt_error"
 
             # Check if attempt limit exceeded (>3 attempts)
@@ -366,43 +356,37 @@ class AuthService:
                 # Log successful verification
                 self._log_auth_event(telegram_id, email, "OTP_VERIFIED", True, None)
 
-                logger.info(
-                    f"OTP verification successful for {mask_telegram_id(telegram_id)}"
-                )
+                logger.info(f"OTP verification successful for {mask_telegram_id(telegram_id)}")
                 return True, "verification_successful"
 
-            else:
-                # OTP verification failed - check if this is the 3rd attempt
-                if attempts >= self.config.otp_max_attempts:
-                    # Delete OTP after max attempts reached
-                    self.redis_client.delete_otp(telegram_id, "attempt_limit_exceeded")
-                    self._log_auth_event(
-                        telegram_id,
-                        otp_data.get("normalized_email"),
-                        "OTP_FAILED",
-                        False,
-                        "attempt_limit_exceeded",
-                    )
-                    return False, "attempt_limit_exceeded"
-                else:
-                    # Still have attempts left
-                    logger.warning(
-                        f"OTP verification failed for {mask_telegram_id(telegram_id)}, attempt {attempts}/{self.config.otp_max_attempts}"
-                    )
-                    self._log_auth_event(
-                        telegram_id,
-                        otp_data.get("normalized_email"),
-                        "OTP_MISMATCH",
-                        False,
-                        f"attempt_{attempts}",
-                    )
-                    return False, f"invalid_otp_attempt_{attempts}"
+            # OTP verification failed - check if this is the 3rd attempt
+            if attempts >= self.config.otp_max_attempts:
+                # Delete OTP after max attempts reached
+                self.redis_client.delete_otp(telegram_id, "attempt_limit_exceeded")
+                self._log_auth_event(
+                    telegram_id,
+                    otp_data.get("normalized_email"),
+                    "OTP_FAILED",
+                    False,
+                    "attempt_limit_exceeded",
+                )
+                return False, "attempt_limit_exceeded"
+            # Still have attempts left
+            logger.warning(
+                f"OTP verification failed for {mask_telegram_id(telegram_id)}, attempt {attempts}/{self.config.otp_max_attempts}"
+            )
+            self._log_auth_event(
+                telegram_id,
+                otp_data.get("normalized_email"),
+                "OTP_MISMATCH",
+                False,
+                f"attempt_{attempts}",
+            )
+            return False, f"invalid_otp_attempt_{attempts}"
 
         except Exception as e:
             logger.error(f"Error verifying OTP: {e}")
-            self._log_auth_event(
-                telegram_id, None, "OTP_VERIFICATION_ERROR", False, str(e)
-            )
+            self._log_auth_event(telegram_id, None, "OTP_VERIFICATION_ERROR", False, str(e))
             return False, "verification_error"
 
     def _persist_authentication_state(
@@ -425,7 +409,7 @@ class AuthService:
                 # Try to find existing user
                 user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
-                current_time = datetime.now(timezone.utc)
+                current_time = datetime.now(UTC)
 
                 if user:
                     # Existing user - update authentication timestamps
@@ -466,19 +450,12 @@ class AuthService:
                             "Continuing with authentication without profile update."
                         )
 
-                    logger.debug(
-                        f"Updated existing user for {mask_telegram_id(telegram_id)}"
-                    )
+                    logger.debug(f"Updated existing user for {mask_telegram_id(telegram_id)}")
 
                 else:
                     # New user - check for email conflicts first
-                    existing_email_user = (
-                        session.query(User).filter_by(email=email).first()
-                    )
-                    if (
-                        existing_email_user
-                        and existing_email_user.telegram_id != telegram_id
-                    ):
+                    existing_email_user = session.query(User).filter_by(email=email).first()
+                    if existing_email_user and existing_email_user.telegram_id != telegram_id:
                         logger.error(
                             f"Email conflict: {mask_email(email)} already exists for different user"
                         )
@@ -560,7 +537,7 @@ class AuthService:
             logger.error(f"Error checking authentication status: {e}")
             return False
 
-    def get_user_email(self, telegram_id: int) -> Optional[str]:
+    def get_user_email(self, telegram_id: int) -> str | None:
         """
         Get authenticated user's normalized email.
 
@@ -586,10 +563,10 @@ class AuthService:
     def _log_auth_event(
         self,
         telegram_id: int,
-        email: Optional[str],
+        email: str | None,
         event_type: str,
         success: bool,
-        reason: Optional[str],
+        reason: str | None,
     ) -> None:
         """
         Log authentication event to audit trail.
@@ -609,7 +586,7 @@ class AuthService:
                     event_type=event_type,
                     success=success,
                     reason=reason,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 session.add(auth_event)
                 session.commit()
@@ -624,7 +601,7 @@ class AuthService:
 
 
 # Global auth service instance
-auth_service: Optional[AuthService] = None
+auth_service: AuthService | None = None
 
 
 def init_auth_service(config: BotConfig) -> AuthService:
@@ -653,7 +630,5 @@ def get_auth_service() -> AuthService:
         RuntimeError: If auth service is not initialized
     """
     if auth_service is None:
-        raise RuntimeError(
-            "Auth service not initialized. Call init_auth_service() first."
-        )
+        raise RuntimeError("Auth service not initialized. Call init_auth_service() first.")
     return auth_service

@@ -7,8 +7,6 @@ missing/partial data, and profile comparison functionality.
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from telegram_bot.auth.user_profile_utils import (
     extract_user_profile,
     has_meaningful_profile_changes,
@@ -590,6 +588,3 @@ class TestShouldUpdateUserProfile:
 
         # Assert - Should return True on exception (safe default)
         assert result is True
-
-
-

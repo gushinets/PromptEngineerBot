@@ -6,12 +6,12 @@ Test script to verify token flow during follow-up transition.
 import os
 import sys
 
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from unittest.mock import MagicMock
 
 from telegram_bot.core.bot_handler import BotHandler
-from telegram_bot.core.conversation_manager import ConversationManager
 from telegram_bot.utils.config import BotConfig
 
 
@@ -39,9 +39,7 @@ def test_token_flow():
         user_id, {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
     )
 
-    print(
-        f"Tokens before logging: {bot_handler.conversation_manager.get_token_totals(user_id)}"
-    )
+    print(f"Tokens before logging: {bot_handler.conversation_manager.get_token_totals(user_id)}")
 
     # Mock the sheets logger
     sheets_calls = []
@@ -55,9 +53,7 @@ def test_token_flow():
     # Log conversation totals (this should reset tokens)
     bot_handler._log_conversation_totals(user_id, "CRAFT", "Optimized prompt")
 
-    print(
-        f"Tokens after logging: {bot_handler.conversation_manager.get_token_totals(user_id)}"
-    )
+    print(f"Tokens after logging: {bot_handler.conversation_manager.get_token_totals(user_id)}")
 
     # Call reset_to_followup_ready (this should preserve tokens)
     bot_handler.conversation_manager.reset_to_followup_ready(user_id)
@@ -82,9 +78,7 @@ def test_token_flow():
 
     # Log follow-up totals with optimized prompt as UserRequest
     optimized_prompt = bot_handler.state_manager.get_improved_prompt_cache(user_id)
-    bot_handler._log_conversation_totals(
-        user_id, "FOLLOWUP", "Refined prompt", optimized_prompt
-    )
+    bot_handler._log_conversation_totals(user_id, "FOLLOWUP", "Refined prompt", optimized_prompt)
 
     print(
         f"Tokens after follow-up logging: {bot_handler.conversation_manager.get_token_totals(user_id)}"

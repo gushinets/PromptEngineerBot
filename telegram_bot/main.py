@@ -43,6 +43,7 @@ from telegram_bot.utils.graceful_degradation import init_degradation_manager
 from telegram_bot.utils.health_checks import init_health_monitor
 from telegram_bot.utils.logging_utils import setup_application_logging
 
+
 # Load env early so Sheets handler sees variables from .env
 load_dotenv()
 
@@ -96,9 +97,7 @@ try:
         _sheets_logger.addHandler(_gsheets_handler)
         logger.info("Google Sheets logging enabled successfully")
     else:
-        logger.warning(
-            "Google Sheets handler not created - check environment variables"
-        )
+        logger.warning("Google Sheets handler not created - check environment variables")
 except Exception as e:
     # Do not fail if gsheets handler cannot be created
     logger.error(f"Failed to initialize Google Sheets logging: {e}", exc_info=True)
@@ -122,9 +121,7 @@ def log_sheets(event: str, payload: dict) -> None:
         _sheets_logger.info(message)
         logger.debug(f"Successfully logged to sheets: {event}")
     except Exception as e:
-        logger.error(
-            f"Failed to log to Google Sheets for event '{event}': {e}", exc_info=True
-        )
+        logger.error(f"Failed to log to Google Sheets for event '{event}': {e}", exc_info=True)
         # Fallback to string format
         try:
             message = str({"event": event, **payload})
@@ -203,12 +200,9 @@ async def main():
                     if config.redis_write_check_strict:
                         logger.error(message)
                         raise RuntimeError("Redis write health check failed")
-                    else:
-                        logger.warning(message)
+                    logger.warning(message)
             except Exception as redis_init_err:
-                logger.error(
-                    f"Redis initialization/health verification failed: {redis_init_err}"
-                )
+                logger.error(f"Redis initialization/health verification failed: {redis_init_err}")
                 raise
 
             # Initialize auth service
@@ -255,9 +249,7 @@ async def main():
             bot_handler.set_email_flow_orchestrator(orchestrator)
             logger.info("Email flow orchestrator initialized successfully")
         else:
-            logger.info(
-                "Email feature disabled - skipping email component initialization"
-            )
+            logger.info("Email feature disabled - skipping email component initialization")
 
         # Create the Application with connection pool settings
         # Increased timeouts to handle slow LLM responses and poor connections
@@ -276,9 +268,7 @@ async def main():
 
         # Add handlers
         application.add_handler(CommandHandler("start", start))
-        application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-        )
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
         # Start the Bot with error handling
         logger.info("Starting polling...")
@@ -310,7 +300,7 @@ async def main():
         logger.info("Bot shutdown complete")
         raise
     except Exception as e:
-        logger.error(f"Failed to start bot: {str(e)}")
+        logger.error(f"Failed to start bot: {e!s}")
         logger.exception("Exception details:")
 
         # Cleanup on error
@@ -337,6 +327,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error: {e!s}")
         logger.exception("Exception details:")
         raise

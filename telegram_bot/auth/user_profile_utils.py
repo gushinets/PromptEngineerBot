@@ -6,7 +6,8 @@ from Telegram Update objects and managing profile data updates.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
+
 
 if TYPE_CHECKING:
     from telegram_bot.data.database import User
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def extract_user_profile(effective_user: Optional[Any]) -> Dict[str, Any]:
+def extract_user_profile(effective_user: Any | None) -> dict[str, Any]:
     """
     Extract user profile data from Telegram effective_user object.
 
@@ -84,7 +85,7 @@ def extract_user_profile(effective_user: Optional[Any]) -> Dict[str, Any]:
 
 
 def has_meaningful_profile_changes(
-    current_profile: Dict[str, Any], new_profile: Dict[str, Any]
+    current_profile: dict[str, Any], new_profile: dict[str, Any]
 ) -> bool:
     """
     Check if profile has meaningful changes worth updating in the database.
@@ -126,7 +127,7 @@ def has_meaningful_profile_changes(
         return True
 
 
-def should_update_user_profile(user: "User", effective_user: Optional[Any]) -> bool:
+def should_update_user_profile(user: "User", effective_user: Any | None) -> bool:
     """
     Profile comparison utility to determine if user profile should be updated.
 

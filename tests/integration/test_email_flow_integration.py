@@ -14,6 +14,7 @@ from telegram.ext import ContextTypes
 
 from telegram_bot.utils.config import BotConfig
 
+
 # from telegram_bot.email_flow import EmailFlowOrchestrator  # Mock this for testing
 
 
@@ -120,9 +121,7 @@ async def email_flow_orchestrator(
     orchestrator = MagicMock()
 
     # Create async mock methods that actually perform expected state management calls
-    async def mock_start_email_authentication(
-        update, context, user_id, original_prompt=None
-    ):
+    async def mock_start_email_authentication(update, context, user_id, original_prompt=None):
         # Simulate the real method behavior for authentication service calls
         is_authenticated = mock_auth_service.is_user_authenticated(user_id)
         if is_authenticated:
@@ -139,9 +138,8 @@ async def email_flow_orchestrator(
                 },
             )
             return True
-        else:
-            mock_auth_service.send_otp(user_id, "test@example.com", "test@example.com")
-            return True
+        mock_auth_service.send_otp(user_id, "test@example.com", "test@example.com")
+        return True
 
     async def mock_handle_email_input(update, context, user_id, email):
         # Simulate OTP sending with error handling
@@ -159,14 +157,10 @@ async def email_flow_orchestrator(
         mock_auth_service.verify_otp(user_id, otp)
         return True
 
-    async def mock_start_followup_questions(
-        update, context, user_id, improved_prompt=None
-    ):
+    async def mock_start_followup_questions(update, context, user_id, improved_prompt=None):
         # Simulate starting followup conversation
         if improved_prompt:
-            mock_conversation_manager.start_followup_conversation(
-                user_id, improved_prompt
-            )
+            mock_conversation_manager.start_followup_conversation(user_id, improved_prompt)
         return True
 
     async def mock_handle_followup_conversation(update, context, user_id, text):
@@ -199,9 +193,7 @@ async def email_flow_orchestrator(
 
         return True
 
-    async def mock_run_optimization_and_email_delivery(
-        update, context, user_id, refined_prompt
-    ):
+    async def mock_run_optimization_and_email_delivery(update, context, user_id, refined_prompt):
         # Simulate optimization and email delivery
         try:
             # First run the individual optimization methods (this is what tests expect)
@@ -227,9 +219,7 @@ async def email_flow_orchestrator(
 
             if email_failed:
                 # Send processing message first, then error message (no prompt sharing)
-                await update.message.reply_text(
-                    "🔄 Processing your optimized prompts..."
-                )
+                await update.message.reply_text("🔄 Processing your optimized prompts...")
                 from telegram_bot.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
 
                 await update.message.reply_text(ERROR_EMAIL_OPTIMIZATION_FAILED)
@@ -242,15 +232,9 @@ async def email_flow_orchestrator(
             lyra_result = await orchestrator._run_lyra_optimization(refined_prompt)
             ggl_result = await orchestrator._run_ggl_optimization(refined_prompt)
 
-            await update.message.reply_text(
-                f"🔹 **CRAFT optimized prompt:**\n\n{craft_result}"
-            )
-            await update.message.reply_text(
-                f"🔹 **LYRA optimized prompt:**\n\n{lyra_result}"
-            )
-            await update.message.reply_text(
-                f"🔹 **GGL optimized prompt:**\n\n{ggl_result}"
-            )
+            await update.message.reply_text(f"🔹 **CRAFT optimized prompt:**\n\n{craft_result}")
+            await update.message.reply_text(f"🔹 **LYRA optimized prompt:**\n\n{lyra_result}")
+            await update.message.reply_text(f"🔹 **GGL optimized prompt:**\n\n{ggl_result}")
             return True
 
     async def mock_handle_followup_timeout(update, context, user_id):
@@ -267,9 +251,7 @@ async def email_flow_orchestrator(
     orchestrator.handle_otp_verification = mock_handle_otp_verification
     orchestrator.start_followup_questions = mock_start_followup_questions
     orchestrator.handle_followup_conversation = mock_handle_followup_conversation
-    orchestrator._run_optimization_and_email_delivery = (
-        mock_run_optimization_and_email_delivery
-    )
+    orchestrator._run_optimization_and_email_delivery = mock_run_optimization_and_email_delivery
     orchestrator._handle_followup_timeout = mock_handle_followup_timeout
     orchestrator._is_followup_timeout = MagicMock(return_value=False)
 
@@ -497,12 +479,8 @@ class TestEmailFlowIntegration:
 
         # Step 3: Verify optimization and email delivery proceeds with stored email
         with (
-            patch.object(
-                email_flow_orchestrator, "_run_craft_optimization"
-            ) as mock_craft,
-            patch.object(
-                email_flow_orchestrator, "_run_lyra_optimization"
-            ) as mock_lyra,
+            patch.object(email_flow_orchestrator, "_run_craft_optimization") as mock_craft,
+            patch.object(email_flow_orchestrator, "_run_lyra_optimization") as mock_lyra,
             patch.object(email_flow_orchestrator, "_run_ggl_optimization") as mock_ggl,
         ):
             mock_craft.return_value = "CRAFT optimized result"
@@ -572,18 +550,12 @@ class TestEmailFlowIntegration:
 
         # Mock email delivery failure
         mock_email_service.send_optimized_prompts_email.return_value.success = False
-        mock_email_service.send_optimized_prompts_email.return_value.error = (
-            "SMTP timeout"
-        )
+        mock_email_service.send_optimized_prompts_email.return_value.error = "SMTP timeout"
 
         # Mock optimization results
         with (
-            patch.object(
-                email_flow_orchestrator, "_run_craft_optimization"
-            ) as mock_craft,
-            patch.object(
-                email_flow_orchestrator, "_run_lyra_optimization"
-            ) as mock_lyra,
+            patch.object(email_flow_orchestrator, "_run_craft_optimization") as mock_craft,
+            patch.object(email_flow_orchestrator, "_run_lyra_optimization") as mock_lyra,
             patch.object(email_flow_orchestrator, "_run_ggl_optimization") as mock_ggl,
         ):
             mock_craft.return_value = "CRAFT result"
@@ -681,9 +653,7 @@ class TestEmailFlowIntegration:
         )
 
         # Handle user response
-        email_flow_orchestrator.llm_client.send_prompt.return_value = (
-            "Follow-up question"
-        )
+        email_flow_orchestrator.llm_client.send_prompt.return_value = "Follow-up question"
 
         result = await email_flow_orchestrator.handle_followup_conversation(
             mock_update, mock_context, user_id, user_response
@@ -691,9 +661,7 @@ class TestEmailFlowIntegration:
         assert result is True
 
         # Verify message was added to conversation
-        mock_conversation_manager.append_message.assert_called_with(
-            user_id, "user", user_response
-        )
+        mock_conversation_manager.append_message.assert_called_with(user_id, "user", user_response)
 
         # Verify LLM was called
         email_flow_orchestrator.llm_client.send_prompt.assert_called()
@@ -724,9 +692,7 @@ class TestEmailFlowIntegration:
         assert result is True
 
         # Verify timeout was handled gracefully
-        mock_state_manager.set_in_followup_conversation.assert_called_with(
-            user_id, False
-        )
+        mock_state_manager.set_in_followup_conversation.assert_called_with(user_id, False)
 
         # Verify optimization proceeded with cached prompt
         mock_email_service.send_optimized_prompts_email.assert_called()
@@ -788,9 +754,7 @@ class TestEmailFlowIntegration:
         for i, response in enumerate(user_responses):
             if i == len(user_responses) - 1:
                 # Last response generates refined prompt
-                refined_prompt = (
-                    "Refined marketing copy prompt for small business product launch"
-                )
+                refined_prompt = "Refined marketing copy prompt for small business product launch"
                 email_flow_orchestrator.llm_client.send_prompt.return_value = (
                     f"<REFINED_PROMPT>{refined_prompt}</REFINED_PROMPT>"
                 )
@@ -857,12 +821,8 @@ class TestEmailFlowErrorHandling:
 
         # Should fallback to chat delivery
         with (
-            patch.object(
-                email_flow_orchestrator, "_run_craft_optimization"
-            ) as mock_craft,
-            patch.object(
-                email_flow_orchestrator, "_run_lyra_optimization"
-            ) as mock_lyra,
+            patch.object(email_flow_orchestrator, "_run_craft_optimization") as mock_craft,
+            patch.object(email_flow_orchestrator, "_run_lyra_optimization") as mock_lyra,
             patch.object(email_flow_orchestrator, "_run_ggl_optimization") as mock_ggl,
         ):
             mock_craft.return_value = "CRAFT result"
@@ -877,9 +837,7 @@ class TestEmailFlowErrorHandling:
         # Verify fallback to chat delivery
         assert mock_update.message.reply_text.call_count >= 3
 
-    async def test_llm_service_failure(
-        self, email_flow_orchestrator, mock_update, mock_context
-    ):
+    async def test_llm_service_failure(self, email_flow_orchestrator, mock_update, mock_context):
         """Test handling of LLM service failures."""
         user_id = 12345
         user_response = "My response"
@@ -956,9 +914,7 @@ class TestEmailFlowConcurrency:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Verify all flows started successfully
-        assert all(
-            result is True for result in results if not isinstance(result, Exception)
-        )
+        assert all(result is True for result in results if not isinstance(result, Exception))
 
         # Verify services were called for each user
         assert mock_auth_service.send_otp.call_count >= len(user_ids)
@@ -972,12 +928,8 @@ class TestEmailFlowConcurrency:
 
         # Mock optimization methods
         with (
-            patch.object(
-                email_flow_orchestrator, "_run_craft_optimization"
-            ) as mock_craft,
-            patch.object(
-                email_flow_orchestrator, "_run_lyra_optimization"
-            ) as mock_lyra,
+            patch.object(email_flow_orchestrator, "_run_craft_optimization") as mock_craft,
+            patch.object(email_flow_orchestrator, "_run_lyra_optimization") as mock_lyra,
             patch.object(email_flow_orchestrator, "_run_ggl_optimization") as mock_ggl,
         ):
             mock_craft.return_value = "CRAFT result"
@@ -997,15 +949,8 @@ class TestEmailFlowConcurrency:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Verify all optimizations completed
-            assert all(
-                result is True
-                for result in results
-                if not isinstance(result, Exception)
-            )
+            assert all(result is True for result in results if not isinstance(result, Exception))
 
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

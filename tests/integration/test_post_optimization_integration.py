@@ -34,9 +34,7 @@ class TestPostOptimizationSystemIntegration:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.core.bot_handler import BotHandler
 
@@ -60,9 +58,7 @@ class TestPostOptimizationSystemIntegration:
                 context = MagicMock()
 
                 # Step 1: User completes follow-up (this would show the post-optimization button)
-                bot_handler.state_manager.set_improved_prompt_cache(
-                    user_id, "Refined prompt"
-                )
+                bot_handler.state_manager.set_improved_prompt_cache(user_id, "Refined prompt")
                 bot_handler._safe_reply = AsyncMock()
 
                 # Simulate completion message with keyboard
@@ -92,9 +88,7 @@ class TestPostOptimizationSystemIntegration:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.core.bot_handler import BotHandler
 
@@ -116,9 +110,7 @@ class TestPostOptimizationSystemIntegration:
 
                 # Step 1: User declines follow-up (this would show the post-optimization button)
                 bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
-                bot_handler.state_manager.set_improved_prompt_cache(
-                    user_id, "Improved prompt"
-                )
+                bot_handler.state_manager.set_improved_prompt_cache(user_id, "Improved prompt")
                 bot_handler._safe_reply = AsyncMock()
 
                 # Simulate decline handling
@@ -148,9 +140,7 @@ class TestPostOptimizationSystemIntegration:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.core.bot_handler import BotHandler
 
@@ -184,9 +174,7 @@ class TestPostOptimizationSystemIntegration:
                 )
 
                 # Verify existing email flow was started (not post-optimization flow)
-                email_flow.start_email_flow.assert_called_once_with(
-                    update, context, user_id
-                )
+                email_flow.start_email_flow.assert_called_once_with(update, context, user_id)
 
                 # Verify post-optimization flow was NOT called
                 assert (
@@ -206,9 +194,7 @@ class TestPostOptimizationSystemIntegration:
         regular_keyboards = [SELECT_METHOD_KEYBOARD, FOLLOWUP_CHOICE_KEYBOARD]
 
         for keyboard in regular_keyboards:
-            keyboard_buttons = [
-                button.text for row in keyboard.keyboard for button in row
-            ]
+            keyboard_buttons = [button.text for row in keyboard.keyboard for button in row]
             assert BTN_POST_OPTIMIZATION_EMAIL not in keyboard_buttons, (
                 f"Post-optimization button found in regular keyboard: {keyboard}"
             )
@@ -220,9 +206,7 @@ class TestPostOptimizationSystemIntegration:
         ]
 
         for keyboard in post_keyboards:
-            keyboard_buttons = [
-                button.text for row in keyboard.keyboard for button in row
-            ]
+            keyboard_buttons = [button.text for row in keyboard.keyboard for button in row]
             assert BTN_POST_OPTIMIZATION_EMAIL in keyboard_buttons, (
                 f"Post-optimization button missing from post-scenario keyboard: {keyboard}"
             )
@@ -265,9 +249,7 @@ class TestPostOptimizationSystemIntegration:
             user_id = 12345
 
             # Start post-optimization flow
-            await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             # Verify flow data contains post-optimization markers
             state_manager.set_email_flow_data.assert_called_once()
@@ -288,9 +270,7 @@ class TestPostOptimizationSystemIntegration:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.core.bot_handler import BotHandler
 
@@ -317,9 +297,7 @@ class TestPostOptimizationSystemIntegration:
             with patch("telegram_bot.utils.health_checks.get_health_monitor") as mock_health:
                 mock_health.return_value.is_service_healthy.return_value = False
 
-                await bot_handler._handle_post_optimization_email(
-                    update, context, user_id
-                )
+                await bot_handler._handle_post_optimization_email(update, context, user_id)
 
                 # Verify error handling
                 bot_handler._safe_reply.assert_called()
@@ -353,7 +331,7 @@ class TestPostOptimizationSystemIntegration:
                         "method_name": "Follow-up Optimization",
                         "content": "User 1 content",
                     }
-                elif user_id == 67890:
+                if user_id == 67890:
                     return {
                         "type": "single_method",
                         "method_name": "CRAFT",
@@ -375,12 +353,8 @@ class TestPostOptimizationSystemIntegration:
             update2 = MagicMock()
             context = MagicMock()
 
-            await orchestrator.start_post_optimization_email_flow(
-                update1, context, 12345
-            )
-            await orchestrator.start_post_optimization_email_flow(
-                update2, context, 67890
-            )
+            await orchestrator.start_post_optimization_email_flow(update1, context, 12345)
+            await orchestrator.start_post_optimization_email_flow(update2, context, 67890)
 
             # Verify both flows were started with correct data
             assert state_manager.set_email_flow_data.call_count == 2
@@ -407,9 +381,7 @@ class TestPostOptimizationEmailTemplateValidation:
 
         original_prompt = "Создай план маркетинга для стартапа"
         method_name = "CRAFT"
-        optimized_result = (
-            "Создайте подробный план маркетинга для технологического стартапа..."
-        )
+        optimized_result = "Создайте подробный план маркетинга для технологического стартапа..."
 
         subject, html_body, plain_body = templates.compose_single_result_email(
             original_prompt, method_name, optimized_result
@@ -475,13 +447,9 @@ class TestPostOptimizationEmailTemplateValidation:
 
             # Verify that malicious input content is properly escaped
             if "<script>" in malicious_input:
-                assert "&lt;script&gt;" in html_body, (
-                    "Script tags should be HTML escaped"
-                )
+                assert "&lt;script&gt;" in html_body, "Script tags should be HTML escaped"
             if "javascript:" in malicious_input:
-                assert "javascript:" not in html_body, (
-                    "JavaScript protocol should be removed"
-                )
+                assert "javascript:" not in html_body, "JavaScript protocol should be removed"
 
     @pytest.mark.asyncio
     async def test_email_service_integration_comprehensive(self):
@@ -579,9 +547,7 @@ class TestPostOptimizationRegressionPrevention:
         )
 
         # Verify method selection keyboard still contains expected buttons
-        method_buttons = [
-            button.text for row in SELECT_METHOD_KEYBOARD.keyboard for button in row
-        ]
+        method_buttons = [button.text for row in SELECT_METHOD_KEYBOARD.keyboard for button in row]
         assert BTN_EMAIL_DELIVERY in method_buttons
 
         # Verify follow-up choice keyboard still contains expected buttons
@@ -601,9 +567,7 @@ class TestPostOptimizationRegressionPrevention:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.core.bot_handler import BotHandler
 
@@ -647,23 +611,9 @@ class TestPostOptimizationRegressionPrevention:
         assert isinstance(WELCOME_MESSAGE, str) and len(WELCOME_MESSAGE) > 0
         assert isinstance(ERROR_GENERIC, str) and len(ERROR_GENERIC) > 0
         assert isinstance(EMAIL_INPUT_MESSAGE, str) and len(EMAIL_INPUT_MESSAGE) > 0
-        assert (
-            isinstance(OTP_VERIFICATION_SUCCESS, str)
-            and len(OTP_VERIFICATION_SUCCESS) > 0
-        )
-        assert (
-            isinstance(EMAIL_OPTIMIZATION_SUCCESS, str)
-            and len(EMAIL_OPTIMIZATION_SUCCESS) > 0
-        )
+        assert isinstance(OTP_VERIFICATION_SUCCESS, str) and len(OTP_VERIFICATION_SUCCESS) > 0
+        assert isinstance(EMAIL_OPTIMIZATION_SUCCESS, str) and len(EMAIL_OPTIMIZATION_SUCCESS) > 0
 
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-
-
-
-
-
-

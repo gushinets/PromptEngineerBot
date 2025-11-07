@@ -5,7 +5,6 @@ This module tests the integration between bot handler and email flow,
 UI interactions, button handling, and conversation state management.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -18,9 +17,7 @@ from telegram_bot.utils.messages import (
     BTN_EMAIL_DELIVERY,
     BTN_GGL,
     BTN_LYRA,
-    BTN_NO,
     BTN_RESET,
-    BTN_YES,
 )
 
 
@@ -102,13 +99,9 @@ def bot_handler(mock_config, mock_llm_client):
 
     # Make all email flow methods async by default
     mock_email_flow.start_email_flow = AsyncMock(return_value=True)
-    mock_email_flow.handle_email_input = AsyncMock(
-        side_effect=mock_handle_email_input_side_effect
-    )
+    mock_email_flow.handle_email_input = AsyncMock(side_effect=mock_handle_email_input_side_effect)
     mock_email_flow.handle_otp_verification = AsyncMock(return_value=True)
-    mock_email_flow.handle_otp_input = AsyncMock(
-        side_effect=mock_handle_otp_input_side_effect
-    )
+    mock_email_flow.handle_otp_input = AsyncMock(side_effect=mock_handle_otp_input_side_effect)
     mock_email_flow.handle_followup_choice = AsyncMock(return_value=True)
     mock_email_flow.handle_followup_prompt_input = AsyncMock(return_value=True)
     mock_email_flow.handle_followup_conversation = AsyncMock(return_value=True)
@@ -148,9 +141,7 @@ class TestBotHandlerEmailIntegration:
 
         # Configure the mock to simulate the expected behavior
         async def mock_handle_message(update, context):
-            await update.message.reply_text(
-                "Choose method:", reply_markup=mock_keyboard
-            )
+            await update.message.reply_text("Choose method:", reply_markup=mock_keyboard)
 
         bot_handler.handle_message = mock_handle_message
 
@@ -168,10 +159,7 @@ class TestBotHandlerEmailIntegration:
         email_button_found = False
         for row in reply_markup.keyboard:
             for button in row:
-                if (
-                    isinstance(button, KeyboardButton)
-                    and BTN_EMAIL_DELIVERY in button.text
-                ):
+                if isinstance(button, KeyboardButton) and BTN_EMAIL_DELIVERY in button.text:
                     email_button_found = True
                     break
 
@@ -235,9 +223,7 @@ class TestBotHandlerEmailIntegration:
             mock_update, mock_context, user_id, otp
         )
 
-    async def test_error_message_display_localization(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_error_message_display_localization(self, bot_handler, mock_update, mock_context):
         """Test error message display in user's language."""
         user_id = mock_update.effective_user.id
         invalid_email = "invalid-email"
@@ -321,9 +307,7 @@ class TestBotHandlerHealthCheckIntegration:
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
-            mock_health_monitor.is_service_healthy.side_effect = (
-                lambda service: service != "redis"
-            )
+            mock_health_monitor.is_service_healthy.side_effect = lambda service: service != "redis"
 
             await bot_handler.handle_message(mock_update, mock_context)
 
@@ -352,9 +336,7 @@ class TestBotHandlerHealthCheckIntegration:
         with patch(
             "telegram_bot.utils.health_checks.get_health_monitor", return_value=mock_health_monitor
         ):
-            mock_health_monitor.is_service_healthy.side_effect = (
-                lambda service: service != "smtp"
-            )
+            mock_health_monitor.is_service_healthy.side_effect = lambda service: service != "smtp"
 
             # Mock the email flow orchestrator to simulate fallback behavior
             async def mock_start_email_flow(update, context, user_id):
@@ -420,9 +402,7 @@ class TestBotHandlerHealthCheckIntegration:
 class TestBotHandlerMessageRouting:
     """Test message routing during email flow states."""
 
-    async def test_message_routing_priority(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_message_routing_priority(self, bot_handler, mock_update, mock_context):
         """Test message routing priority during different states."""
         user_id = mock_update.effective_user.id
 
@@ -470,9 +450,7 @@ class TestBotHandlerMessageRouting:
         assert user2_state.waiting_for_email_input is False
         assert user2_state.waiting_for_otp_input is True
 
-    async def test_invalid_state_transitions(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_invalid_state_transitions(self, bot_handler, mock_update, mock_context):
         """Test handling of invalid state transitions."""
         user_id = mock_update.effective_user.id
 
@@ -489,9 +467,7 @@ class TestBotHandlerMessageRouting:
 class TestBotHandlerErrorRecovery:
     """Test error recovery in bot handler email integration."""
 
-    async def test_email_flow_error_recovery(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_email_flow_error_recovery(self, bot_handler, mock_update, mock_context):
         """Test recovery from email flow errors."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = BTN_EMAIL_DELIVERY
@@ -503,9 +479,7 @@ class TestBotHandlerErrorRecovery:
 
         # Mock email flow orchestrator to raise exception
         mock_email_flow = MagicMock()
-        mock_email_flow.start_email_flow = AsyncMock(
-            side_effect=Exception("Email flow error")
-        )
+        mock_email_flow.start_email_flow = AsyncMock(side_effect=Exception("Email flow error"))
         bot_handler.email_flow_orchestrator = mock_email_flow
 
         await bot_handler.handle_message(mock_update, mock_context)
@@ -520,9 +494,7 @@ class TestBotHandlerErrorRecovery:
         # Should process CRAFT normally
         bot_handler.llm_client.send_prompt.assert_called()
 
-    async def test_state_corruption_recovery(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_state_corruption_recovery(self, bot_handler, mock_update, mock_context):
         """Test recovery from corrupted state."""
         user_id = mock_update.effective_user.id
 
@@ -548,10 +520,9 @@ class TestBotHandlerErrorRecovery:
         bot_handler.state_manager.set_waiting_for_email_input(user_id, True)
 
         # Mock email flow to timeout
-        import asyncio
 
         bot_handler.email_flow_orchestrator.handle_email_input = AsyncMock(
-            side_effect=asyncio.TimeoutError("Operation timed out")
+            side_effect=TimeoutError("Operation timed out")
         )
 
         await bot_handler.handle_message(mock_update, mock_context)
@@ -562,6 +533,3 @@ class TestBotHandlerErrorRecovery:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

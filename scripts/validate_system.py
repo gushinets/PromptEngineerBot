@@ -11,6 +11,7 @@ import os
 import sys
 from unittest.mock import Mock, patch
 
+
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
@@ -23,22 +24,10 @@ def test_imports():
 
     try:
         # Test core imports
-        from telegram_bot.core.bot_handler import BotHandler
-        from telegram_bot.main import main
-        from telegram_bot.utils.config import BotConfig
 
         print("✓ Core modules imported successfully")
 
         # Test email feature imports
-        from telegram_bot.auth.auth_service import AuthService
-        from telegram_bot.data.database import init_database
-        from telegram_bot.flows.background_tasks import BackgroundTaskScheduler
-        from telegram_bot.flows.email_flow import EmailFlowOrchestrator
-        from telegram_bot.services.email_service import EmailService
-        from telegram_bot.services.redis_client import RedisClient
-        from telegram_bot.utils.audit_service import AuditService
-        from telegram_bot.utils.health_checks import HealthMonitor
-        from telegram_bot.utils.metrics import MetricsCollector
 
         print("✓ Email feature modules imported successfully")
 
@@ -101,7 +90,6 @@ def test_service_initialization():
     try:
         from telegram_bot.auth.auth_service import AuthService
         from telegram_bot.flows.background_tasks import BackgroundTaskScheduler
-        from telegram_bot.services.redis_client import RedisClient
         from telegram_bot.utils.audit_service import AuditService
         from telegram_bot.utils.config import BotConfig
         from telegram_bot.utils.health_checks import HealthMonitor
@@ -123,9 +111,7 @@ def test_service_initialization():
             config = BotConfig.from_env()
 
         # Test service creation (without actual connections)
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=Mock()
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=Mock()):
             auth_service = AuthService(config)
         print("✓ Auth service created successfully")
 
@@ -153,7 +139,6 @@ def test_email_flow_components():
     print("\nTesting email flow components...")
 
     try:
-        from telegram_bot.auth.auth_service import AuthService
         from telegram_bot.services.email_service import EmailService
         from telegram_bot.utils.config import BotConfig
         from telegram_bot.utils.email_templates import EmailTemplates
@@ -320,7 +305,7 @@ def main():
         print(f"✗ Async tests failed: {e}")
         total += 1
 
-    print(f"\n=== Validation Results ===")
+    print("\n=== Validation Results ===")
     print(f"Passed: {passed}/{total} tests")
 
     if passed == total:
@@ -328,10 +313,9 @@ def main():
         print("\nSystem integration is working correctly.")
         print("The email prompt delivery feature is ready for deployment.")
         return 0
-    else:
-        print(f"✗ {total - passed} tests failed.")
-        print("\nSystem integration has issues that need to be resolved.")
-        return 1
+    print(f"✗ {total - passed} tests failed.")
+    print("\nSystem integration has issues that need to be resolved.")
+    return 1
 
 
 if __name__ == "__main__":

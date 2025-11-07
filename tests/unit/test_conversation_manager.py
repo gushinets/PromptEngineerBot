@@ -266,9 +266,7 @@ class TestConversationManager:
         with patch(
             "telegram_bot.core.conversation_manager.PromptLoader"
         ) as mock_prompt_loader_class:
-            mock_prompt_loader_class.side_effect = FileNotFoundError(
-                "Prompt file not found"
-            )
+            mock_prompt_loader_class.side_effect = FileNotFoundError("Prompt file not found")
 
             # ConversationManager should fail to initialize when PromptLoader fails
             with pytest.raises(FileNotFoundError, match="Prompt file not found"):
@@ -443,6 +441,3 @@ class TestConversationManager:
         # Verify conversation was cleared but we're no longer in follow-up
         assert manager.get_transcript(user_id) == []
         assert manager.is_in_followup_conversation(user_id) is False
-
-
-

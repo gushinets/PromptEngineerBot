@@ -13,7 +13,7 @@ Requirements tested:
 """
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -25,7 +25,7 @@ from telegram_bot.auth.user_profile_utils import (
     extract_user_profile,
     should_update_user_profile,
 )
-from telegram_bot.data.database import Base, User, get_db_session
+from telegram_bot.data.database import Base, User
 
 
 class TestCompleteProfileFlowIntegration:
@@ -76,7 +76,9 @@ class TestCompleteProfileFlowIntegration:
     @pytest.fixture
     def auth_service(self, mock_redis_client, mock_config):
         """Create AuthService instance with mocked dependencies."""
-        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis_client):
+        with patch(
+            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis_client
+        ):
             return AuthService(mock_config)
 
     @pytest.fixture
@@ -155,14 +157,10 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute end-to-end verification
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, complete_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, complete_telegram_user)
 
             # Verify successful registration
             assert success, f"Registration should succeed, got message: {message}"
@@ -170,9 +168,7 @@ class TestCompleteProfileFlowIntegration:
 
             # Verify user was created in database with complete profile
             with test_session_factory() as session:
-                created_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                created_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert created_user is not None, "User should be created in database"
 
@@ -226,23 +222,17 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute end-to-end verification
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, partial_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, partial_telegram_user)
 
             # Verify successful registration
             assert success, f"Registration should succeed, got message: {message}"
 
             # Verify user was created with partial profile data
             with test_session_factory() as session:
-                created_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                created_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert created_user is not None
 
@@ -278,10 +268,10 @@ class TestCompleteProfileFlowIntegration:
                 email=email,
                 email_original=email_original,
                 is_authenticated=True,
-                email_verified_at=datetime.now(timezone.utc),
-                last_authenticated_at=datetime.now(timezone.utc),
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                email_verified_at=datetime.now(UTC),
+                last_authenticated_at=datetime.now(UTC),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 first_name="John",
                 last_name="Doe",
                 is_bot=False,
@@ -306,23 +296,17 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute subsequent verification with updated profile (premium status changed)
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, complete_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, complete_telegram_user)
 
             # Verify successful update
             assert success, f"Profile update should succeed, got message: {message}"
 
             # Verify profile was updated in database
             with test_session_factory() as session:
-                updated_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                updated_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert updated_user is not None
 
@@ -360,10 +344,10 @@ class TestCompleteProfileFlowIntegration:
                 email=email,
                 email_original=email_original,
                 is_authenticated=True,
-                email_verified_at=datetime.now(timezone.utc),
-                last_authenticated_at=datetime.now(timezone.utc),
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                email_verified_at=datetime.now(UTC),
+                last_authenticated_at=datetime.now(UTC),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 first_name="John",  # Same as complete_telegram_user
                 last_name="Doe",  # Same as complete_telegram_user
                 is_bot=False,  # Same as complete_telegram_user
@@ -387,23 +371,17 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute verification with identical profile data
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, complete_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, complete_telegram_user)
 
             # Verify successful authentication without profile update
             assert success, f"Authentication should succeed, got message: {message}"
 
             # Verify profile data remains unchanged (no unnecessary updates)
             with test_session_factory() as session:
-                user_after = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                user_after = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert user_after is not None
                 assert user_after.first_name == "John"
@@ -443,23 +421,17 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute verification with bot user
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, bot_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, bot_telegram_user)
 
             # Verify successful bot registration
             assert success, f"Bot registration should succeed, got message: {message}"
 
             # Verify bot-specific profile data
             with test_session_factory() as session:
-                bot_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                bot_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert bot_user is not None
 
@@ -501,25 +473,17 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute verification with premium user
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, premium_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, premium_telegram_user)
 
             # Verify successful premium user registration
-            assert success, (
-                f"Premium user registration should succeed, got message: {message}"
-            )
+            assert success, f"Premium user registration should succeed, got message: {message}"
 
             # Verify premium user profile data
             with test_session_factory() as session:
-                premium_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                premium_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert premium_user is not None
 
@@ -560,9 +524,7 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute verification with None effective_user
             success, message = auth_service.verify_otp(telegram_id, otp, None)
@@ -574,9 +536,7 @@ class TestCompleteProfileFlowIntegration:
 
             # Verify user was created with safe defaults
             with test_session_factory() as session:
-                edge_case_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                edge_case_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert edge_case_user is not None
 
@@ -622,9 +582,7 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute verification with malformed effective_user
             success, message = auth_service.verify_otp(telegram_id, otp, malformed_user)
@@ -636,9 +594,7 @@ class TestCompleteProfileFlowIntegration:
 
             # Verify user was created with available data and safe defaults
             with test_session_factory() as session:
-                malformed_user_db = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                malformed_user_db = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert malformed_user_db is not None
 
@@ -664,10 +620,10 @@ class TestCompleteProfileFlowIntegration:
                 email="test@example.com",
                 email_original="Test@Example.Com",
                 is_authenticated=True,
-                email_verified_at=datetime.now(timezone.utc),
-                last_authenticated_at=datetime.now(timezone.utc),
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                email_verified_at=datetime.now(UTC),
+                last_authenticated_at=datetime.now(UTC),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 first_name="Old",  # Different from complete_telegram_user
                 last_name="Name",  # Different from complete_telegram_user
                 is_bot=False,
@@ -691,9 +647,7 @@ class TestCompleteProfileFlowIntegration:
             session.commit()
 
             # Test again - should not need update
-            needs_update_after = should_update_user_profile(
-                test_user, complete_telegram_user
-            )
+            needs_update_after = should_update_user_profile(test_user, complete_telegram_user)
             assert needs_update_after is False, "Should not detect changes after update"
 
     def test_profile_extraction_utility_robustness(self):
@@ -767,10 +721,10 @@ class TestCompleteProfileFlowIntegration:
                 email=email,
                 email_original=email_original,
                 is_authenticated=True,
-                email_verified_at=datetime.now(timezone.utc),
-                last_authenticated_at=datetime.now(timezone.utc),
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                email_verified_at=datetime.now(UTC),
+                last_authenticated_at=datetime.now(UTC),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 first_name="Initial",
                 last_name="User",
                 is_bot=False,
@@ -794,23 +748,17 @@ class TestCompleteProfileFlowIntegration:
 
         # Mock database session to use test database
         with patch("telegram_bot.auth.auth_service.get_db_session") as mock_get_session:
-            mock_get_session.return_value.__enter__.return_value = (
-                test_session_factory()
-            )
+            mock_get_session.return_value.__enter__.return_value = test_session_factory()
 
             # Execute verification (simulating concurrent update)
-            success, message = auth_service.verify_otp(
-                telegram_id, otp, complete_telegram_user
-            )
+            success, message = auth_service.verify_otp(telegram_id, otp, complete_telegram_user)
 
             # Verify successful handling of concurrent update
             assert success, f"Concurrent update should succeed, got message: {message}"
 
             # Verify final state is consistent
             with test_session_factory() as session:
-                final_user = (
-                    session.query(User).filter_by(telegram_id=telegram_id).first()
-                )
+                final_user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 assert final_user is not None
                 # Should have the updated profile data
@@ -821,6 +769,3 @@ class TestCompleteProfileFlowIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

@@ -20,13 +20,30 @@
     // Formatting and Linting
     "python.formatting.provider": "black",
     "python.linting.enabled": true,
-    "python.linting.pylintEnabled": false,
-    "python.linting.flake8Enabled": true,
-    "python.linting.mypyEnabled": false,
+    "python.linting.banditEnabled": true,
+    "python.linting.banditArgs": [
+        "--configfile",
+        ".bandit"
+    ],
+    // Ruff Configuration
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": true,
+            "source.organizeImports": true
+        }
+    },
+    "ruff.lint.enable": true,
+    "ruff.lint.run": "onSave",
     // File Associations
     "files.associations": {
         "*.env*": "dotenv",
-        "Dockerfile*": "dockerfile"
+        "Dockerfile*": "dockerfile",
+        ".gitleaks.toml": "toml",
+        ".bandit": "yaml",
+        ".semgrep.yml": "yaml",
+        "ruff.toml": "toml"
     },
     // Editor Settings
     "editor.rulers": [

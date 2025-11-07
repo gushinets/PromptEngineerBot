@@ -9,7 +9,6 @@ appears in logs.
 import logging
 import re
 from functools import wraps
-from typing import Any, Dict, Optional, Union
 
 from telegram_bot.data.database import mask_email, mask_telegram_id
 
@@ -26,9 +25,7 @@ class PIIProtectedFormatter(logging.Formatter):
         super().__init__(*args, **kwargs)
 
         # Compile regex patterns for PII detection
-        self._email_pattern = re.compile(
-            r"\b[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}\b", re.UNICODE
-        )
+        self._email_pattern = re.compile(r"\b[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}\b", re.UNICODE)
         self._telegram_id_pattern = re.compile(
             r"\b\d{8,12}\b"
         )  # Telegram IDs are typically 8-12 digits
@@ -37,9 +34,7 @@ class PIIProtectedFormatter(logging.Formatter):
             r"((?:secret\s+key|api_key|password|pwd|pass|secret|token|key))(?:\s*[=:]\s*|\s+)(?!(?:stored|found|missing|error|success|failed|valid|invalid|expired|generated)\b)[^\s]+",
             re.IGNORECASE,
         )
-        self._url_credentials_pattern = re.compile(
-            r"://[^:]+:[^@]+@"
-        )  # URLs with credentials
+        self._url_credentials_pattern = re.compile(r"://[^:]+:[^@]+@")  # URLs with credentials
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with PII masking."""
@@ -108,7 +103,6 @@ class StructuredLogger:
         """Set up PII-protected formatter if not already configured."""
         # Don't add handlers here - rely on root logger configuration
         # This prevents duplicate handlers when setup_application_logging is used
-        pass
 
     def _format_context(self, **context) -> str:
         """Format context data for logging."""
@@ -207,16 +201,14 @@ def log_pii_safe(func):
         kwargs_str = " | ".join([f"{k}={v}" for k, v in safe_kwargs.items()])
         args_str = ", ".join([str(arg) for arg in safe_args[:3]])
 
-        logger.debug(
-            f"FUNCTION_CALL: {func.__name__} | args=[{args_str}] | {kwargs_str}"
-        )
+        logger.debug(f"FUNCTION_CALL: {func.__name__} | args=[{args_str}] | {kwargs_str}")
 
         try:
             result = func(*args, **kwargs)
             logger.debug(f"FUNCTION_SUCCESS: {func.__name__}")
             return result
         except Exception as e:
-            logger.error(f"FUNCTION_ERROR: {func.__name__} | error={str(e)}")
+            logger.error(f"FUNCTION_ERROR: {func.__name__} | error={e!s}")
             raise
 
     return wrapper
@@ -235,15 +227,11 @@ class EmailFlowLogger:
 
     def log_flow_start(self, telegram_id: int):
         """Log email flow initiation."""
-        self.logger.info(
-            "EMAIL_FLOW_START: User initiated email delivery", telegram_id=telegram_id
-        )
+        self.logger.info("EMAIL_FLOW_START: User initiated email delivery", telegram_id=telegram_id)
 
     def log_email_input(self, telegram_id: int, email: str, is_valid: bool):
         """Log email input and validation."""
-        self.logger.info(
-            f"EMAIL_INPUT: User provided email", telegram_id=telegram_id, email=email
-        )
+        self.logger.info("EMAIL_INPUT: User provided email", telegram_id=telegram_id, email=email)
         self.logger.info(
             f"EMAIL_VALIDATION: Email format {'valid' if is_valid else 'invalid'}",
             telegram_id=telegram_id,
@@ -256,7 +244,7 @@ class EmailFlowLogger:
         user_count: int,
         seconds_since_last: int,
         is_allowed: bool,
-        reason: Optional[str] = None,
+        reason: str | None = None,
     ):
         """Log rate limiting check."""
         self.logger.info(
@@ -286,13 +274,11 @@ class EmailFlowLogger:
         telegram_id: int,
         attempt: int,
         success: bool,
-        reason: Optional[str] = None,
+        reason: str | None = None,
     ):
         """Log OTP verification attempt."""
         if success:
-            self.logger.info(
-                "OTP_VERIFY_SUCCESS: User authenticated", telegram_id=telegram_id
-            )
+            self.logger.info("OTP_VERIFY_SUCCESS: User authenticated", telegram_id=telegram_id)
         else:
             self.logger.warning(
                 f"OTP_VERIFY_FAILED: Failed attempt {attempt}/3",
@@ -309,7 +295,7 @@ class EmailFlowLogger:
         operation: str,
         telegram_id: int,
         success: bool,
-        details: Optional[str] = None,
+        details: str | None = None,
     ):
         """Log Redis operations."""
         if success:
@@ -330,7 +316,7 @@ class EmailFlowLogger:
         operation: str,
         telegram_id: int,
         success: bool,
-        details: Optional[str] = None,
+        details: str | None = None,
     ):
         """Log database operations."""
         if success:
@@ -351,8 +337,8 @@ class EmailFlowLogger:
         telegram_id: int,
         email: str,
         success: bool,
-        error_type: Optional[str] = None,
-        delivery_time_ms: Optional[int] = None,
+        error_type: str | None = None,
+        delivery_time_ms: int | None = None,
     ):
         """Log email sending attempts."""
         if success:
@@ -370,14 +356,10 @@ class EmailFlowLogger:
                 error_type=error_type or "unknown",
             )
 
-    def log_smtp_connection(
-        self, success: bool, host: str, port: int, error: Optional[str] = None
-    ):
+    def log_smtp_connection(self, success: bool, host: str, port: int, error: str | None = None):
         """Log SMTP connection attempts."""
         if success:
-            self.logger.debug(
-                "SMTP_CONNECT: Connection established", host=host, port=port
-            )
+            self.logger.debug("SMTP_CONNECT: Connection established", host=host, port=port)
         else:
             self.logger.error(
                 "SMTP_CONNECT_FAILED: Connection failed",
@@ -389,18 +371,14 @@ class EmailFlowLogger:
     def log_followup_flow(self, telegram_id: int, stage: str, success: bool = True):
         """Log follow-up questions flow."""
         if success:
-            self.logger.info(
-                f"FOLLOWUP_{stage.upper()}: Stage completed", telegram_id=telegram_id
-            )
+            self.logger.info(f"FOLLOWUP_{stage.upper()}: Stage completed", telegram_id=telegram_id)
         else:
             self.logger.warning(
                 f"FOLLOWUP_{stage.upper()}_FAILED: Stage failed",
                 telegram_id=telegram_id,
             )
 
-    def log_optimization_flow(
-        self, telegram_id: int, stage: str, method: Optional[str] = None
-    ):
+    def log_optimization_flow(self, telegram_id: int, stage: str, method: str | None = None):
         """Log optimization flow."""
         if method:
             self.logger.info(
@@ -408,16 +386,14 @@ class EmailFlowLogger:
                 telegram_id=telegram_id,
             )
         else:
-            self.logger.info(
-                f"OPTIMIZATION_{stage.upper()}: All methods", telegram_id=telegram_id
-            )
+            self.logger.info(f"OPTIMIZATION_{stage.upper()}: All methods", telegram_id=telegram_id)
 
     def log_health_check(
         self,
         service: str,
         healthy: bool,
-        response_time_ms: Optional[int] = None,
-        error: Optional[str] = None,
+        response_time_ms: int | None = None,
+        error: str | None = None,
     ):
         """Log health check results."""
         if healthy:
@@ -433,8 +409,8 @@ class EmailFlowLogger:
     def log_error_scenario(
         self,
         scenario: str,
-        telegram_id: Optional[int] = None,
-        error: Optional[str] = None,
+        telegram_id: int | None = None,
+        error: str | None = None,
         **context,
     ):
         """Log error scenarios."""
@@ -446,9 +422,7 @@ class EmailFlowLogger:
         )
 
 
-def setup_application_logging(
-    log_level: str = "INFO", log_format: Optional[str] = None
-):
+def setup_application_logging(log_level: str = "INFO", log_format: str | None = None):
     """
     Set up application-wide logging with PII protection.
 
@@ -514,15 +488,13 @@ def log_system_event(event: str, **context):
     logger.info(f"SYSTEM_EVENT: {event}", **context)
 
 
-def log_security_event(event: str, telegram_id: Optional[int] = None, **context):
+def log_security_event(event: str, telegram_id: int | None = None, **context):
     """Log security-related event."""
     logger = get_logger("security")
     logger.warning(f"SECURITY_EVENT: {event}", telegram_id=telegram_id, **context)
 
 
-def log_performance_metric(
-    metric: str, value: Union[int, float], unit: str = "", **context
-):
+def log_performance_metric(metric: str, value: int | float, unit: str = "", **context):
     """Log performance metric."""
     logger = get_logger("performance")
     logger.info(f"PERFORMANCE_METRIC: {metric}", value=value, unit=unit, **context)

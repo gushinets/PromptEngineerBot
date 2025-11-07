@@ -1,8 +1,5 @@
 """Tests for the messages module."""
 
-import pytest
-from telegram import ForceReply
-
 from telegram_bot.utils.messages import (
     BTN_CRAFT,
     BTN_GENERATE_PROMPT,
@@ -123,9 +120,7 @@ class TestParseLLMResponse:
 
     def test_parse_llm_response_question(self):
         """Test parsing LLM response with QUESTION tag."""
-        response = (
-            "Some text <QUESTION>What do you want to achieve?</QUESTION> more text"
-        )
+        response = "Some text <QUESTION>What do you want to achieve?</QUESTION> more text"
 
         result, is_question, is_improved_prompt = parse_llm_response(response)
 
@@ -135,7 +130,9 @@ class TestParseLLMResponse:
 
     def test_parse_llm_response_improved_prompt(self):
         """Test parsing LLM response with IMPROVED_PROMPT tag."""
-        response = "Some text <IMPROVED_PROMPT>Here is your improved prompt</IMPROVED_PROMPT> more text"
+        response = (
+            "Some text <IMPROVED_PROMPT>Here is your improved prompt</IMPROVED_PROMPT> more text"
+        )
 
         result, is_question, is_improved_prompt = parse_llm_response(response)
 
@@ -182,7 +179,9 @@ class TestParseFollowupResponse:
 
     def test_parse_followup_response_with_refined_prompt_tag(self):
         """Test parsing response with REFINED_PROMPT tag."""
-        response = "Some text <REFINED_PROMPT>Here is your refined prompt</REFINED_PROMPT> more text"
+        response = (
+            "Some text <REFINED_PROMPT>Here is your refined prompt</REFINED_PROMPT> more text"
+        )
 
         result, is_refined_prompt = parse_followup_response(response)
 
@@ -191,9 +190,7 @@ class TestParseFollowupResponse:
 
     def test_parse_followup_response_missing_closing_tag(self):
         """Test parsing response with missing closing tag."""
-        response = (
-            "Some text <REFINED_PROMPT>Here is your refined prompt without closing tag"
-        )
+        response = "Some text <REFINED_PROMPT>Here is your refined prompt without closing tag"
 
         result, is_refined_prompt = parse_followup_response(response)
 
@@ -202,7 +199,9 @@ class TestParseFollowupResponse:
 
     def test_parse_followup_response_case_insensitive(self):
         """Test parsing response with case-insensitive tag matching."""
-        response = "Some text <refined_prompt>Here is your refined prompt</refined_prompt> more text"
+        response = (
+            "Some text <refined_prompt>Here is your refined prompt</refined_prompt> more text"
+        )
 
         result, is_refined_prompt = parse_followup_response(response)
 
@@ -228,7 +227,9 @@ class TestParseFollowupResponse:
 
     def test_parse_followup_response_whitespace_handling(self):
         """Test proper whitespace handling in extracted content."""
-        response = "Text <REFINED_PROMPT>  \n  Here is content with whitespace  \n  </REFINED_PROMPT>"
+        response = (
+            "Text <REFINED_PROMPT>  \n  Here is content with whitespace  \n  </REFINED_PROMPT>"
+        )
 
         result, is_refined_prompt = parse_followup_response(response)
 
@@ -316,7 +317,9 @@ class TestParseFollowupResponse:
 
     def test_parse_followup_response_nested_tags(self):
         """Test parsing with nested or similar tags."""
-        response = "Text <REFINED_PROMPT>Content with <OTHER_TAG>nested</OTHER_TAG> tags</REFINED_PROMPT>"
+        response = (
+            "Text <REFINED_PROMPT>Content with <OTHER_TAG>nested</OTHER_TAG> tags</REFINED_PROMPT>"
+        )
 
         result, is_refined_prompt = parse_followup_response(response)
 
@@ -333,9 +336,7 @@ class TestFormatImprovedPromptResponse:
         improved_prompt = "Write a compelling short story about adventure"
         method_name = "CRAFT"
 
-        result = format_improved_prompt_response(
-            user_prompt, improved_prompt, method_name
-        )
+        result = format_improved_prompt_response(user_prompt, improved_prompt, method_name)
 
         assert "CRAFT" in result
         assert "Write a story" in result
@@ -348,9 +349,7 @@ class TestFormatImprovedPromptResponse:
         improved_prompt = "Write a story with **bold** and _italic_"
         method_name = "LYRA"
 
-        result = format_improved_prompt_response(
-            user_prompt, improved_prompt, method_name
-        )
+        result = format_improved_prompt_response(user_prompt, improved_prompt, method_name)
 
         # Check that markdown characters are escaped
         assert "\\*emphasis\\*" in result
@@ -364,9 +363,7 @@ class TestFormatImprovedPromptResponse:
         improved_prompt = "  \n  Improved prompt with whitespace  \n  "
         method_name = "GGL"
 
-        result = format_improved_prompt_response(
-            user_prompt, improved_prompt, method_name
-        )
+        result = format_improved_prompt_response(user_prompt, improved_prompt, method_name)
 
         assert "Improved prompt with whitespace" in result
         # Should not contain extra whitespace
@@ -581,9 +578,7 @@ class TestFollowupResponseErrorHandling:
 
     def test_parse_followup_response_special_characters_preservation(self):
         """Test that special characters are preserved during parsing."""
-        special_chars = (
-            'Content with "quotes", symbols: @#$%^&*(), and unicode: café 🚀'
-        )
+        special_chars = 'Content with "quotes", symbols: @#$%^&*(), and unicode: café 🚀'
         response = f"<REFINED_PROMPT>{special_chars}</REFINED_PROMPT>"
 
         parsed, is_refined = parse_followup_response(response)
@@ -619,6 +614,3 @@ class TestFollowupResponseErrorHandling:
 
         assert parsed == ""  # Should be stripped
         assert is_refined is False
-
-
-

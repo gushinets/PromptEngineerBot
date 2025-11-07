@@ -8,8 +8,11 @@ import asyncio
 import os
 import sys
 
+
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
+from datetime import UTC
 
 from telegram_bot.utils.health_checks import (
     HealthCheckResult,
@@ -25,9 +28,7 @@ def test_health_check_result():
     """Test HealthCheckResult creation."""
     print("Testing HealthCheckResult...")
 
-    result = HealthCheckResult(
-        service="database", status=HealthStatus.HEALTHY, response_time_ms=50
-    )
+    result = HealthCheckResult(service="database", status=HealthStatus.HEALTHY, response_time_ms=50)
 
     assert result.service == "database"
     assert result.status == HealthStatus.HEALTHY
@@ -41,12 +42,12 @@ def test_service_health():
     """Test ServiceHealth creation."""
     print("Testing ServiceHealth...")
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     health = ServiceHealth(
         service="smtp",
         status=HealthStatus.HEALTHY,
-        last_check=datetime.now(timezone.utc),
+        last_check=datetime.now(UTC),
     )
 
     assert health.service == "smtp"
@@ -100,9 +101,7 @@ def test_service_health_tracking():
     monitor = HealthMonitor(failure_threshold=2)
 
     # Simulate successful check
-    results = {
-        "database": HealthCheckResult(service="database", status=HealthStatus.HEALTHY)
-    }
+    results = {"database": HealthCheckResult(service="database", status=HealthStatus.HEALTHY)}
 
     monitor._update_service_health(results)
 
@@ -139,11 +138,11 @@ def test_health_summary():
     """Test health summary generation."""
     print("Testing health summary...")
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     monitor = HealthMonitor()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Add service health data
     monitor._service_health["database"] = ServiceHealth(
@@ -188,9 +187,7 @@ def test_global_health_monitor():
     print("Testing global health monitor...")
 
     # Initialize
-    monitor = init_health_monitor(
-        check_interval=60, failure_threshold=5, recovery_threshold=3
-    )
+    monitor = init_health_monitor(check_interval=60, failure_threshold=5, recovery_threshold=3)
 
     assert monitor.check_interval == 60
     assert monitor.failure_threshold == 5
@@ -211,7 +208,7 @@ async def test_monitoring_lifecycle():
 
     # Mock the check_all_services method to avoid actual health checks
     original_check = monitor.check_all_services
-    monitor.check_all_services = lambda: {}
+    monitor.check_all_services = dict
 
     try:
         # Start monitoring

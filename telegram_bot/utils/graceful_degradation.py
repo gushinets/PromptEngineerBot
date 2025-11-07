@@ -7,14 +7,15 @@ rather than failing completely.
 """
 
 import asyncio
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from telegram_bot.utils.config import BotConfig
-from telegram_bot.utils.health_checks import HealthStatus, get_health_monitor
+from telegram_bot.utils.health_checks import get_health_monitor
 from telegram_bot.utils.logging_utils import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -51,9 +52,9 @@ class DegradationState:
     """Current degradation state of the system."""
 
     level: DegradationLevel
-    degraded_services: List[ServiceType]
-    active_fallbacks: List[str]
-    user_message: Optional[str] = None
+    degraded_services: list[ServiceType]
+    active_fallbacks: list[str]
+    user_message: str | None = None
 
 
 class GracefulDegradationManager:
@@ -71,14 +72,14 @@ class GracefulDegradationManager:
         self._current_state = DegradationState(
             level=DegradationLevel.NORMAL, degraded_services=[], active_fallbacks=[]
         )
-        self._fallback_handlers: Dict[str, Callable] = {}
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._fallback_handlers: dict[str, Callable] = {}
+        self._monitoring_task: asyncio.Task | None = None
         self._monitoring_running = False
 
         # Register default fallback handlers
         self._register_default_handlers()
 
-    def _init_degradation_rules(self) -> List[DegradationRule]:
+    def _init_degradation_rules(self) -> list[DegradationRule]:
         """Initialize degradation rules for different service failures."""
         return [
             # Redis degradation rules
@@ -172,9 +173,7 @@ class GracefulDegradationManager:
 
             # Determine degraded services
             degraded_services = [
-                service
-                for service, is_healthy in service_health.items()
-                if not is_healthy
+                service for service, is_healthy in service_health.items() if not is_healthy
             ]
 
             # Check if degradation state changed
@@ -184,12 +183,10 @@ class GracefulDegradationManager:
             return self._current_state
 
         except Exception as e:
-            logger.error(
-                f"DEGRADATION_CHECK_ERROR: Failed to check degradation - {str(e)}"
-            )
+            logger.error(f"DEGRADATION_CHECK_ERROR: Failed to check degradation - {e!s}")
             return self._current_state
 
-    async def _update_degradation_state(self, degraded_services: List[ServiceType]):
+    async def _update_degradation_state(self, degraded_services: list[ServiceType]):
         """Update degradation state and apply fallback rules."""
         old_state = self._current_state
 
@@ -223,7 +220,7 @@ class GracefulDegradationManager:
             logger.warning(f"SERVICE_DEGRADED: {service.value} is now unhealthy")
 
     def _calculate_degradation_level(
-        self, degraded_services: List[ServiceType]
+        self, degraded_services: list[ServiceType]
     ) -> DegradationLevel:
         """Calculate overall degradation level based on degraded services."""
         if not degraded_services:
@@ -239,22 +236,19 @@ class GracefulDegradationManager:
 
         if degraded_set & critical_services:
             return DegradationLevel.EMERGENCY
-        elif len(degraded_set & important_services) >= 2:
+        if len(degraded_set & important_services) >= 2:
             return DegradationLevel.MINIMAL
-        elif degraded_set & important_services:
+        if degraded_set & important_services:
             return DegradationLevel.PARTIAL
-        else:
-            return DegradationLevel.NORMAL
+        return DegradationLevel.NORMAL
 
-    async def _apply_degradation_rules(self, degraded_services: List[ServiceType]):
+    async def _apply_degradation_rules(self, degraded_services: list[ServiceType]):
         """Apply degradation rules for failed services."""
         applicable_rules = []
 
         # Find applicable rules
         for service in degraded_services:
-            service_rules = [
-                rule for rule in self._degradation_rules if rule.service == service
-            ]
+            service_rules = [rule for rule in self._degradation_rules if rule.service == service]
             applicable_rules.extend(service_rules)
 
         # Sort by priority (higher first)
@@ -267,21 +261,17 @@ class GracefulDegradationManager:
                 self._current_state.active_fallbacks.append(rule.fallback_action)
             except Exception as e:
                 logger.error(
-                    f"FALLBACK_RULE_ERROR: Failed to apply rule {rule.fallback_action} - {str(e)}"
+                    f"FALLBACK_RULE_ERROR: Failed to apply rule {rule.fallback_action} - {e!s}"
                 )
 
     async def _apply_fallback_rule(self, rule: DegradationRule):
         """Apply a specific fallback rule."""
         handler = self._fallback_handlers.get(rule.fallback_action)
         if not handler:
-            logger.warning(
-                f"FALLBACK_HANDLER_MISSING: No handler for {rule.fallback_action}"
-            )
+            logger.warning(f"FALLBACK_HANDLER_MISSING: No handler for {rule.fallback_action}")
             return
 
-        logger.info(
-            f"APPLYING_FALLBACK: {rule.fallback_action} for {rule.service.value}"
-        )
+        logger.info(f"APPLYING_FALLBACK: {rule.fallback_action} for {rule.service.value}")
 
         if asyncio.iscoroutinefunction(handler):
             await handler(rule)
@@ -292,9 +282,7 @@ class GracefulDegradationManager:
 
     async def _handle_disable_email_auth(self, rule: DegradationRule):
         """Handle disabling email authentication when Redis is unavailable."""
-        logger.info(
-            "FALLBACK_APPLIED: Email authentication disabled (Redis unavailable)"
-        )
+        logger.info("FALLBACK_APPLIED: Email authentication disabled (Redis unavailable)")
         # This would be used by bot handlers to skip email auth flow
 
     async def _handle_disable_rate_limiting(self, rule: DegradationRule):
@@ -304,16 +292,12 @@ class GracefulDegradationManager:
 
     async def _handle_disable_flow_state(self, rule: DegradationRule):
         """Handle disabling flow state management when Redis is unavailable."""
-        logger.info(
-            "FALLBACK_APPLIED: Flow state management disabled (Redis unavailable)"
-        )
+        logger.info("FALLBACK_APPLIED: Flow state management disabled (Redis unavailable)")
         # This would be used by conversation managers to skip state persistence
 
     async def _handle_email_to_chat_fallback(self, rule: DegradationRule):
         """Handle falling back to chat delivery when SMTP is unavailable."""
-        logger.info(
-            "FALLBACK_APPLIED: Email delivery will fallback to chat (SMTP unavailable)"
-        )
+        logger.info("FALLBACK_APPLIED: Email delivery will fallback to chat (SMTP unavailable)")
         # This would be used by email service to deliver content via chat instead
 
     async def _handle_queue_emails_for_retry(self, rule: DegradationRule):
@@ -325,9 +309,7 @@ class GracefulDegradationManager:
 
     async def _handle_disable_user_persistence(self, rule: DegradationRule):
         """Handle disabling user data persistence when database is unavailable."""
-        logger.warning(
-            "FALLBACK_APPLIED: User data persistence disabled (Database unavailable)"
-        )
+        logger.warning("FALLBACK_APPLIED: User data persistence disabled (Database unavailable)")
         # This would be used by auth service to skip user data storage
 
     async def _handle_disable_audit_logging(self, rule: DegradationRule):
@@ -335,7 +317,7 @@ class GracefulDegradationManager:
         logger.info("FALLBACK_APPLIED: Audit logging disabled (Database unavailable)")
         # This would be used by audit service to skip event logging
 
-    def get_user_message(self, language: str = "EN") -> Optional[str]:
+    def get_user_message(self, language: str = "EN") -> str | None:
         """
         Get user-friendly message about current service degradation.
 
@@ -414,7 +396,7 @@ class GracefulDegradationManager:
         """Check if should skip audit logging due to database unavailability."""
         return not self.is_service_available(ServiceType.DATABASE)
 
-    def get_degradation_summary(self) -> Dict[str, Any]:
+    def get_degradation_summary(self) -> dict[str, Any]:
         """
         Get comprehensive degradation summary.
 
@@ -423,9 +405,7 @@ class GracefulDegradationManager:
         """
         return {
             "level": self._current_state.level.value,
-            "degraded_services": [
-                s.value for s in self._current_state.degraded_services
-            ],
+            "degraded_services": [s.value for s in self._current_state.degraded_services],
             "active_fallbacks": self._current_state.active_fallbacks,
             "services_available": {
                 "email_auth": self.is_email_auth_available(),
@@ -447,15 +427,11 @@ class GracefulDegradationManager:
             check_interval: Interval between checks in seconds
         """
         if self._monitoring_running:
-            logger.warning(
-                "DEGRADATION_MONITOR_ALREADY_RUNNING: Monitoring is already running"
-            )
+            logger.warning("DEGRADATION_MONITOR_ALREADY_RUNNING: Monitoring is already running")
             return
 
         self._monitoring_running = True
-        self._monitoring_task = asyncio.create_task(
-            self._monitoring_loop(check_interval)
-        )
+        self._monitoring_task = asyncio.create_task(self._monitoring_loop(check_interval))
 
         logger.info(
             f"DEGRADATION_MONITOR_STARTED: Monitoring started with {check_interval}s interval"
@@ -490,16 +466,14 @@ class GracefulDegradationManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(
-                    f"DEGRADATION_MONITOR_ERROR: Monitoring loop error - {str(e)}"
-                )
+                logger.error(f"DEGRADATION_MONITOR_ERROR: Monitoring loop error - {e!s}")
                 await asyncio.sleep(check_interval)
 
         logger.info("DEGRADATION_MONITOR_LOOP_STOP: Degradation monitoring stopped")
 
 
 # Global degradation manager instance
-degradation_manager: Optional[GracefulDegradationManager] = None
+degradation_manager: GracefulDegradationManager | None = None
 
 
 def init_degradation_manager(config: BotConfig) -> GracefulDegradationManager:
@@ -573,7 +547,7 @@ def should_skip_rate_limiting() -> bool:
         return False
 
 
-def get_user_degradation_message(language: str = "EN") -> Optional[str]:
+def get_user_degradation_message(language: str = "EN") -> str | None:
     """Get user message about current degradation."""
     try:
         return get_degradation_manager().get_user_message(language)
@@ -582,7 +556,7 @@ def get_user_degradation_message(language: str = "EN") -> Optional[str]:
         return None
 
 
-def check_email_flow_readiness(language: str = "EN") -> tuple[bool, Optional[str]]:
+def check_email_flow_readiness(language: str = "EN") -> tuple[bool, str | None]:
     """
     Check if email flow is ready to proceed.
 
@@ -610,7 +584,7 @@ def check_email_flow_readiness(language: str = "EN") -> tuple[bool, Optional[str
         return True, None
 
 
-def handle_smtp_fallback(language: str = "EN") -> tuple[bool, Optional[str]]:
+def handle_smtp_fallback(language: str = "EN") -> tuple[bool, str | None]:
     """
     Handle SMTP fallback when email delivery is unavailable.
 

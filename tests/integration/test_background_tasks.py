@@ -2,8 +2,7 @@
 Tests for background task scheduler and audit event purging.
 """
 
-import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -99,6 +98,3 @@ class TestBackgroundTasksGlobal:
         task_info = scheduler._tasks["audit_purge"]
         assert task_info["interval"] == timedelta(hours=24)
         assert task_info["run_immediately"] is False
-
-
-
