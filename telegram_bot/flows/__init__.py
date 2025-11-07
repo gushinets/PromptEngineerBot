@@ -15,10 +15,11 @@ from telegram_bot.flows.email_flow import (
     init_email_flow_orchestrator,
 )
 
+
 __all__ = [
+    "get_email_flow_orchestrator",
     "init_background_tasks",
+    "init_email_flow_orchestrator",
     "start_background_tasks",
     "stop_background_tasks",
-    "get_email_flow_orchestrator",
-    "init_email_flow_orchestrator",
 ]

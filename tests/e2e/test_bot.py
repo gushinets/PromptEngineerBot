@@ -1,12 +1,11 @@
 """Tests for the Telegram bot functionality."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+
 # Import the functions to test
-from telegram_bot.main import handle_message, start
 
 
 class TestBotFunctionality:
@@ -29,9 +28,7 @@ class TestBotFunctionality:
         mock_config.model_name = "test-model"
 
         mock_llm_client = MagicMock()
-        bot_handler = BotHandler(
-            mock_config, mock_llm_client, lambda event, payload: None
-        )
+        bot_handler = BotHandler(mock_config, mock_llm_client, lambda event, payload: None)
 
         # Execute
         await bot_handler.handle_start(mock_update, mock_context)
@@ -63,7 +60,7 @@ class TestBotFunctionality:
         self, mock_update, mock_context, mock_llm_client, method, expected_prompt_type
     ):
         """Test different optimization method selections."""
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import MagicMock
 
         from telegram_bot.core.bot_handler import BotHandler
         from telegram_bot.utils.config import BotConfig
@@ -75,9 +72,7 @@ class TestBotFunctionality:
         mock_config.model_name = "test-model"
 
         # Create bot handler with our mock client
-        bot_handler = BotHandler(
-            mock_config, mock_llm_client, lambda event, payload: None
-        )
+        bot_handler = BotHandler(mock_config, mock_llm_client, lambda event, payload: None)
 
         # Test the flow directly
         user_id = mock_update.effective_user.id
@@ -113,26 +108,16 @@ class TestBotFunctionality:
                     or "CRAFT" in content
                 )
             elif expected_prompt_type == "LYRA":
-                assert (
-                    "Lyra" in content
-                    or "МЕТОДОЛОГИЯ 4-D" in content
-                    or "LYRA" in content
-                )
+                assert "Lyra" in content or "МЕТОДОЛОГИЯ 4-D" in content or "LYRA" in content
             elif expected_prompt_type == "GGL":
-                assert (
-                    "Google" in content
-                    or "Prompt Engineering" in content
-                    or "GGL" in content
-                )
+                assert "Google" in content or "Prompt Engineering" in content or "GGL" in content
 
 
 class TestTimeoutHandling:
     """Test cases for timeout handling in the bot."""
 
     @pytest.mark.asyncio
-    async def test_llm_timeout_handling(
-        self, mock_update, mock_context, mock_llm_client
-    ):
+    async def test_llm_timeout_handling(self, mock_update, mock_context, mock_llm_client):
         """Test that the bot handles LLM timeouts gracefully."""
         from unittest.mock import MagicMock
 
@@ -140,7 +125,7 @@ class TestTimeoutHandling:
         from telegram_bot.utils.config import BotConfig
 
         # Set up a timeout error
-        mock_llm_client.send_prompt.side_effect = asyncio.TimeoutError("LLM timeout")
+        mock_llm_client.send_prompt.side_effect = TimeoutError("LLM timeout")
 
         # Create a real bot handler with mocked dependencies
         mock_config = MagicMock(spec=BotConfig)
@@ -148,9 +133,7 @@ class TestTimeoutHandling:
         mock_config.llm_backend = "TEST"
         mock_config.model_name = "test-model"
 
-        bot_handler = BotHandler(
-            mock_config, mock_llm_client, lambda event, payload: None
-        )
+        bot_handler = BotHandler(mock_config, mock_llm_client, lambda event, payload: None)
 
         # Test the flow
         await bot_handler.handle_start(mock_update, mock_context)
@@ -172,11 +155,7 @@ class TestTimeoutHandling:
         for call in calls:
             args, _ = call
             text = str(args[0])
-            if (
-                ("ошибка" in text.lower())
-                or ("Error" in text)
-                or ("timeout" in text.lower())
-            ):
+            if ("ошибка" in text.lower()) or ("Error" in text) or ("timeout" in text.lower()):
                 error_found = True
                 break
 
@@ -219,8 +198,3 @@ class TestTimeoutHandling:
             builder.connect_timeout.assert_called_with(60.0)
             builder.read_timeout.assert_called_with(300.0)
             builder.write_timeout.assert_called_with(120.0)
-
-
-
-
-

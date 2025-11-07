@@ -30,18 +30,14 @@ class TestPostOptimizationEmailButton:
     def test_post_followup_completion_keyboard_includes_email_button(self):
         """Test that post-followup completion keyboard includes the email button."""
         keyboard_buttons = [
-            button.text
-            for row in POST_FOLLOWUP_COMPLETION_KEYBOARD.keyboard
-            for button in row
+            button.text for row in POST_FOLLOWUP_COMPLETION_KEYBOARD.keyboard for button in row
         ]
         assert BTN_POST_OPTIMIZATION_EMAIL in keyboard_buttons
 
     def test_post_followup_decline_keyboard_includes_email_button(self):
         """Test that post-followup decline keyboard includes the email button."""
         keyboard_buttons = [
-            button.text
-            for row in POST_FOLLOWUP_DECLINE_KEYBOARD.keyboard
-            for button in row
+            button.text for row in POST_FOLLOWUP_DECLINE_KEYBOARD.keyboard for button in row
         ]
         assert BTN_POST_OPTIMIZATION_EMAIL in keyboard_buttons
 
@@ -55,9 +51,7 @@ class TestPostOptimizationEmailButton:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             bot_handler = BotHandler(config, llm_client)
             bot_handler.email_flow_orchestrator = AsyncMock()
@@ -104,9 +98,7 @@ class TestPostOptimizationEmailFlow:
             return orchestrator
 
     @pytest.mark.asyncio
-    async def test_get_current_optimization_result_follow_up(
-        self, email_flow_orchestrator
-    ):
+    async def test_get_current_optimization_result_follow_up(self, email_flow_orchestrator):
         """Test getting current optimization result for follow-up completion scenario."""
         user_id = 12345
         improved_prompt = "This is the improved prompt from follow-up"
@@ -125,23 +117,17 @@ class TestPostOptimizationEmailFlow:
         assert result["content"] == improved_prompt
 
     @pytest.mark.asyncio
-    async def test_get_current_optimization_result_single_method(
-        self, email_flow_orchestrator
-    ):
+    async def test_get_current_optimization_result_single_method(self, email_flow_orchestrator):
         """Test getting current optimization result for single method scenario."""
         user_id = 12345
         optimization_result = "This is the CRAFT optimization result"
 
         # Mock state manager - no stored result and no cached improved prompt
         email_flow_orchestrator.state_manager.get_post_optimization_result.return_value = None
-        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = (
-            None
-        )
+        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = None
 
         # Mock conversation manager
-        email_flow_orchestrator.conversation_manager.get_current_method.return_value = (
-            "CRAFT"
-        )
+        email_flow_orchestrator.conversation_manager.get_current_method.return_value = "CRAFT"
         email_flow_orchestrator.conversation_manager.get_transcript.return_value = [
             {"role": "system", "content": "System prompt"},
             {"role": "user", "content": "User prompt"},
@@ -156,31 +142,23 @@ class TestPostOptimizationEmailFlow:
         assert result["content"] == optimization_result
 
     @pytest.mark.asyncio
-    async def test_get_current_optimization_result_no_result(
-        self, email_flow_orchestrator
-    ):
+    async def test_get_current_optimization_result_no_result(self, email_flow_orchestrator):
         """Test getting current optimization result when no result is available."""
         user_id = 12345
 
         # Mock state manager - no stored result and no cached improved prompt
         email_flow_orchestrator.state_manager.get_post_optimization_result.return_value = None
-        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = (
-            None
-        )
+        email_flow_orchestrator.state_manager.get_improved_prompt_cache.return_value = None
 
         # Mock conversation manager with no current method
-        email_flow_orchestrator.conversation_manager.get_current_method.return_value = (
-            None
-        )
+        email_flow_orchestrator.conversation_manager.get_current_method.return_value = None
 
         result = email_flow_orchestrator._get_current_optimization_result(user_id)
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_current_optimization_result_stored_result(
-        self, email_flow_orchestrator
-    ):
+    async def test_get_current_optimization_result_stored_result(self, email_flow_orchestrator):
         """Test getting current optimization result from stored result (follow-up decline scenario)."""
         user_id = 12345
         stored_result = {
@@ -191,7 +169,9 @@ class TestPostOptimizationEmailFlow:
         }
 
         # Mock state manager to return stored result
-        email_flow_orchestrator.state_manager.get_post_optimization_result.return_value = stored_result
+        email_flow_orchestrator.state_manager.get_post_optimization_result.return_value = (
+            stored_result
+        )
 
         result = email_flow_orchestrator._get_current_optimization_result(user_id)
 
@@ -223,18 +203,10 @@ class TestPostOptimizationEmailFlow:
         email_flow_orchestrator._get_current_optimization_result = MagicMock(
             return_value=current_result
         )
-        email_flow_orchestrator.conversation_manager.get_user_prompt.return_value = (
-            original_prompt
-        )
-        email_flow_orchestrator.auth_service.is_user_authenticated = MagicMock(
-            return_value=True
-        )
-        email_flow_orchestrator.auth_service.get_user_email = MagicMock(
-            return_value=user_email
-        )
-        email_flow_orchestrator._send_post_optimization_email = AsyncMock(
-            return_value=True
-        )
+        email_flow_orchestrator.conversation_manager.get_user_prompt.return_value = original_prompt
+        email_flow_orchestrator.auth_service.is_user_authenticated = MagicMock(return_value=True)
+        email_flow_orchestrator.auth_service.get_user_email = MagicMock(return_value=user_email)
+        email_flow_orchestrator._send_post_optimization_email = AsyncMock(return_value=True)
         email_flow_orchestrator._safe_reply = AsyncMock()
 
         result = await email_flow_orchestrator.start_post_optimization_email_flow(
@@ -267,12 +239,8 @@ class TestPostOptimizationEmailFlow:
         email_flow_orchestrator._get_current_optimization_result = MagicMock(
             return_value=current_result
         )
-        email_flow_orchestrator.conversation_manager.get_user_prompt.return_value = (
-            original_prompt
-        )
-        email_flow_orchestrator.auth_service.is_user_authenticated = MagicMock(
-            return_value=False
-        )
+        email_flow_orchestrator.conversation_manager.get_user_prompt.return_value = original_prompt
+        email_flow_orchestrator.auth_service.is_user_authenticated = MagicMock(return_value=False)
         email_flow_orchestrator.state_manager.set_email_flow_data = MagicMock()
         email_flow_orchestrator.state_manager.set_waiting_for_email_input = MagicMock()
         email_flow_orchestrator._safe_reply = AsyncMock()
@@ -474,9 +442,7 @@ class TestPostOptimizationEmailIntegration:
             user_id = 12345
             otp_text = "123456"
 
-            result = await orchestrator.handle_otp_input(
-                update, context, user_id, otp_text
-            )
+            result = await orchestrator.handle_otp_input(update, context, user_id, otp_text)
 
             assert result is True
             orchestrator._send_post_optimization_email.assert_called_once()
@@ -512,9 +478,7 @@ class TestPostOptimizationEmailIntegration:
             state_manager.set_waiting_for_otp_input = MagicMock()
 
             # Mock follow-up and delivery
-            orchestrator._proceed_to_followup_and_delivery = AsyncMock(
-                return_value=True
-            )
+            orchestrator._proceed_to_followup_and_delivery = AsyncMock(return_value=True)
             orchestrator._safe_reply = AsyncMock()
 
             # Mock update and context
@@ -523,9 +487,7 @@ class TestPostOptimizationEmailIntegration:
             user_id = 12345
             otp_text = "123456"
 
-            result = await orchestrator.handle_otp_input(
-                update, context, user_id, otp_text
-            )
+            result = await orchestrator.handle_otp_input(update, context, user_id, otp_text)
 
             assert result is True
             orchestrator._proceed_to_followup_and_delivery.assert_called_once()
@@ -540,9 +502,7 @@ class TestPostOptimizationEmailIntegration:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.bot_handler import BotHandler
 
@@ -554,9 +514,7 @@ class TestPostOptimizationEmailIntegration:
             user_id = 12345
 
             # Test scenario 1: After follow-up completion
-            with patch.object(
-                bot_handler, "_complete_followup_conversation"
-            ) as mock_complete:
+            with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
 
                 async def mock_complete_side_effect(update, user_id, refined_prompt):
                     # Simulate sending the completion message with post-optimization button
@@ -631,9 +589,7 @@ class TestPostOptimizationEmailIntegration:
             orchestrator._get_current_optimization_result = MagicMock(return_value=None)
             orchestrator._safe_reply = AsyncMock()
 
-            result = await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            result = await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             assert result is False
             orchestrator._safe_reply.assert_called()
@@ -648,9 +604,7 @@ class TestPostOptimizationEmailIntegration:
             )
             conversation_manager.get_user_prompt.return_value = None
 
-            result = await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            result = await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             assert result is False
 
@@ -663,20 +617,14 @@ class TestPostOptimizationEmailIntegration:
             email_result = MagicMock()
             email_result.success = False
             email_result.error = "SMTP error"
-            mock_email.return_value.send_single_result_email = AsyncMock(
-                return_value=email_result
-            )
+            mock_email.return_value.send_single_result_email = AsyncMock(return_value=email_result)
 
             orchestrator._send_post_optimization_email = AsyncMock(return_value=False)
 
-            result = await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            result = await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             # Should handle error gracefully
-            assert (
-                result is False or result is True
-            )  # Depends on implementation details
+            assert result is False or result is True  # Depends on implementation details
 
     @pytest.mark.asyncio
     async def test_authentication_reuse_post_optimization(self):
@@ -699,9 +647,7 @@ class TestPostOptimizationEmailIntegration:
 
             # Mock authenticated user
             mock_auth.return_value.is_user_authenticated = MagicMock(return_value=True)
-            mock_auth.return_value.get_user_email = MagicMock(
-                return_value="test@example.com"
-            )
+            mock_auth.return_value.get_user_email = MagicMock(return_value="test@example.com")
 
             # Mock current result and original prompt
             orchestrator._get_current_optimization_result = MagicMock(
@@ -721,16 +667,12 @@ class TestPostOptimizationEmailIntegration:
             context = MagicMock()
             user_id = 12345
 
-            result = await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            result = await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             assert result is True
 
             # Verify authentication was checked
-            mock_auth.return_value.is_user_authenticated.assert_called_once_with(
-                user_id
-            )
+            mock_auth.return_value.is_user_authenticated.assert_called_once_with(user_id)
             mock_auth.return_value.get_user_email.assert_called_once_with(user_id)
 
             # Verify email was sent directly without OTP flow
@@ -778,9 +720,7 @@ class TestPostOptimizationEmailIntegration:
             context = MagicMock()
             user_id = 12345
 
-            result = await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            result = await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             assert result is True
 
@@ -791,15 +731,11 @@ class TestPostOptimizationEmailIntegration:
             assert flow_data["flow_type"] == "post_optimization"
             assert flow_data["original_prompt"] == "Original prompt"
             assert flow_data["current_result"]["type"] == "follow_up"
-            assert (
-                flow_data["current_result"]["method_name"] == "Follow-up Optimization"
-            )
+            assert flow_data["current_result"]["method_name"] == "Follow-up Optimization"
             assert flow_data["current_result"]["content"] == "Optimized content"
 
             # Verify waiting for email input state was set
-            state_manager.set_waiting_for_email_input.assert_called_once_with(
-                user_id, True
-            )
+            state_manager.set_waiting_for_email_input.assert_called_once_with(user_id, True)
 
 
 if __name__ == "__main__":
@@ -818,9 +754,7 @@ class TestPostOptimizationButtonDisplayLogic:
 
         # Verify keyboard contains the post-optimization email button
         keyboard_buttons = [
-            button.text
-            for row in POST_FOLLOWUP_COMPLETION_KEYBOARD.keyboard
-            for button in row
+            button.text for row in POST_FOLLOWUP_COMPLETION_KEYBOARD.keyboard for button in row
         ]
         assert BTN_POST_OPTIMIZATION_EMAIL in keyboard_buttons
 
@@ -839,9 +773,7 @@ class TestPostOptimizationButtonDisplayLogic:
 
         # Verify keyboard contains the post-optimization email button
         keyboard_buttons = [
-            button.text
-            for row in POST_FOLLOWUP_DECLINE_KEYBOARD.keyboard
-            for button in row
+            button.text for row in POST_FOLLOWUP_DECLINE_KEYBOARD.keyboard for button in row
         ]
         assert BTN_POST_OPTIMIZATION_EMAIL in keyboard_buttons
 
@@ -860,9 +792,7 @@ class TestPostOptimizationButtonDisplayLogic:
             FOLLOWUP_CHOICE_KEYBOARD,
             FOLLOWUP_CONVERSATION_KEYBOARD,
         ]:
-            keyboard_buttons = [
-                button.text for row in keyboard.keyboard for button in row
-            ]
+            keyboard_buttons = [button.text for row in keyboard.keyboard for button in row]
             assert BTN_POST_OPTIMIZATION_EMAIL not in keyboard_buttons
 
     @pytest.mark.asyncio
@@ -875,9 +805,7 @@ class TestPostOptimizationButtonDisplayLogic:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.bot_handler import BotHandler
 
@@ -885,8 +813,8 @@ class TestPostOptimizationButtonDisplayLogic:
 
             # Mock email flow orchestrator
             bot_handler.email_flow_orchestrator = MagicMock()
-            bot_handler.email_flow_orchestrator.start_post_optimization_email_flow = (
-                AsyncMock(return_value=True)
+            bot_handler.email_flow_orchestrator.start_post_optimization_email_flow = AsyncMock(
+                return_value=True
             )
 
             # Mock health monitor
@@ -921,9 +849,7 @@ class TestPostOptimizationErrorHandling:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.bot_handler import BotHandler
 
@@ -942,16 +868,13 @@ class TestPostOptimizationErrorHandling:
                 update.message.text = BTN_POST_OPTIMIZATION_EMAIL
                 context = MagicMock()
 
-                await bot_handler._handle_post_optimization_email(
-                    update, context, 12345
-                )
+                await bot_handler._handle_post_optimization_email(update, context, 12345)
 
                 # Verify error message was sent
                 bot_handler._safe_reply.assert_called()
                 call_args = bot_handler._safe_reply.call_args[0]
                 assert any(
-                    "недоступен" in str(arg).lower()
-                    or "unavailable" in str(arg).lower()
+                    "недоступен" in str(arg).lower() or "unavailable" in str(arg).lower()
                     for arg in call_args
                 )
 
@@ -984,9 +907,7 @@ class TestPostOptimizationErrorHandling:
             context = MagicMock()
             user_id = 12345
 
-            result = await orchestrator.start_post_optimization_email_flow(
-                update, context, user_id
-            )
+            result = await orchestrator.start_post_optimization_email_flow(update, context, user_id)
 
             assert result is False
             orchestrator._safe_reply.assert_called()
@@ -1001,9 +922,7 @@ class TestPostOptimizationErrorHandling:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.bot_handler import BotHandler
 
@@ -1035,9 +954,7 @@ class TestPostOptimizationErrorHandling:
         with patch("telegram_bot.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
-            mock_container.return_value.get_conversation_manager.return_value = (
-                MagicMock()
-            )
+            mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
             from telegram_bot.bot_handler import BotHandler
 
@@ -1045,8 +962,8 @@ class TestPostOptimizationErrorHandling:
 
             # Mock email flow orchestrator that raises exception
             bot_handler.email_flow_orchestrator = MagicMock()
-            bot_handler.email_flow_orchestrator.start_post_optimization_email_flow = (
-                AsyncMock(side_effect=Exception("Test exception"))
+            bot_handler.email_flow_orchestrator.start_post_optimization_email_flow = AsyncMock(
+                side_effect=Exception("Test exception")
             )
             bot_handler._safe_reply = AsyncMock()
 
@@ -1058,9 +975,7 @@ class TestPostOptimizationErrorHandling:
                 update.effective_user.id = 12345
                 context = MagicMock()
 
-                await bot_handler._handle_post_optimization_email(
-                    update, context, 12345
-                )
+                await bot_handler._handle_post_optimization_email(update, context, 12345)
 
                 # Verify error message was sent
                 bot_handler._safe_reply.assert_called()
@@ -1154,9 +1069,7 @@ class TestPostOptimizationFlowValidation:
 
             # Test follow-up result detection
             state_manager.get_post_optimization_result.return_value = None
-            state_manager.get_improved_prompt_cache.return_value = (
-                "Follow-up improved prompt"
-            )
+            state_manager.get_improved_prompt_cache.return_value = "Follow-up improved prompt"
 
             result = orchestrator._get_current_optimization_result(12345)
 
@@ -1284,6 +1197,3 @@ class TestPostOptimizationEmailTemplateIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

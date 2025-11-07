@@ -44,9 +44,7 @@ class TestEmailServiceSingleResult:
 
         # Mock email sending
         mock_result = EmailDeliveryResult(success=True, message_id="test123")
-        email_service._send_email_with_queue_fallback = AsyncMock(
-            return_value=mock_result
-        )
+        email_service._send_email_with_queue_fallback = AsyncMock(return_value=mock_result)
         email_service._generate_email_hash = MagicMock(return_value="hash123")
         email_service._is_email_already_sent = AsyncMock(return_value=False)
 
@@ -89,9 +87,7 @@ class TestEmailServiceSingleResult:
 
         # Mock email sending failure
         mock_result = EmailDeliveryResult(success=False, error="SMTP error")
-        email_service._send_email_with_queue_fallback = AsyncMock(
-            return_value=mock_result
-        )
+        email_service._send_email_with_queue_fallback = AsyncMock(return_value=mock_result)
         email_service._generate_email_hash = MagicMock(return_value="hash123")
         email_service._is_email_already_sent = AsyncMock(return_value=False)
 
@@ -112,9 +108,7 @@ class TestEmailServiceSingleResult:
 
         # Mock email sending
         mock_result = EmailDeliveryResult(success=True, message_id="test123")
-        email_service._send_email_with_queue_fallback = AsyncMock(
-            return_value=mock_result
-        )
+        email_service._send_email_with_queue_fallback = AsyncMock(return_value=mock_result)
         email_service._generate_email_hash = MagicMock(return_value="hash123")
         email_service._is_email_already_sent = AsyncMock(return_value=False)
 
@@ -174,6 +168,3 @@ class TestEmailServiceSingleResult:
 
 if __name__ == "__main__":
     pytest.main([__file__])
-
-
-

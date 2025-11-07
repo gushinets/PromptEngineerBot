@@ -5,7 +5,6 @@ Prompt loading and management.
 import logging
 import os
 import sys
-from typing import Dict
 
 
 class PromptLoader:
@@ -17,7 +16,7 @@ class PromptLoader:
             package_root = os.path.dirname(os.path.dirname(__file__))
             prompts_dir = os.path.join(package_root, "prompts")
         self.prompts_dir = prompts_dir
-        self._prompts: Dict[str, str] = {}
+        self._prompts: dict[str, str] = {}
         self._load_prompts()
 
     def _load_prompts(self):
@@ -42,7 +41,7 @@ class PromptLoader:
             filepath = os.path.join(self.prompts_dir, filename)
             try:
                 logger.debug(f"Loading prompt file: {filepath}")
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, encoding="utf-8") as f:
                     content = f.read().strip()
                     if not content:
                         error_msg = f"Prompt file is empty: {filepath}"
@@ -67,12 +66,12 @@ class PromptLoader:
             except (PermissionError, OSError) as e:
                 error_msg = f"Critical error: Cannot read prompt file {filepath}: {e}"
                 logger.error(error_msg)
-                failed_prompts.append(f"{key} ({filename}): {str(e)}")
+                failed_prompts.append(f"{key} ({filename}): {e!s}")
                 raise Exception(error_msg) from e
             except Exception as e:
                 error_msg = f"Critical error: Unexpected error loading prompt file {filepath}: {e}"
                 logger.error(error_msg)
-                failed_prompts.append(f"{key} ({filename}): {str(e)}")
+                failed_prompts.append(f"{key} ({filename}): {e!s}")
                 raise Exception(error_msg) from e
 
         # Log summary

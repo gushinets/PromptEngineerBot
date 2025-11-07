@@ -79,9 +79,7 @@ class TestOTPStorage:
         mock_pipeline.expire.assert_called_once()
         mock_pipeline.execute.assert_called_once()
 
-    def test_store_otp_with_original_complete_context(
-        self, redis_client_instance, mock_redis
-    ):
+    def test_store_otp_with_original_complete_context(self, redis_client_instance, mock_redis):
         """Test complete OTP context storage as per task 2.5 requirements."""
         mock_pipeline = mock_redis.pipeline.return_value
 
@@ -104,9 +102,7 @@ class TestOTPStorage:
         assert (
             stored_data["normalized_email"] == "test@example.com"
         )  # Explicitly named as per design
-        assert (
-            stored_data["email_original"] == "Test@Example.Com"
-        )  # Original format preserved
+        assert stored_data["email_original"] == "Test@Example.Com"  # Original format preserved
         assert stored_data["attempts"] == 0  # Attempt counter starts at 0
         assert "expires_at" in stored_data  # Expiry timestamp included
 
@@ -218,9 +214,7 @@ class TestOTPStorage:
         result = redis_client_instance.get_otp_data(123456789)
 
         assert result is None  # Should return None for expired OTP
-        mock_redis.delete.assert_called_once_with(
-            "otp:123456789"
-        )  # Should cleanup expired key
+        mock_redis.delete.assert_called_once_with("otp:123456789")  # Should cleanup expired key
 
     def test_key_cleanup_scenarios(self, redis_client_instance, mock_redis):
         """Test various key cleanup scenarios as per task 2.5."""
@@ -241,9 +235,7 @@ class TestOTPStorage:
         # Verify all cleanup calls were made
         assert mock_redis.delete.call_count == 3
 
-    def test_increment_otp_attempts_with_existence_check(
-        self, redis_client_instance, mock_redis
-    ):
+    def test_increment_otp_attempts_with_existence_check(self, redis_client_instance, mock_redis):
         """Test OTP attempts increment with existence check as per task 2.5."""
         mock_redis.exists.return_value = True  # OTP key exists
         mock_redis.hincrby.return_value = 2
@@ -254,9 +246,7 @@ class TestOTPStorage:
         mock_redis.exists.assert_called_once_with("otp:123456789")
         mock_redis.hincrby.assert_called_once_with("otp:123456789", "attempts", 1)
 
-    def test_increment_otp_attempts_key_not_exists(
-        self, redis_client_instance, mock_redis
-    ):
+    def test_increment_otp_attempts_key_not_exists(self, redis_client_instance, mock_redis):
         """Test OTP attempts increment when key doesn't exist."""
         mock_redis.exists.return_value = False  # OTP key doesn't exist
 
@@ -301,9 +291,7 @@ class TestRateLimiting:
         """Test email rate limit check when allowed."""
         mock_redis.get.return_value = b"2"  # Under limit of 3
 
-        is_allowed, count = redis_client_instance.check_email_rate_limit(
-            "test@example.com"
-        )
+        is_allowed, count = redis_client_instance.check_email_rate_limit("test@example.com")
 
         assert is_allowed is True
         assert count == 2
@@ -313,9 +301,7 @@ class TestRateLimiting:
         """Test email rate limit check when exceeded."""
         mock_redis.get.return_value = b"3"  # At limit of 3
 
-        is_allowed, count = redis_client_instance.check_email_rate_limit(
-            "test@example.com"
-        )
+        is_allowed, count = redis_client_instance.check_email_rate_limit("test@example.com")
 
         assert is_allowed is False
         assert count == 3
@@ -332,9 +318,7 @@ class TestRateLimiting:
 
     def test_check_spacing_limit_allowed(self, redis_client_instance, mock_redis):
         """Test spacing limit check when allowed."""
-        mock_redis.get.return_value = str(
-            int(time.time()) - 120
-        ).encode()  # 2 minutes ago
+        mock_redis.get.return_value = str(int(time.time()) - 120).encode()  # 2 minutes ago
 
         is_allowed, seconds = redis_client_instance.check_spacing_limit(123456789)
 
@@ -343,9 +327,7 @@ class TestRateLimiting:
 
     def test_check_spacing_limit_too_soon(self, redis_client_instance, mock_redis):
         """Test spacing limit check when too soon."""
-        mock_redis.get.return_value = str(
-            int(time.time()) - 30
-        ).encode()  # 30 seconds ago
+        mock_redis.get.return_value = str(int(time.time()) - 30).encode()  # 30 seconds ago
 
         is_allowed, seconds = redis_client_instance.check_spacing_limit(123456789)
 
@@ -356,9 +338,7 @@ class TestRateLimiting:
         """Test rate limit counter increments."""
         mock_pipeline = mock_redis.pipeline.return_value
 
-        result = redis_client_instance.increment_rate_limits(
-            123456789, "test@example.com"
-        )
+        result = redis_client_instance.increment_rate_limits(123456789, "test@example.com")
 
         assert result is True
         assert mock_pipeline.incr.call_count == 2  # Email and user counters
@@ -437,9 +417,7 @@ class TestGlobalRedisClient:
 
         # Only mock the underlying Redis connection
         with patch("telegram_bot.services.redis_client.redis.Redis"):
-            client = telegram_bot.services.redis_client.init_redis(
-                "redis://localhost:6379"
-            )
+            client = telegram_bot.services.redis_client.init_redis("redis://localhost:6379")
 
             assert isinstance(client, telegram_bot.services.redis_client.RedisClient)
             assert client.redis_url == "redis://localhost:6379"

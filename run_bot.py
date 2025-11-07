@@ -7,6 +7,7 @@ This script ensures proper module imports and runs the bot.
 import os
 import sys
 
+
 # Add the project root to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
 if project_root not in sys.path:

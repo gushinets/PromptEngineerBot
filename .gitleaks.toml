@@ -1,0 +1,166 @@
+# GitLeaks Configuration for Telegram Prompt Engineering Bot
+# This configuration detects hardcoded secrets and sensitive information
+
+title = "GitLeaks Security Configuration"
+
+# Global settings
+[extend]
+useDefault = true  # Include GitLeaks' built-in rules
+
+# Custom rules for project-specific secrets
+[[rules]]
+id = "telegram-bot-token"
+description = "Telegram Bot API Token"
+regex = '''[0-9]{8,10}:[a-zA-Z0-9_-]{35}'''
+keywords = [
+    "TELEGRAM_TOKEN",
+    "BOT_TOKEN",
+    "telegram_token",
+    "bot_token",
+]
+tags = ["telegram", "api-token"]
+severity = "critical"
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+keywords = [
+    "OPENAI_API_KEY",
+    "openai_api_key",
+    "OPENAI_KEY",
+    "openai_key",
+]
+tags = ["openai", "api-key"]
+severity = "critical"
+
+[[rules]]
+id = "openrouter-api-key"
+description = "OpenRouter API Key"
+regex = '''sk-or-v1-[a-zA-Z0-9]{64}'''
+keywords = [
+    "OPENROUTER_API_KEY",
+    "openrouter_api_key",
+    "OPENROUTER_KEY",
+    "openrouter_key",
+]
+tags = ["openrouter", "api-key"]
+severity = "critical"
+
+[[rules]]
+id = "google-service-account-json"
+description = "Google Service Account JSON"
+regex = '''"type":\s*"service_account"'''
+path = '''google_service_key\.json'''
+keywords = [
+    "service_account",
+    "private_key_id",
+    "private_key",
+]
+tags = ["google", "service-account"]
+severity = "critical"
+
+[[rules]]
+id = "database-connection-string"
+description = "Database Connection String with Password"
+regex = '''(?i)(postgresql|mysql|mongodb):\/\/[^:]+:[^@]+@[^\/]+'''
+keywords = [
+    "DATABASE_URL",
+    "DB_URL",
+    "database_url",
+    "db_url",
+]
+tags = ["database", "credentials"]
+severity = "high"
+
+[[rules]]
+id = "smtp-password"
+description = "SMTP Password"
+regex = '''(?i)smtp[_-]?password\s*[=:]\s*['"][^'"]{8,}['"]'''
+keywords = [
+    "SMTP_PASSWORD",
+    "smtp_password",
+    "mail_password",
+]
+tags = ["smtp", "credentials"]
+severity = "high"
+
+[[rules]]
+id = "redis-password"
+description = "Redis Password"
+regex = '''(?i)redis[_-]?password\s*[=:]\s*['"][^'"]{8,}['"]'''
+keywords = [
+    "REDIS_PASSWORD",
+    "redis_password",
+]
+tags = ["redis", "credentials"]
+severity = "high"
+
+# Allowlist configuration to reduce false positives
+[allowlist]
+description = "Allowlist for false positives and example files"
+
+# Paths to exclude from scanning
+paths = [
+    ".env.example",
+    ".env.template",
+    ".env",  # Actual environment file with real secrets (not committed to git)
+    "google_service_key.json",  # Service account file (not committed to git)
+    "docker-compose.yml",  # Contains development database credentials
+    "docs/",
+    "tests/fixtures/",
+    "tests/security/",
+    "tests/integration/",  # Integration tests may contain test credentials
+    "tests/unit/test_logging_utils.py",  # Contains masked test examples
+    "tests/e2e/test_security.py",  # Security tests with test tokens
+    ".kiro/specs/",
+    "README.md",
+    "MIGRATION_GUIDE.md",
+    ".git/",
+    ".venv/",
+    "venv/",
+    "__pycache__/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    "node_modules/",
+    "build/",
+    "dist/",
+    ".coverage",
+    "htmlcov/",
+    "alembic/versions/",
+]
+
+# Regex patterns for allowed values (placeholders and examples)
+regexes = [
+    '''your_.*_token''',
+    '''your_.*_key''',
+    '''your_.*_password''',
+    '''example\.com''',
+    '''localhost''',
+    '''127\.0\.0\.1''',
+    '''0\.0\.0\.0''',
+    '''test_.*_token''',
+    '''test_.*_key''',
+    '''mock_.*''',
+    '''fake_.*''',
+    '''dummy_.*''',
+    '''placeholder''',
+    '''REPLACE_WITH_.*''',
+    '''INSERT_.*_HERE''',
+    '''<.*>''',  # Placeholder in angle brackets
+    '''\[.*\]''',  # Placeholder in square brackets
+]
+
+# Stop words that indicate example/placeholder content
+stopwords = [
+    "example",
+    "sample",
+    "test",
+    "mock",
+    "fake",
+    "dummy",
+    "placeholder",
+    "your_",
+    "insert_",
+    "replace_",
+]

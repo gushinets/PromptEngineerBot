@@ -1,0 +1,44 @@
+# Safety Policy Configuration
+# This file documents vulnerability exceptions for the Safety dependency scanner
+# 
+# Safety scans Python dependencies in requirements.txt and pyproject.toml for known
+# security vulnerabilities (CVEs). Use this file to document and ignore specific
+# vulnerabilities that are:
+# - False positives (vulnerability doesn't apply to how we use the package)
+# - Accepted risks (vulnerability acknowledged but mitigation not yet implemented)
+# - Awaiting fixes (vulnerability known, fix planned for future release)
+#
+# IMPORTANT: Every ignored vulnerability MUST include:
+# - reason: Clear explanation of why it's being ignored
+# - expires: Date when this exception should be reviewed (YYYY-MM-DD format)
+#
+# Documentation: https://docs.pyup.io/docs/safety-20-policy-file
+
+security:
+  # List of vulnerability IDs to ignore
+  # Each entry should document the CVE ID, reason for ignoring, and expiration date
+  ignore-vulnerabilities:
+    # Example format (remove or replace with actual vulnerabilities):
+    # 
+    # 51668:
+    #   reason: "False positive - we don't use the affected feature (XML parsing)"
+    #   expires: "2025-12-31"
+    # 
+    # 52495:
+    #   reason: "Accepted risk - vulnerability in dev dependency only, not in production"
+    #   expires: "2025-06-30"
+    # 
+    # 53127:
+    #   reason: "Awaiting fix - no patch available yet, mitigation implemented via input validation"
+    #   expires: "2025-03-31"
+
+  # Continue scanning even if vulnerabilities are found (set to false to fail builds)
+  continue-on-vulnerability-error: false
+
+# Best Practices:
+# 1. Review expired exceptions monthly and either remove or extend with updated justification
+# 2. Link to internal tickets/issues tracking vulnerability remediation
+# 3. Prefer upgrading vulnerable packages over ignoring vulnerabilities
+# 4. Document mitigation strategies for accepted risks
+# 5. Use specific CVE IDs rather than package names when possible
+# 6. Set realistic expiration dates (typically 30-90 days for review)

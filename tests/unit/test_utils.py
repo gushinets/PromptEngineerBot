@@ -6,8 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from telegram_bot.dependencies import reset_container
-
 
 @pytest.fixture(autouse=True)
 def reset_dependency_container():
@@ -44,6 +42,3 @@ def create_mock_llm_client():
         return_value={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
     )
     return mock_llm_client
-
-
-

@@ -5,6 +5,7 @@ Tests OTP generation, hashing, verification, rate limiting, and user persistence
 """
 
 import time
+from datetime import UTC
 from unittest.mock import Mock, patch
 
 import pytest
@@ -47,7 +48,9 @@ class TestAuthService:
     @pytest.fixture
     def auth_service(self, mock_redis_client, mock_config):
         """Create AuthService instance with mocked dependencies."""
-        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis_client):
+        with patch(
+            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis_client
+        ):
             return AuthService(mock_config)
 
     def test_validate_email_format_valid(self, auth_service):
@@ -61,9 +64,7 @@ class TestAuthService:
         ]
 
         for email in valid_emails:
-            assert auth_service.validate_email_format(email), (
-                f"Should accept valid email: {email}"
-            )
+            assert auth_service.validate_email_format(email), f"Should accept valid email: {email}"
 
     def test_validate_email_format_invalid(self, auth_service):
         """Test email format validation with invalid emails."""
@@ -96,9 +97,7 @@ class TestAuthService:
 
             # Should be in valid range (100000-999999)
             otp_int = int(otp)
-            assert 100000 <= otp_int <= 999999, (
-                f"OTP should be 6 digits, got: {otp_int}"
-            )
+            assert 100000 <= otp_int <= 999999, f"OTP should be 6 digits, got: {otp_int}"
 
     def test_otp_hashing(self, auth_service):
         """Test OTP is properly hashed with Argon2id."""
@@ -114,14 +113,10 @@ class TestAuthService:
         assert otp_hash.startswith("$argon2id$"), "Hash should be in Argon2id format"
 
         # Should verify correctly
-        assert auth_service.verify_otp_hash(otp, otp_hash), (
-            "Hash should verify correctly"
-        )
+        assert auth_service.verify_otp_hash(otp, otp_hash), "Hash should verify correctly"
 
         # Should not verify with wrong OTP
-        assert not auth_service.verify_otp_hash("654321", otp_hash), (
-            "Wrong OTP should not verify"
-        )
+        assert not auth_service.verify_otp_hash("654321", otp_hash), "Wrong OTP should not verify"
 
     def test_otp_hashing_error_handling(self, auth_service):
         """Test OTP hashing error handling."""
@@ -202,9 +197,7 @@ class TestAuthService:
         )  # 30s since last
         allowed, reason = auth_service.check_rate_limits(telegram_id, email)
         assert not allowed, "Should block send if <60s since last"
-        assert "spacing_violation" in reason, (
-            f"Should indicate spacing violation, got: {reason}"
-        )
+        assert "spacing_violation" in reason, f"Should indicate spacing violation, got: {reason}"
 
         # Test send allowed if ≥60s since last send
         mock_redis_client.check_spacing_limit.return_value = (
@@ -238,9 +231,7 @@ class TestAuthService:
         success, message, otp = auth_service.send_otp(telegram_id, email)
 
         assert not success, "Should fail when rate limited"
-        assert "rate_limited" in message, (
-            f"Should indicate rate limiting, got: {message}"
-        )
+        assert "rate_limited" in message, f"Should indicate rate limiting, got: {message}"
         assert otp is None, "Should not return OTP when rate limited"
 
     def test_send_otp_success(self, auth_service, mock_redis_client):
@@ -284,9 +275,7 @@ class TestAuthService:
         success, message, otp = auth_service.send_otp(telegram_id, email)
 
         assert not success, "Should fail when storage fails"
-        assert message == "storage_failed", (
-            f"Should indicate storage failure, got: {message}"
-        )
+        assert message == "storage_failed", f"Should indicate storage failure, got: {message}"
         assert otp is None, "Should not return OTP when storage fails"
 
     def test_verify_otp_not_found(self, auth_service, mock_redis_client):
@@ -353,9 +342,7 @@ class TestAuthService:
         )
 
         # Should delete OTP after attempt limit exceeded with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "attempt_limit_exceeded"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "attempt_limit_exceeded")
 
     def test_verify_otp_invalid_code(self, auth_service, mock_redis_client):
         """Test OTP verification with wrong code and attempt counter increment."""
@@ -392,9 +379,7 @@ class TestAuthService:
         # Should NOT delete OTP on failed attempt (unless 3rd attempt)
         mock_redis_client.delete_otp.assert_not_called()
 
-    def test_verify_otp_invalid_code_third_attempt(
-        self, auth_service, mock_redis_client
-    ):
+    def test_verify_otp_invalid_code_third_attempt(self, auth_service, mock_redis_client):
         """Test OTP verification with wrong code on 3rd attempt - delete key after >3 failed attempts."""
         telegram_id = 123456789
         otp = "123456"
@@ -427,9 +412,7 @@ class TestAuthService:
         mock_redis_client.increment_otp_attempts.assert_called_once_with(telegram_id)
 
         # Should delete OTP key after >3 failed attempts with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "attempt_limit_exceeded"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "attempt_limit_exceeded")
 
     @patch("telegram_bot.auth.auth_service.get_db_session")
     def test_verify_otp_success_new_user_first_verification(
@@ -470,14 +453,10 @@ class TestAuthService:
         success, message = auth_service.verify_otp(telegram_id, otp)
 
         assert success, f"Should succeed with correct OTP, got message: {message}"
-        assert message == "verification_successful", (
-            f"Should indicate success, got: {message}"
-        )
+        assert message == "verification_successful", f"Should indicate success, got: {message}"
 
         # Should delete OTP key on successful verification with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "verification_success"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "verification_success")
 
         # Should create new user with proper fields and log auth event
         assert mock_session.add.call_count == 2, "Should add both User and AuthEvent"
@@ -532,21 +511,15 @@ class TestAuthService:
         mock_get_session.return_value.__enter__.return_value = mock_session
         mock_user = Mock()
         mock_user.email_verified_at = None  # Never verified before
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         success, message = auth_service.verify_otp(telegram_id, otp)
 
         assert success, f"Should succeed with correct OTP, got message: {message}"
-        assert message == "verification_successful", (
-            f"Should indicate success, got: {message}"
-        )
+        assert message == "verification_successful", f"Should indicate success, got: {message}"
 
         # Should delete OTP key on successful verification with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "verification_success"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "verification_success")
 
         # Should update existing user with first-time verification
         assert mock_user.email == email  # Normalized
@@ -588,26 +561,20 @@ class TestAuthService:
         mock_user = Mock()
 
         # User was already verified before (has email_verified_at timestamp)
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        original_verified_at = datetime.now(timezone.utc)
+        original_verified_at = datetime.now(UTC)
         mock_user.email_verified_at = original_verified_at
 
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         success, message = auth_service.verify_otp(telegram_id, otp)
 
         assert success, f"Should succeed with correct OTP, got message: {message}"
-        assert message == "verification_successful", (
-            f"Should indicate success, got: {message}"
-        )
+        assert message == "verification_successful", f"Should indicate success, got: {message}"
 
         # Should delete OTP key on successful verification with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "verification_success"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "verification_success")
 
         # Should update existing user for subsequent verification
         assert mock_user.email == email  # Normalized
@@ -665,9 +632,7 @@ class TestAuthService:
         )
 
         # Should still delete OTP key after verification attempt with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "verification_success"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "verification_success")
 
     @patch("telegram_bot.auth.auth_service.get_db_session")
     def test_is_user_authenticated_true(self, mock_get_session, auth_service):
@@ -678,9 +643,7 @@ class TestAuthService:
         mock_session = Mock()
         mock_get_session.return_value.__enter__.return_value = mock_session
         mock_user = Mock()
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         result = auth_service.is_user_authenticated(telegram_id)
 
@@ -711,9 +674,7 @@ class TestAuthService:
         mock_get_session.return_value.__enter__.return_value = mock_session
         mock_user = Mock()
         mock_user.email = expected_email
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_user
-        )
+        mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
 
         result = auth_service.get_user_email(telegram_id)
 
@@ -758,9 +719,7 @@ class TestAuthService:
         assert args[4] == 300  # ttl
         assert len(args[1]) > 0  # OTP hash should be present and non-empty
 
-    def test_attempt_counter_increment_and_persistence(
-        self, auth_service, mock_redis_client
-    ):
+    def test_attempt_counter_increment_and_persistence(self, auth_service, mock_redis_client):
         """Test attempt counter increment and persistence on every verification attempt."""
         telegram_id = 123456789
         otp = "123456"
@@ -864,9 +823,7 @@ class TestAuthService:
         )
 
         # Verify OTP key is deleted after >3 failed attempts with proper reason
-        mock_redis_client.delete_otp.assert_called_once_with(
-            telegram_id, "attempt_limit_exceeded"
-        )
+        mock_redis_client.delete_otp.assert_called_once_with(telegram_id, "attempt_limit_exceeded")
 
     def test_otp_key_cleanup_on_expiry(self, auth_service, mock_redis_client):
         """Test OTP key deletion on expiry."""
@@ -897,7 +854,6 @@ class TestAuthServiceGlobals:
 
     def test_init_auth_service(self):
         """Test auth service initialization."""
-        from telegram_bot.config import BotConfig
 
         mock_config = Mock()
         mock_config.otp_ttl_seconds = 300
@@ -923,7 +879,6 @@ class TestAuthServiceGlobals:
 
     def test_get_auth_service_initialized(self):
         """Test getting auth service when initialized."""
-        from telegram_bot.config import BotConfig
 
         mock_config = Mock()
         mock_config.otp_ttl_seconds = 300
@@ -936,6 +891,3 @@ class TestAuthServiceGlobals:
             service = init_auth_service(mock_config)
             retrieved_service = get_auth_service()
             assert retrieved_service is service
-
-
-

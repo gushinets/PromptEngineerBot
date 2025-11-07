@@ -7,8 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from dotenv import load_dotenv
 
+
 # Import test utilities to ensure autouse fixtures are loaded
-from tests.unit.test_utils import reset_dependency_container
+
 
 # Add the project root to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -74,6 +75,3 @@ def mock_llm_client():
     )
 
     return mock_client
-
-
-

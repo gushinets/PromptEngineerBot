@@ -29,19 +29,17 @@ Performance-optimized indexes are created for profile fields:
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Index, Text, create_engine, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
+
 
 logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
-
-    pass
 
 
 class User(Base):
@@ -66,17 +64,11 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    email_original: Mapped[Optional[str]] = mapped_column(Text)
+    email_original: Mapped[str | None] = mapped_column(Text)
     is_authenticated: Mapped[bool] = mapped_column(Boolean, default=False)
-    email_verified_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
-    last_authenticated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=func.now()
-    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_authenticated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
@@ -84,11 +76,11 @@ class User(Base):
     # Telegram profile fields extracted from update.effective_user
     # These fields are automatically populated during user interactions
 
-    first_name: Mapped[Optional[str]] = mapped_column(Text)
+    first_name: Mapped[str | None] = mapped_column(Text)
     """User's first name from Telegram (update.effective_user.first_name).
     Nullable as some users may not have a first name set in their Telegram profile."""
 
-    last_name: Mapped[Optional[str]] = mapped_column(Text)
+    last_name: Mapped[str | None] = mapped_column(Text)
     """User's last name from Telegram (update.effective_user.last_name).
     Nullable as most users don't set a last name in their Telegram profile."""
 
@@ -96,12 +88,12 @@ class User(Base):
     """Indicates if this user is a Telegram bot account (update.effective_user.is_bot).
     Defaults to False for regular user accounts. Used for analytics and bot detection."""
 
-    is_premium: Mapped[Optional[bool]] = mapped_column(Boolean)
+    is_premium: Mapped[bool | None] = mapped_column(Boolean)
     """Indicates if user has Telegram Premium subscription (update.effective_user.is_premium).
     Nullable as this field may not be available for all users or in all Telegram versions.
     Used for feature differentiation and user analytics."""
 
-    language_code: Mapped[Optional[str]] = mapped_column(Text)
+    language_code: Mapped[str | None] = mapped_column(Text)
     """User's language preference as ISO 639-1 code (update.effective_user.language_code).
     Examples: 'en', 'es', 'fr', 'de'. Nullable as not all users have language set.
     Used for localization and language-specific features."""
@@ -118,13 +110,11 @@ class AuthEvent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(Text)
+    email: Mapped[str | None] = mapped_column(Text)
     event_type: Mapped[str] = mapped_column(Text, nullable=False)
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    reason: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=func.now()
-    )
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
 
     def __repr__(self) -> str:
         return f"<AuthEvent(id={self.id}, event_type='{self.event_type}', success={self.success})>"
@@ -133,21 +123,15 @@ class AuthEvent(Base):
 # Essential Indexes for User Model
 Index("ix_users_telegram_id", User.telegram_id)
 Index("ix_users_email", User.email)
-Index(
-    "ix_users_authenticated", User.is_authenticated, User.last_authenticated_at.desc()
-)
+Index("ix_users_authenticated", User.is_authenticated, User.last_authenticated_at.desc())
 
 # Profile field indexes for efficient queries on Telegram user data
 Index("ix_users_language_code", User.language_code)  # Language-based user segmentation
 Index("ix_users_is_premium", User.is_premium)  # Premium user filtering and analytics
-Index(
-    "ix_users_bot_premium", User.is_bot, User.is_premium
-)  # Composite index for user type queries
+Index("ix_users_bot_premium", User.is_bot, User.is_premium)  # Composite index for user type queries
 
 # Essential Indexes for AuthEvents Model
-Index(
-    "ix_auth_events_telegram_time", AuthEvent.telegram_id, AuthEvent.created_at.desc()
-)
+Index("ix_auth_events_telegram_time", AuthEvent.telegram_id, AuthEvent.created_at.desc())
 Index("ix_auth_events_email_time", AuthEvent.email, AuthEvent.created_at.desc())
 Index("ix_auth_events_type_time", AuthEvent.event_type, AuthEvent.created_at.desc())
 
@@ -195,9 +179,7 @@ class DatabaseManager:
     def get_session_factory(self):
         """Get or create session factory."""
         if self._session_factory is None:
-            self._session_factory = sessionmaker(
-                bind=self.get_engine(), expire_on_commit=False
-            )
+            self._session_factory = sessionmaker(bind=self.get_engine(), expire_on_commit=False)
         return self._session_factory
 
     def create_tables(self):
@@ -302,7 +284,7 @@ def mask_telegram_id(tg_id: int) -> str:
 
 
 # Global database manager instance
-db_manager: Optional[DatabaseManager] = None
+db_manager: DatabaseManager | None = None
 
 
 def init_database(
@@ -357,9 +339,7 @@ def get_db_manager() -> DatabaseManager:
         RuntimeError: If database manager is not initialized
     """
     if db_manager is None:
-        raise RuntimeError(
-            "Database manager not initialized. Call init_database() first."
-        )
+        raise RuntimeError("Database manager not initialized. Call init_database() first.")
     return db_manager
 
 

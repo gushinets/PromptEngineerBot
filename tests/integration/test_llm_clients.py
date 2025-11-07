@@ -1,14 +1,10 @@
 """Tests for LLM client implementations."""
 
 import asyncio
-import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import aiohttp
 import pytest
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
-from openai.types.chat.chat_completion import Choice
 
 # Import the clients to test
 from telegram_bot.services.llm.openai_client import OpenAIClient
@@ -37,7 +33,9 @@ class TestOpenAIClient:
     @pytest.mark.asyncio
     async def test_send_prompt_success(self, mock_openai_response):
         """Test successful prompt sending to OpenAI."""
-        with patch("telegram_bot.services.llm.openai_client.OpenAIClient._call_openai_api") as mock_call:
+        with patch(
+            "telegram_bot.services.llm.openai_client.OpenAIClient._call_openai_api"
+        ) as mock_call:
             # Mock underlying API call
             mock_call.return_value = ("Mocked response", None)
 
@@ -60,7 +58,7 @@ class TestOpenAIClient:
         """Test timeout handling in OpenAI client."""
         with patch(
             "telegram_bot.services.llm.openai_client.OpenAIClient._call_openai_api",
-            side_effect=asyncio.TimeoutError("API timeout"),
+            side_effect=TimeoutError("API timeout"),
         ):
             client = OpenAIClient(
                 api_key="test-key",
@@ -73,7 +71,7 @@ class TestOpenAIClient:
 
             with patch(
                 "telegram_bot.services.llm.openai_client.OpenAIClient._call_openai_api",
-                side_effect=asyncio.TimeoutError("API timeout"),
+                side_effect=TimeoutError("API timeout"),
             ):
                 with pytest.raises(Exception) as exc_info:
                     await client.send_prompt(messages)
@@ -180,14 +178,12 @@ class TestLLMClientIntegration:
                 if client_class is OpenAIClient:
                     with patch(
                         "telegram_bot.services.llm.openai_client.OpenAIClient._call_openai_api",
-                        side_effect=asyncio.TimeoutError("API timeout"),
+                        side_effect=TimeoutError("API timeout"),
                     ):
                         # Initialize client before invoking send_prompt
                         client = client_class(**client_kwargs)
                         with pytest.raises(asyncio.TimeoutError):
-                            await client.send_prompt(
-                                [{"role": "user", "content": "Test timeout"}]
-                            )
+                            await client.send_prompt([{"role": "user", "content": "Test timeout"}])
                         continue
                 try:
                     # Configure client with a short timeout
@@ -200,13 +196,8 @@ class TestLLMClientIntegration:
 
                     # Test that timeout is properly raised
                     with pytest.raises(asyncio.TimeoutError):
-                        await client.send_prompt(
-                            [{"role": "user", "content": "Test timeout"}]
-                        )
+                        await client.send_prompt([{"role": "user", "content": "Test timeout"}])
 
                 except Exception as e:
                     if "Timeout" not in str(e):
                         raise  # Re-raise if it's not a timeout error
-
-
-

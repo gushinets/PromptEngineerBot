@@ -8,7 +8,8 @@ and graceful degradation without relying on problematic pytest fixtures.
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 
 # Add paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -17,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.graceful_degradation import (
     DegradationLevel,
-    DegradationRule,
     DegradationState,
     GracefulDegradationManager,
     ServiceType,
@@ -26,7 +26,6 @@ from telegram_bot.utils.health_checks import (
     HealthCheckResult,
     HealthMonitor,
     HealthStatus,
-    ServiceHealth,
 )
 from telegram_bot.utils.logging_utils import (
     PIIProtectedFormatter,
@@ -55,9 +54,7 @@ def test_health_monitoring_basic():
     assert HealthStatus.UNKNOWN.value == "unknown"
 
     # Test health check result
-    result = HealthCheckResult(
-        service="database", status=HealthStatus.HEALTHY, response_time_ms=50
-    )
+    result = HealthCheckResult(service="database", status=HealthStatus.HEALTHY, response_time_ms=50)
     assert result.service == "database"
     assert result.status == HealthStatus.HEALTHY
     assert result.response_time_ms == 50
@@ -275,6 +272,3 @@ def run_all_tests():
 
 if __name__ == "__main__":
     run_all_tests()
-
-
-

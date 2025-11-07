@@ -15,7 +15,6 @@ class Redis:
 
     def __init__(self, connection_pool=None):
         """Initialize mock Redis client."""
-        pass
 
     def ping(self):
         """Mock ping command."""
@@ -43,7 +42,7 @@ class Redis:
 
     def get(self, key):
         """Mock get command."""
-        return None
+        return
 
     def incr(self, key):
         """Mock incr command."""

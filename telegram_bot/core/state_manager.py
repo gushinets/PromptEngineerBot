@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 
 @dataclass
@@ -19,18 +18,16 @@ class UserState:
         post_optimization_result (Optional[dict]): Cached optimization result for post-optimization email button.
     """
 
-    waiting_for_prompt: bool = (
-        True  # Default to True so new users start in prompt input mode
-    )
-    last_interaction: Optional[str] = None
+    waiting_for_prompt: bool = True  # Default to True so new users start in prompt input mode
+    last_interaction: str | None = None
     waiting_for_followup_choice: bool = False
     in_followup_conversation: bool = False
-    improved_prompt_cache: Optional[str] = None
-    cached_method_name: Optional[str] = None
+    improved_prompt_cache: str | None = None
+    cached_method_name: str | None = None
     waiting_for_email_input: bool = False
     waiting_for_otp_input: bool = False
-    email_flow_data: Optional[dict] = None
-    post_optimization_result: Optional[dict] = None
+    email_flow_data: dict | None = None
+    post_optimization_result: dict | None = None
 
 
 class StateManager:
@@ -40,7 +37,7 @@ class StateManager:
     """
 
     def __init__(self):
-        self.states: Dict[int, UserState] = {}
+        self.states: dict[int, UserState] = {}
 
     def get_user_state(self, user_id: int) -> UserState:
         """
@@ -94,7 +91,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         state.in_followup_conversation = active
 
-    def set_improved_prompt_cache(self, user_id: int, prompt: Optional[str]):
+    def set_improved_prompt_cache(self, user_id: int, prompt: str | None):
         """
         Cache the improved prompt for follow-up conversation context.
         Args:
@@ -104,7 +101,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         state.improved_prompt_cache = prompt
 
-    def get_improved_prompt_cache(self, user_id: int) -> Optional[str]:
+    def get_improved_prompt_cache(self, user_id: int) -> str | None:
         """
         Get the cached improved prompt for follow-up conversation context.
         Args:
@@ -115,7 +112,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         return state.improved_prompt_cache
 
-    def set_cached_method_name(self, user_id: int, method_name: Optional[str]):
+    def set_cached_method_name(self, user_id: int, method_name: str | None):
         """
         Cache the method name for the improved prompt.
         Args:
@@ -125,7 +122,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         state.cached_method_name = method_name
 
-    def get_cached_method_name(self, user_id: int) -> Optional[str]:
+    def get_cached_method_name(self, user_id: int) -> str | None:
         """
         Get the cached method name for the improved prompt.
         Args:
@@ -156,7 +153,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         state.waiting_for_otp_input = waiting
 
-    def set_email_flow_data(self, user_id: int, data: Optional[dict]):
+    def set_email_flow_data(self, user_id: int, data: dict | None):
         """
         Set email flow data for the user.
         Args:
@@ -166,7 +163,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         state.email_flow_data = data
 
-    def get_email_flow_data(self, user_id: int) -> Optional[dict]:
+    def get_email_flow_data(self, user_id: int) -> dict | None:
         """
         Get email flow data for the user.
         Args:
@@ -177,7 +174,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         return state.email_flow_data
 
-    def set_post_optimization_result(self, user_id: int, result: Optional[dict]):
+    def set_post_optimization_result(self, user_id: int, result: dict | None):
         """
         Set post-optimization result for the user.
         Args:
@@ -187,7 +184,7 @@ class StateManager:
         state = self.get_user_state(user_id)
         state.post_optimization_result = result
 
-    def get_post_optimization_result(self, user_id: int) -> Optional[dict]:
+    def get_post_optimization_result(self, user_id: int) -> dict | None:
         """
         Get post-optimization result for the user.
         Args:

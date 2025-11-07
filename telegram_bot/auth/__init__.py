@@ -14,10 +14,11 @@ from telegram_bot.auth.user_profile_utils import (
     should_update_user_profile,
 )
 
+
 __all__ = [
-    "get_auth_service",
-    "init_auth_service",
     "extract_user_profile",
+    "get_auth_service",
     "has_meaningful_profile_changes",
+    "init_auth_service",
     "should_update_user_profile",
 ]

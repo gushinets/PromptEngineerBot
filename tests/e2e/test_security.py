@@ -5,8 +5,6 @@ This module tests security vulnerabilities, data protection,
 rate limiting bypass attempts, PII masking, and access controls.
 """
 
-import hashlib
-import re
 import time
 from unittest.mock import MagicMock, patch
 
@@ -134,9 +132,7 @@ class TestOTPSecurity:
 
         # Check for sufficient uniqueness (should be close to 10000 unique values)
         uniqueness_ratio = len(otps) / 10000
-        assert uniqueness_ratio > 0.95, (
-            f"OTP uniqueness ratio {uniqueness_ratio:.3f} too low"
-        )
+        assert uniqueness_ratio > 0.95, f"OTP uniqueness ratio {uniqueness_ratio:.3f} too low"
 
     def test_otp_hash_security(self, auth_service):
         """Test OTP hashing security."""
@@ -149,19 +145,13 @@ class TestOTPSecurity:
             hashes.append(hash_value)
 
             # Verify hash format (Argon2id)
-            assert hash_value.startswith("$argon2id$"), (
-                f"Hash {hash_value} not Argon2id format"
-            )
+            assert hash_value.startswith("$argon2id$"), f"Hash {hash_value} not Argon2id format"
 
             # Verify hash verifies correctly
-            assert auth_service.verify_otp_hash(otp, hash_value), (
-                "Hash verification failed"
-            )
+            assert auth_service.verify_otp_hash(otp, hash_value), "Hash verification failed"
 
             # Verify wrong OTP doesn't verify
-            assert not auth_service.verify_otp_hash("654321", hash_value), (
-                "Wrong OTP verified"
-            )
+            assert not auth_service.verify_otp_hash("654321", hash_value), "Wrong OTP verified"
 
         # All hashes should be different (salted)
         unique_hashes = set(hashes)
@@ -187,9 +177,7 @@ class TestOTPSecurity:
             # Should contain hash, not plaintext
             if "otp_hash" in stored_data:
                 assert stored_data["otp_hash"] != otp, "Plaintext OTP stored in Redis"
-                assert stored_data["otp_hash"].startswith("$argon2id$"), (
-                    "OTP not properly hashed"
-                )
+                assert stored_data["otp_hash"].startswith("$argon2id$"), "OTP not properly hashed"
 
         # The key point is that OTP was hashed before storage
         # This is verified by the fact that send_otp succeeded and returned a hash
@@ -207,9 +195,7 @@ class TestRateLimitingSecurity:
         mock_config.user_rate_limit_per_hour = 5
         mock_config.otp_spacing_seconds = 60
 
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis):
             service = AuthService(mock_config)
             service.redis_client = mock_redis
             return service, mock_redis
@@ -278,9 +264,7 @@ class TestRateLimitingSecurity:
 
         # Multiple rapid requests should be blocked
         for i in range(5):
-            success, message, otp = auth_service.send_otp(
-                telegram_id, f"test{i}@example.com"
-            )
+            success, message, otp = auth_service.send_otp(telegram_id, f"test{i}@example.com")
             assert not success, f"Spacing limit bypassed on attempt {i + 1}"
             assert "rate_limited" in message
 
@@ -305,9 +289,7 @@ class TestRateLimitingSecurity:
         # Simulate concurrent requests
         results = []
         for i in range(10):
-            success, message, otp = auth_service.send_otp(
-                telegram_id, f"test{i}@example.com"
-            )
+            success, message, otp = auth_service.send_otp(telegram_id, f"test{i}@example.com")
             results.append(success)
 
         successful_requests = sum(results)
@@ -393,18 +375,12 @@ class TestDataProtectionSecurity:
 
         # Verify sensitive data is not in logs
         assert sensitive_data["email"] not in log_output, "Email found in logs"
-        assert str(sensitive_data["telegram_id"]) not in log_output, (
-            "Telegram ID found in logs"
-        )
+        assert str(sensitive_data["telegram_id"]) not in log_output, "Telegram ID found in logs"
         assert sensitive_data["otp"] not in log_output, "OTP found in logs"
 
         # Verify masked data is present
-        assert mask_email(sensitive_data["email"]) in log_output, (
-            "Masked email not found"
-        )
-        assert mask_telegram_id(sensitive_data["telegram_id"]) in log_output, (
-            "Masked ID not found"
-        )
+        assert mask_email(sensitive_data["email"]) in log_output, "Masked email not found"
+        assert mask_telegram_id(sensitive_data["telegram_id"]) in log_output, "Masked ID not found"
 
     def test_database_data_protection(self):
         """Test database data protection."""
@@ -457,7 +433,6 @@ class TestEmailSecurityVulnerabilities:
         ]
 
         # Import and create a real AuthService instance
-        from telegram_bot.auth.auth_service import AuthService
 
         # Mock dependencies
         mock_redis = MagicMock()
@@ -470,9 +445,7 @@ class TestEmailSecurityVulnerabilities:
 
         importlib.reload(telegram_bot.auth.auth_service)
 
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis):
             # Create a real AuthService instance (not mocked)
             auth_service = telegram_bot.auth.auth_service.AuthService(mock_config)
 
@@ -511,9 +484,7 @@ class TestEmailSecurityVulnerabilities:
 
             # Verify malicious content is escaped or removed
             assert "<script>" not in body, f"Script tag not sanitized in: {content}"
-            assert "javascript:" not in body, (
-                f"JavaScript protocol not sanitized in: {content}"
-            )
+            assert "javascript:" not in body, f"JavaScript protocol not sanitized in: {content}"
             assert "onerror=" not in body, f"Event handler not sanitized in: {content}"
             assert "<iframe" not in body, f"Iframe tag not sanitized in: {content}"
 
@@ -597,9 +568,7 @@ class TestAccessControlSecurity:
         user2_transcript = conv_manager.get_transcript(user2_id)
 
         assert user1_prompt != user2_prompt, "User prompts not isolated"
-        assert len(user1_transcript) > 0 and len(user2_transcript) > 0, (
-            "Transcripts empty"
-        )
+        assert len(user1_transcript) > 0 and len(user2_transcript) > 0, "Transcripts empty"
 
         # Verify no cross-contamination
         user1_messages = [msg["content"] for msg in user1_transcript]
@@ -622,9 +591,7 @@ class TestAccessControlSecurity:
         # Configure mock config
         mock_config.otp_max_attempts = 3
 
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis):
             auth_service = telegram_bot.auth.auth_service.AuthService(mock_config)
 
             # Test various bypass attempts
@@ -658,9 +625,7 @@ class TestCryptographicSecurity:
         mock_redis = MagicMock()
         mock_config = MagicMock()
 
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis):
             # Create a real AuthService instance (not mocked)
             auth_service = telegram_bot.auth.auth_service.AuthService(mock_config)
 
@@ -669,9 +634,7 @@ class TestCryptographicSecurity:
             otp_hash = auth_service.hash_otp(otp)
 
             # Verify we get a real hash, not a mock
-            assert isinstance(otp_hash, str), (
-                f"Expected string, got {type(otp_hash)}: {otp_hash}"
-            )
+            assert isinstance(otp_hash, str), f"Expected string, got {type(otp_hash)}: {otp_hash}"
 
             # Verify Argon2id is used (secure algorithm)
             assert otp_hash.startswith("$argon2id$"), "Insecure hash algorithm used"
@@ -695,9 +658,7 @@ class TestCryptographicSecurity:
         mock_redis = MagicMock()
         mock_config = MagicMock()
 
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis):
             # Create a real AuthService instance (not mocked)
             auth_service = telegram_bot.auth.auth_service.AuthService(mock_config)
 
@@ -706,9 +667,7 @@ class TestCryptographicSecurity:
             for _ in range(1000):
                 otp = auth_service.generate_otp()
                 # Ensure we get a real OTP, not a mock
-                assert isinstance(otp, str), (
-                    f"Expected string OTP, got {type(otp)}: {otp}"
-                )
+                assert isinstance(otp, str), f"Expected string OTP, got {type(otp)}: {otp}"
                 assert otp.isdigit(), f"OTP should be numeric: {otp}"
                 assert len(otp) == 6, f"OTP should be 6 digits: {otp}"
                 otps.append(int(otp))
@@ -718,9 +677,7 @@ class TestCryptographicSecurity:
             expected_mean = (100000 + 999999) / 2  # Middle of range
 
             # Mean should be close to expected (within 5%)
-            assert abs(mean - expected_mean) / expected_mean < 0.05, (
-                "OTP distribution not random"
-            )
+            assert abs(mean - expected_mean) / expected_mean < 0.05, "OTP distribution not random"
 
             # Test for patterns (no consecutive identical OTPs)
             consecutive_identical = 0
@@ -729,9 +686,7 @@ class TestCryptographicSecurity:
                     consecutive_identical += 1
 
             # Should be very few consecutive identical (less than 1%)
-            assert consecutive_identical / len(otps) < 0.01, (
-                "Too many consecutive identical OTPs"
-            )
+            assert consecutive_identical / len(otps) < 0.01, "Too many consecutive identical OTPs"
 
     def test_timing_attack_resistance(self):
         """Test resistance to timing attacks."""
@@ -744,9 +699,7 @@ class TestCryptographicSecurity:
         mock_redis = MagicMock()
         mock_config = MagicMock()
 
-        with patch(
-            "telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis
-        ):
+        with patch("telegram_bot.auth.auth_service.get_redis_client", return_value=mock_redis):
             auth_service = telegram_bot.auth.auth_service.AuthService(mock_config)
 
             # Test hash verification timing
@@ -775,9 +728,7 @@ class TestCryptographicSecurity:
             min_time = min(avg_correct, avg_wrong)
             if min_time > 0:
                 timing_ratio = max(avg_correct, avg_wrong) / min_time
-                assert timing_ratio < 2.0, (
-                    f"Timing attack possible: ratio {timing_ratio:.2f}"
-                )
+                assert timing_ratio < 2.0, f"Timing attack possible: ratio {timing_ratio:.2f}"
             else:
                 # If times are too small to measure, that's actually good for security
                 assert True, "Timing too small to measure - good for security"

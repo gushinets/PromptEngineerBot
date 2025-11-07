@@ -3,10 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from telegram import ReplyKeyboardMarkup
 
 from telegram_bot.core.bot_handler import BotHandler
-from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.messages import (
     BTN_CRAFT,
     BTN_GENERATE_PROMPT,
@@ -101,9 +99,7 @@ class TestBotHandler:
         assert "reply_markup" in kwargs
 
     @pytest.mark.asyncio
-    async def test_handle_message_reset_button(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_message_reset_button(self, bot_handler, mock_update, mock_context):
         """Test handling reset button."""
         mock_update.message.text = BTN_RESET
 
@@ -112,9 +108,7 @@ class TestBotHandler:
             mock_start.assert_called_once_with(mock_update, mock_context)
 
     @pytest.mark.asyncio
-    async def test_handle_message_prompt_input(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_message_prompt_input(self, bot_handler, mock_update, mock_context):
         """Test handling prompt input."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = "Test prompt"
@@ -125,9 +119,7 @@ class TestBotHandler:
         await bot_handler.handle_message(mock_update, mock_context)
 
         # Verify prompt was stored
-        assert (
-            bot_handler.conversation_manager.get_user_prompt(user_id) == "Test prompt"
-        )
+        assert bot_handler.conversation_manager.get_user_prompt(user_id) == "Test prompt"
         assert bot_handler.conversation_manager.is_waiting_for_method(user_id) is True
 
         # Verify method selection message was sent
@@ -142,9 +134,7 @@ class TestBotHandler:
         mock_update.message.text = BTN_CRAFT
 
         # Set up state for method selection
-        bot_handler.state_manager.set_waiting_for_prompt(
-            user_id, False
-        )  # Not waiting for prompt
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)  # Not waiting for prompt
         bot_handler.conversation_manager.set_user_prompt(user_id, "Test prompt")
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
         bot_handler.conversation_manager.append_message(user_id, "user", "Test prompt")
@@ -166,9 +156,7 @@ class TestBotHandler:
         mock_update.message.text = BTN_LYRA
 
         # Set up state for method selection
-        bot_handler.state_manager.set_waiting_for_prompt(
-            user_id, False
-        )  # Not waiting for prompt
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)  # Not waiting for prompt
         bot_handler.conversation_manager.set_user_prompt(user_id, "Test prompt")
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
         bot_handler.conversation_manager.append_message(user_id, "user", "Test prompt")
@@ -179,9 +167,7 @@ class TestBotHandler:
         bot_handler.llm_client.send_prompt.assert_called_once()
 
         # Verify method was set
-        assert (
-            bot_handler.conversation_manager.get_current_method(user_id) == "LYRA Basic"
-        )
+        assert bot_handler.conversation_manager.get_current_method(user_id) == "LYRA Basic"
 
     @pytest.mark.asyncio
     async def test_handle_message_invalid_method_selection(
@@ -192,9 +178,7 @@ class TestBotHandler:
         mock_update.message.text = "Invalid method"
 
         # Set up state for method selection
-        bot_handler.state_manager.set_waiting_for_prompt(
-            user_id, False
-        )  # Not waiting for prompt
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)  # Not waiting for prompt
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
 
         await bot_handler.handle_message(mock_update, mock_context)
@@ -206,21 +190,15 @@ class TestBotHandler:
         bot_handler.llm_client.send_prompt.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_handle_conversation_turn(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_conversation_turn(self, bot_handler, mock_update, mock_context):
         """Test handling multi-turn conversation."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = "Follow-up question"
 
         # Set up existing conversation
-        bot_handler.state_manager.set_waiting_for_prompt(
-            user_id, False
-        )  # Not waiting for prompt
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)  # Not waiting for prompt
         bot_handler.conversation_manager.set_current_method(user_id, "CRAFT")
-        bot_handler.conversation_manager.append_message(
-            user_id, "user", "Initial prompt"
-        )
+        bot_handler.conversation_manager.append_message(user_id, "user", "Initial prompt")
 
         await bot_handler.handle_message(mock_update, mock_context)
 
@@ -232,9 +210,7 @@ class TestBotHandler:
         bot_handler.llm_client.send_prompt.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_process_with_llm_success(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_process_with_llm_success(self, bot_handler, mock_update, mock_context):
         """Test successful LLM processing."""
         user_id = mock_update.effective_user.id
         method_name = "CRAFT"
@@ -271,9 +247,7 @@ class TestBotHandler:
         assert "Произошла ошибка" in args[0]
 
     @pytest.mark.asyncio
-    async def test_process_with_llm_improved_prompt(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_process_with_llm_improved_prompt(self, bot_handler, mock_update, mock_context):
         """Test LLM processing with improved prompt response (legacy test - now offers follow-up)."""
         user_id = mock_update.effective_user.id
         method_name = "CRAFT"
@@ -285,9 +259,7 @@ class TestBotHandler:
 
         # Set up conversation
         bot_handler.conversation_manager.set_user_prompt(user_id, "Original prompt")
-        bot_handler.conversation_manager.append_message(
-            user_id, "user", "Original prompt"
-        )
+        bot_handler.conversation_manager.append_message(user_id, "user", "Original prompt")
 
         await bot_handler._process_with_llm(mock_update, user_id, method_name)
 
@@ -320,9 +292,7 @@ class TestBotHandler:
             None,
         ]
 
-        result = await bot_handler._safe_reply(
-            mock_update, "Test message", parse_mode="Markdown"
-        )
+        result = await bot_handler._safe_reply(mock_update, "Test message", parse_mode="Markdown")
 
         assert result is True
         assert mock_update.message.reply_text.call_count == 2
@@ -397,9 +367,7 @@ class TestBotHandler:
         sheets_logger.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_handle_followup_choice_no(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_choice_no(self, bot_handler, mock_update, mock_context):
         """Test handling НЕТ choice in follow-up questions."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = BTN_NO
@@ -426,9 +394,7 @@ class TestBotHandler:
         assert bot_handler.conversation_manager.get_transcript(user_id) == []
 
     @pytest.mark.asyncio
-    async def test_handle_followup_choice_yes(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_choice_yes(self, bot_handler, mock_update, mock_context):
         """Test handling ДА choice in follow-up questions with simplified flow."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = BTN_YES
@@ -454,9 +420,7 @@ class TestBotHandler:
         user_state = bot_handler.state_manager.get_user_state(user_id)
         assert user_state.waiting_for_followup_choice is False
         assert user_state.in_followup_conversation is True
-        assert (
-            user_state.improved_prompt_cache == cached_prompt
-        )  # Cache preserved for follow-up
+        assert user_state.improved_prompt_cache == cached_prompt  # Cache preserved for follow-up
 
     @pytest.mark.asyncio
     async def test_handle_followup_choice_yes_no_cache(
@@ -483,9 +447,7 @@ class TestBotHandler:
         assert user_state.waiting_for_prompt is True
 
     @pytest.mark.asyncio
-    async def test_handle_followup_choice_invalid(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_choice_invalid(self, bot_handler, mock_update, mock_context):
         """Test handling invalid choice in follow-up questions."""
         user_id = mock_update.effective_user.id
         invalid_text = "Invalid choice"
@@ -551,13 +513,11 @@ class TestBotHandler:
         # Set up follow-up conversation state properly
         print(f"TEST DEBUG: Setting up state for user_id={user_id}")
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
-        print(f"TEST DEBUG: Set in_followup_conversation=True")
+        print("TEST DEBUG: Set in_followup_conversation=True")
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Improved prompt")
-        print(f"TEST DEBUG: Set improved_prompt_cache='Improved prompt'")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
-        print(f"TEST DEBUG: Started followup conversation")
+        print("TEST DEBUG: Set improved_prompt_cache='Improved prompt'")
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
+        print("TEST DEBUG: Started followup conversation")
 
         # Verify state was set correctly
         user_state = bot_handler.state_manager.get_user_state(user_id)
@@ -567,13 +527,9 @@ class TestBotHandler:
 
         # Debug: Check validation before proceeding
         print(f"DEBUG: user_id = {user_id}")
-        print(
-            f"DEBUG: validation result = {bot_handler._validate_followup_state(user_id)}"
-        )
+        print(f"DEBUG: validation result = {bot_handler._validate_followup_state(user_id)}")
         user_state = bot_handler.state_manager.get_user_state(user_id)
-        print(
-            f"DEBUG: in_followup_conversation = {user_state.in_followup_conversation}"
-        )
+        print(f"DEBUG: in_followup_conversation = {user_state.in_followup_conversation}")
         print(f"DEBUG: improved_prompt_cache = {user_state.improved_prompt_cache}")
         print(
             f"DEBUG: conversation_manager check = {bot_handler.conversation_manager.is_in_followup_conversation(user_id)}"
@@ -609,9 +565,7 @@ class TestBotHandler:
 
         # Set up follow-up conversation state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         with patch.object(bot_handler, "_process_followup_generation") as mock_process:
             await bot_handler._handle_followup_conversation(
@@ -631,30 +585,20 @@ class TestBotHandler:
         # Set up follow-up conversation state properly
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Improved prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Mock LLM response with refined prompt
         bot_handler.llm_client.send_prompt.return_value = (
             "<REFINED_PROMPT>Final refined prompt</REFINED_PROMPT>"
         )
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
-            await bot_handler._handle_followup_conversation(
-                mock_update, user_id, "My answer"
-            )
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
+            await bot_handler._handle_followup_conversation(mock_update, user_id, "My answer")
 
-            mock_complete.assert_called_once_with(
-                mock_update, user_id, "Final refined prompt"
-            )
+            mock_complete.assert_called_once_with(mock_update, user_id, "Final refined prompt")
 
     @pytest.mark.asyncio
-    async def test_handle_followup_conversation_error(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_conversation_error(self, bot_handler, mock_update, mock_context):
         """Test error handling in follow-up conversation."""
         user_id = mock_update.effective_user.id
         mock_update.message.text = "My answer"
@@ -662,19 +606,13 @@ class TestBotHandler:
         # Set up follow-up conversation state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Make LLM client raise an error
         bot_handler.llm_client.send_prompt.side_effect = Exception("LLM Error")
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
-            await bot_handler._handle_followup_conversation(
-                mock_update, user_id, "My answer"
-            )
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
+            await bot_handler._handle_followup_conversation(mock_update, user_id, "My answer")
 
             # Should fallback to cached prompt
             mock_complete.assert_called_once_with(mock_update, user_id, "Cached prompt")
@@ -689,18 +627,14 @@ class TestBotHandler:
         # Set up follow-up conversation state properly
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Improved prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Mock LLM response with refined prompt
         bot_handler.llm_client.send_prompt.return_value = (
             "<REFINED_PROMPT>Generated refined prompt</REFINED_PROMPT>"
         )
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
             await bot_handler._process_followup_generation(mock_update, user_id)
 
             # Verify generate signal was sent to LLM
@@ -711,9 +645,7 @@ class TestBotHandler:
             )
 
             # Verify completion was called
-            mock_complete.assert_called_once_with(
-                mock_update, user_id, "Generated refined prompt"
-            )
+            mock_complete.assert_called_once_with(mock_update, user_id, "Generated refined prompt")
 
     @pytest.mark.asyncio
     async def test_process_followup_generation_no_refined_prompt(
@@ -724,60 +656,42 @@ class TestBotHandler:
 
         # Set up follow-up conversation state
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Fallback prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Mock LLM response without refined prompt
         bot_handler.llm_client.send_prompt.return_value = "Some other response"
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
             await bot_handler._process_followup_generation(mock_update, user_id)
 
             # Should fallback to cached prompt
-            mock_complete.assert_called_once_with(
-                mock_update, user_id, "Fallback prompt"
-            )
+            mock_complete.assert_called_once_with(mock_update, user_id, "Fallback prompt")
 
     @pytest.mark.asyncio
-    async def test_process_followup_generation_error(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_process_followup_generation_error(self, bot_handler, mock_update, mock_context):
         """Test error handling in follow-up generation."""
         user_id = mock_update.effective_user.id
 
         # Set up follow-up conversation state
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Fallback prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Make LLM client raise an error
         bot_handler.llm_client.send_prompt.side_effect = Exception("LLM Error")
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
             await bot_handler._process_followup_generation(mock_update, user_id)
 
             # Should fallback to cached prompt
-            mock_complete.assert_called_once_with(
-                mock_update, user_id, "Fallback prompt"
-            )
+            mock_complete.assert_called_once_with(mock_update, user_id, "Fallback prompt")
 
     @pytest.mark.asyncio
-    async def test_complete_followup_conversation(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_complete_followup_conversation(self, bot_handler, mock_update, mock_context):
         """Test completing follow-up conversation."""
         user_id = mock_update.effective_user.id
         refined_prompt = "Final refined prompt"
 
-        await bot_handler._complete_followup_conversation(
-            mock_update, user_id, refined_prompt
-        )
+        await bot_handler._complete_followup_conversation(mock_update, user_id, refined_prompt)
 
         # Verify refined prompt was sent
         assert mock_update.message.reply_text.call_count >= 2
@@ -790,9 +704,7 @@ class TestBotHandler:
     # Error Handling Tests for Follow-up Feature
 
     @pytest.mark.asyncio
-    async def test_handle_followup_error_timeout(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_error_timeout(self, bot_handler, mock_update, mock_context):
         """Test handling timeout errors during follow-up conversations."""
         user_id = mock_update.effective_user.id
         timeout_error = Exception("Request timed out")
@@ -816,9 +728,7 @@ class TestBotHandler:
         assert timeout_message_found or mock_update.message.reply_text.call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_handle_followup_error_network(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_error_network(self, bot_handler, mock_update, mock_context):
         """Test handling network errors during follow-up conversations."""
         user_id = mock_update.effective_user.id
         network_error = Exception("Connection failed")
@@ -834,9 +744,7 @@ class TestBotHandler:
         mock_update.message.reply_text.assert_called()
 
     @pytest.mark.asyncio
-    async def test_handle_followup_error_no_cache(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_handle_followup_error_no_cache(self, bot_handler, mock_update, mock_context):
         """Test handling errors when no cached prompt is available."""
         user_id = mock_update.effective_user.id
         error = Exception("Generic error")
@@ -844,9 +752,7 @@ class TestBotHandler:
         # No cached prompt
         bot_handler.state_manager.set_improved_prompt_cache(user_id, None)
 
-        await bot_handler._handle_followup_error(
-            mock_update, user_id, error, "conversation"
-        )
+        await bot_handler._handle_followup_error(mock_update, user_id, error, "conversation")
 
         # Verify fallback to prompt input
         mock_update.message.reply_text.assert_called()
@@ -892,9 +798,7 @@ class TestBotHandler:
         # Set up valid follow-up state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Test prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Test prompt")
 
         result = bot_handler._validate_followup_state(user_id)
         assert result is True
@@ -959,9 +863,7 @@ class TestBotHandler:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_recover_followup_state_with_cache(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_recover_followup_state_with_cache(self, bot_handler, mock_update, mock_context):
         """Test state recovery when cached prompt is available."""
         user_id = mock_update.effective_user.id
         cached_prompt = "Cached improved prompt"
@@ -969,9 +871,7 @@ class TestBotHandler:
         # Set up cached prompt
         bot_handler.state_manager.set_improved_prompt_cache(user_id, cached_prompt)
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
             await bot_handler._recover_followup_state(mock_update, user_id)
 
             # Verify recovery message was sent
@@ -981,9 +881,7 @@ class TestBotHandler:
             mock_complete.assert_called_once_with(mock_update, user_id, cached_prompt)
 
     @pytest.mark.asyncio
-    async def test_recover_followup_state_no_cache(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_recover_followup_state_no_cache(self, bot_handler, mock_update, mock_context):
         """Test state recovery when no cached prompt is available."""
         user_id = mock_update.effective_user.id
 
@@ -1004,9 +902,7 @@ class TestBotHandler:
         response = "<REFINED_PROMPT>Refined prompt content</REFINED_PROMPT>"
         user_id = 12345
 
-        parsed, is_refined = bot_handler._parse_followup_response_with_fallback(
-            response, user_id
-        )
+        parsed, is_refined = bot_handler._parse_followup_response_with_fallback(response, user_id)
 
         assert parsed == "Refined prompt content"
         assert is_refined is True
@@ -1016,9 +912,7 @@ class TestBotHandler:
         response = "<REFINED_PROMPT></REFINED_PROMPT>"
         user_id = 12345
 
-        with patch.object(
-            bot_handler, "_fallback_parse_refined_prompt"
-        ) as mock_fallback:
+        with patch.object(bot_handler, "_fallback_parse_refined_prompt") as mock_fallback:
             mock_fallback.return_value = ("Fallback content", True)
 
             parsed, is_refined = bot_handler._parse_followup_response_with_fallback(
@@ -1049,9 +943,7 @@ class TestBotHandler:
         response = "<REFINED_PROMPT>Fallback content</REFINED_PROMPT>"
         user_id = 12345
 
-        parsed, is_refined = bot_handler._fallback_parse_refined_prompt(
-            response, user_id
-        )
+        parsed, is_refined = bot_handler._fallback_parse_refined_prompt(response, user_id)
 
         assert parsed == "Fallback content"
         assert is_refined is True
@@ -1061,9 +953,7 @@ class TestBotHandler:
         response = "<REFINED_PROMPT>Content here<END REFINED_PROMPT>"
         user_id = 12345
 
-        parsed, is_refined = bot_handler._fallback_parse_refined_prompt(
-            response, user_id
-        )
+        parsed, is_refined = bot_handler._fallback_parse_refined_prompt(response, user_id)
 
         assert parsed == "Content here"
         assert is_refined is True
@@ -1073,9 +963,7 @@ class TestBotHandler:
         response = "No refined prompt tag here"
         user_id = 12345
 
-        parsed, is_refined = bot_handler._fallback_parse_refined_prompt(
-            response, user_id
-        )
+        parsed, is_refined = bot_handler._fallback_parse_refined_prompt(response, user_id)
 
         assert parsed == response.strip()
         assert is_refined is False
@@ -1090,9 +978,7 @@ class TestBotHandler:
 
         bot_handler.state_manager.set_improved_prompt_cache(user_id, cached_prompt)
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
             await bot_handler._handle_missing_refined_prompt(mock_update, user_id)
 
             mock_complete.assert_called_once_with(mock_update, user_id, cached_prompt)
@@ -1159,14 +1045,10 @@ class TestBotHandler:
         # Set up valid state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Test prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Test prompt")
 
         # Mock LLM response
-        bot_handler.llm_client.send_prompt.return_value = (
-            "What is your target audience?"
-        )
+        bot_handler.llm_client.send_prompt.return_value = "What is your target audience?"
 
         await bot_handler._process_followup_llm_request(mock_update, user_id)
 
@@ -1186,9 +1068,7 @@ class TestBotHandler:
         # Set up valid state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Test prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Test prompt")
 
         # Mock LLM response without refined prompt
         bot_handler.llm_client.send_prompt.return_value = "Another question?"
@@ -1211,9 +1091,7 @@ class TestBotHandler:
         # Set up follow-up conversation state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Test prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Test prompt")
 
         # Capture transcript state during error handling
         captured_transcript = None
@@ -1221,9 +1099,7 @@ class TestBotHandler:
 
         async def capture_transcript_on_error(*args, **kwargs):
             nonlocal captured_transcript
-            captured_transcript = bot_handler.conversation_manager.get_transcript(
-                user_id
-            ).copy()
+            captured_transcript = bot_handler.conversation_manager.get_transcript(user_id).copy()
             return await original_handle_error(*args, **kwargs)
 
         # Make LLM client raise a timeout error
@@ -1234,9 +1110,7 @@ class TestBotHandler:
             "_handle_followup_error",
             side_effect=capture_transcript_on_error,
         ):
-            await bot_handler._handle_followup_conversation(
-                mock_update, user_id, "User response"
-            )
+            await bot_handler._handle_followup_conversation(mock_update, user_id, "User response")
 
         # Verify error was handled and fallback was used
         mock_update.message.reply_text.assert_called()
@@ -1260,9 +1134,7 @@ class TestBotHandler:
         # Set up follow-up conversation state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Test prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Test prompt")
 
         # Capture transcript state during error handling
         captured_transcript = None
@@ -1270,9 +1142,7 @@ class TestBotHandler:
 
         async def capture_transcript_on_error(*args, **kwargs):
             nonlocal captured_transcript
-            captured_transcript = bot_handler.conversation_manager.get_transcript(
-                user_id
-            ).copy()
+            captured_transcript = bot_handler.conversation_manager.get_transcript(user_id).copy()
             return await original_handle_error(*args, **kwargs)
 
         # Make LLM client raise a network error
@@ -1318,9 +1188,7 @@ class TestBotHandler:
         sheets_logger = MagicMock()
         bot_handler.log_sheets = sheets_logger
 
-        await bot_handler._complete_followup_conversation(
-            mock_update, user_id, refined_prompt
-        )
+        await bot_handler._complete_followup_conversation(mock_update, user_id, refined_prompt)
 
         # Verify refined prompt was sent
         assert mock_update.message.reply_text.call_count >= 1
@@ -1367,17 +1235,13 @@ class TestBotHandler:
             mock_handle.assert_called_once_with(mock_update, user_id, "User response")
 
     @pytest.mark.asyncio
-    async def test_process_with_llm_followup_initial(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_process_with_llm_followup_initial(self, bot_handler, mock_update, mock_context):
         """Test _process_with_llm with FOLLOWUP method for initial questions."""
         user_id = mock_update.effective_user.id
         method_name = "FOLLOWUP"
 
         # Set up follow-up conversation
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Mock LLM response with initial questions
         bot_handler.llm_client.send_prompt.return_value = (
@@ -1403,18 +1267,14 @@ class TestBotHandler:
         method_name = "FOLLOWUP"
 
         # Set up follow-up conversation
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, "Improved prompt"
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, "Improved prompt")
 
         # Mock LLM response with immediate refined prompt (edge case)
         bot_handler.llm_client.send_prompt.return_value = (
             "<REFINED_PROMPT>Immediately refined prompt</REFINED_PROMPT>"
         )
 
-        with patch.object(
-            bot_handler, "_complete_followup_conversation"
-        ) as mock_complete:
+        with patch.object(bot_handler, "_complete_followup_conversation") as mock_complete:
             await bot_handler._process_with_llm(mock_update, user_id, method_name)
 
             # Should complete the conversation immediately
@@ -1437,9 +1297,7 @@ class TestBotHandler:
 
         # Set up conversation
         bot_handler.conversation_manager.set_user_prompt(user_id, "Original prompt")
-        bot_handler.conversation_manager.append_message(
-            user_id, "user", "Original prompt"
-        )
+        bot_handler.conversation_manager.append_message(user_id, "user", "Original prompt")
 
         await bot_handler._process_with_llm(mock_update, user_id, method_name)
 
@@ -1494,12 +1352,8 @@ class TestBotHandler:
 
         # Set up follow-up choice state with other conflicting states
         bot_handler.state_manager.set_waiting_for_followup_choice(user_id, True)
-        bot_handler.state_manager.set_waiting_for_prompt(
-            user_id, True
-        )  # Should be ignored
-        bot_handler.conversation_manager.set_waiting_for_method(
-            user_id, True
-        )  # Should be ignored
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, True)  # Should be ignored
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, True)  # Should be ignored
         bot_handler.state_manager.set_improved_prompt_cache(user_id, "Cached prompt")
 
         with patch.object(bot_handler, "_handle_followup_choice") as mock_handle:
@@ -1516,18 +1370,12 @@ class TestBotHandler:
 
         # Set up follow-up conversation state with other conflicting states
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
-        bot_handler.state_manager.set_waiting_for_prompt(
-            user_id, True
-        )  # Should be ignored
-        bot_handler.conversation_manager.set_waiting_for_method(
-            user_id, True
-        )  # Should be ignored
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, True)  # Should be ignored
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, True)  # Should be ignored
 
         with patch.object(bot_handler, "_handle_followup_conversation") as mock_handle:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(
-                mock_update, user_id, "User response in follow-up"
-            )
+            mock_handle.assert_called_once_with(mock_update, user_id, "User response in follow-up")
 
     @pytest.mark.asyncio
     async def test_handle_message_routing_precedence_prompt_input(
@@ -1539,15 +1387,11 @@ class TestBotHandler:
 
         # Set up prompt waiting state with method selection state
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)
-        bot_handler.conversation_manager.set_waiting_for_method(
-            user_id, True
-        )  # Should be ignored
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, True)  # Should be ignored
 
         with patch.object(bot_handler, "_handle_prompt_input") as mock_handle:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(
-                mock_update, user_id, "New prompt input"
-            )
+            mock_handle.assert_called_once_with(mock_update, user_id, "New prompt input")
 
     @pytest.mark.asyncio
     async def test_handle_message_routing_precedence_method_selection(
@@ -1566,9 +1410,7 @@ class TestBotHandler:
 
         with patch.object(bot_handler, "_handle_method_selection") as mock_handle:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(
-                mock_update, mock_context, user_id, BTN_CRAFT
-            )
+            mock_handle.assert_called_once_with(mock_update, mock_context, user_id, BTN_CRAFT)
 
     @pytest.mark.asyncio
     async def test_handle_message_routing_fallback_conversation_turn(
@@ -1586,9 +1428,7 @@ class TestBotHandler:
 
         with patch.object(bot_handler, "_handle_conversation_turn") as mock_handle:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_handle.assert_called_once_with(
-                mock_update, user_id, "Follow-up message"
-            )
+            mock_handle.assert_called_once_with(mock_update, user_id, "Follow-up message")
 
     @pytest.mark.asyncio
     async def test_handle_message_routing_state_isolation(
@@ -1642,9 +1482,7 @@ class TestBotHandler:
 
         with patch.object(bot_handler, "_handle_method_selection") as mock_method:
             await bot_handler.handle_message(mock_update, mock_context)
-            mock_method.assert_called_once_with(
-                mock_update, mock_context, user_id, BTN_CRAFT
-            )
+            mock_method.assert_called_once_with(mock_update, mock_context, user_id, BTN_CRAFT)
 
         # Transition to follow-up choice
         mock_update.message.text = BTN_YES
@@ -1715,9 +1553,7 @@ class TestBotHandler:
 
         # Step 4: User answers follow-up questions
         mock_update.message.text = "My target audience is developers"
-        bot_handler.llm_client.send_prompt.return_value = (
-            "Any specific programming languages?"
-        )
+        bot_handler.llm_client.send_prompt.return_value = "Any specific programming languages?"
 
         await bot_handler.handle_message(mock_update, mock_context)
 
@@ -1743,9 +1579,7 @@ class TestBotHandler:
         assert bot_handler.conversation_manager.get_transcript(user_id) == []
 
     @pytest.mark.asyncio
-    async def test_complete_followup_workflow_no_flow(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_complete_followup_workflow_no_flow(self, bot_handler, mock_update, mock_context):
         """Test complete НЕТ flow from offer to prompt input reset."""
         user_id = mock_update.effective_user.id
         original_prompt = "Original user prompt"
@@ -1794,17 +1628,11 @@ class TestBotHandler:
         # Set up follow-up conversation state
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, improved_prompt
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)
 
         # Add some conversation history
-        bot_handler.conversation_manager.append_message(
-            user_id, "assistant", "What is your goal?"
-        )
-        bot_handler.conversation_manager.append_message(
-            user_id, "user", "To improve engagement"
-        )
+        bot_handler.conversation_manager.append_message(user_id, "assistant", "What is your goal?")
+        bot_handler.conversation_manager.append_message(user_id, "user", "To improve engagement")
 
         # User clicks generate button
         mock_update.message.text = BTN_GENERATE_PROMPT
@@ -1824,9 +1652,7 @@ class TestBotHandler:
         assert bot_handler.conversation_manager.get_transcript(user_id) == []
 
     @pytest.mark.asyncio
-    async def test_followup_workflow_state_management(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_followup_workflow_state_management(self, bot_handler, mock_update, mock_context):
         """Test conversation state management throughout entire follow-up flow."""
         user_id = mock_update.effective_user.id
         improved_prompt = "Improved prompt"
@@ -1880,18 +1706,12 @@ class TestBotHandler:
         # Set up follow-up conversation with history
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, improved_prompt
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)
 
         # Add conversation history
-        bot_handler.conversation_manager.append_message(
-            user_id, "assistant", "Question 1"
-        )
+        bot_handler.conversation_manager.append_message(user_id, "assistant", "Question 1")
         bot_handler.conversation_manager.append_message(user_id, "user", "Answer 1")
-        bot_handler.conversation_manager.append_message(
-            user_id, "assistant", "Question 2"
-        )
+        bot_handler.conversation_manager.append_message(user_id, "assistant", "Question 2")
         bot_handler.conversation_manager.append_message(user_id, "user", "Answer 2")
 
         # Add token usage
@@ -1901,9 +1721,7 @@ class TestBotHandler:
         )
 
         # Complete the follow-up conversation
-        await bot_handler._complete_followup_conversation(
-            mock_update, user_id, refined_prompt
-        )
+        await bot_handler._complete_followup_conversation(mock_update, user_id, refined_prompt)
 
         # Verify all state was properly reset
         user_state = bot_handler.state_manager.get_user_state(user_id)
@@ -1955,14 +1773,10 @@ class TestBotHandler:
             assert user_state.improved_prompt_cache == f"Improved with {method_name}"
 
             # Verify conversation was reset to follow-up ready state
-            assert (
-                bot_handler.conversation_manager.is_waiting_for_method(user_id) is False
-            )
+            assert bot_handler.conversation_manager.is_waiting_for_method(user_id) is False
 
     @pytest.mark.asyncio
-    async def test_followup_workflow_error_recovery(
-        self, bot_handler, mock_update, mock_context
-    ):
+    async def test_followup_workflow_error_recovery(self, bot_handler, mock_update, mock_context):
         """Test error recovery mechanisms during follow-up workflow."""
         user_id = mock_update.effective_user.id
         improved_prompt = "Cached improved prompt"
@@ -1970,9 +1784,7 @@ class TestBotHandler:
         # Set up follow-up conversation
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, improved_prompt
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)
 
         # Test LLM error during follow-up conversation
         mock_update.message.text = "User response"
@@ -2000,9 +1812,7 @@ class TestBotHandler:
         # Set up follow-up conversation
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
-        bot_handler.conversation_manager.start_followup_conversation(
-            user_id, improved_prompt
-        )
+        bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)
 
         # Test malformed response (missing closing tag)
         mock_update.message.text = "User response"
@@ -2020,6 +1830,3 @@ class TestBotHandler:
 
         # Verify refined prompt was extracted and sent
         mock_update.message.reply_text.assert_called()
-
-
-

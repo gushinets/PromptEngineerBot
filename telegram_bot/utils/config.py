@@ -4,9 +4,9 @@ Configuration management for the Telegram bot.
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 from dotenv import load_dotenv
+
 
 # Load environment variables
 load_dotenv()
@@ -19,25 +19,25 @@ class BotConfig:
     telegram_token: str
     llm_backend: str
     model_name: str
-    initial_prompt: Optional[str] = None
-    bot_id: Optional[str] = None
+    initial_prompt: str | None = None
+    bot_id: str | None = None
 
     # OpenAI settings
-    openai_api_key: Optional[str] = None
+    openai_api_key: str | None = None
     openai_max_retries: int = 5
     openai_request_timeout: float = 60.0
     openai_max_wait_time: float = 300.0
 
     # OpenRouter settings
-    openrouter_api_key: Optional[str] = None
+    openrouter_api_key: str | None = None
     openrouter_timeout: float = 60.0
 
     # Google Sheets settings
     gsheets_logging_enabled: bool = False
-    google_service_account_json: Optional[str] = None
-    google_application_credentials: Optional[str] = None
-    gsheets_spreadsheet_id: Optional[str] = None
-    gsheets_spreadsheet_name: Optional[str] = None
+    google_service_account_json: str | None = None
+    google_application_credentials: str | None = None
+    gsheets_spreadsheet_id: str | None = None
+    gsheets_spreadsheet_name: str | None = None
     gsheets_worksheet: str = "Logs"
     gsheets_batch_size: int = 20
     gsheets_flush_interval_seconds: float = 5.0
@@ -55,11 +55,11 @@ class BotConfig:
     # SMTP settings
     smtp_host: str = "smtp-pulse.com"
     smtp_port: int = 587  # Default to TLS port
-    smtp_username: Optional[str] = None
-    smtp_password: Optional[str] = None
+    smtp_username: str | None = None
+    smtp_password: str | None = None
     smtp_use_tls: bool = True
     smtp_use_ssl: bool = False
-    smtp_from_email: Optional[str] = None
+    smtp_from_email: str | None = None
     smtp_from_name: str = "Prompt Engineering Bot"
 
     # Email authentication settings
@@ -96,10 +96,9 @@ class BotConfig:
 
         if smtp_use_ssl:
             return 465
-        elif smtp_use_tls:
+        if smtp_use_tls:
             return 587
-        else:
-            return 25
+        return 25
 
     @classmethod
     def from_env(cls) -> "BotConfig":
@@ -117,10 +116,8 @@ class BotConfig:
         # Validate backend-specific API keys
         if llm_backend == "OPENAI" and not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY is required when using OpenAI backend")
-        elif llm_backend == "OPENROUTER" and not os.getenv("OPENROUTER_API_KEY"):
-            raise ValueError(
-                "OPENROUTER_API_KEY is required when using OpenRouter backend"
-            )
+        if llm_backend == "OPENROUTER" and not os.getenv("OPENROUTER_API_KEY"):
+            raise ValueError("OPENROUTER_API_KEY is required when using OpenRouter backend")
 
         return cls(
             telegram_token=telegram_token,
@@ -145,9 +142,7 @@ class BotConfig:
             gsheets_spreadsheet_name=os.getenv("GSHEETS_SPREADSHEET_NAME"),
             gsheets_worksheet=os.getenv("GSHEETS_WORKSHEET", "Logs"),
             gsheets_batch_size=int(os.getenv("GSHEETS_BATCH_SIZE", 20)),
-            gsheets_flush_interval_seconds=float(
-                os.getenv("GSHEETS_FLUSH_INTERVAL_SECONDS", 5.0)
-            ),
+            gsheets_flush_interval_seconds=float(os.getenv("GSHEETS_FLUSH_INTERVAL_SECONDS", 5.0)),
             # Database settings
             database_url=os.getenv("DATABASE_URL", "sqlite:///./bot.db"),
             database_pool_size=int(os.getenv("DATABASE_POOL_SIZE", 10)),
@@ -162,10 +157,8 @@ class BotConfig:
             smtp_port=int(os.getenv("SMTP_PORT", cls._get_default_smtp_port())),
             smtp_username=os.getenv("SMTP_USERNAME"),
             smtp_password=os.getenv("SMTP_PASSWORD"),
-            smtp_use_tls=os.getenv("SMTP_USE_TLS", "true").lower()
-            in ("true", "1", "yes"),
-            smtp_use_ssl=os.getenv("SMTP_USE_SSL", "false").lower()
-            in ("true", "1", "yes"),
+            smtp_use_tls=os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes"),
+            smtp_use_ssl=os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1", "yes"),
             smtp_from_email=os.getenv("SMTP_FROM_EMAIL"),
             smtp_from_name=os.getenv("SMTP_FROM_NAME", "Prompt Engineering Bot"),
             # Email authentication settings
@@ -183,12 +176,9 @@ class BotConfig:
             # Localization settings
             language=os.getenv("LANGUAGE", "EN").upper(),
             # Email feature toggle
-            email_enabled=os.getenv("EMAIL_ENABLED", "true").lower()
-            in ("true", "1", "yes"),
+            email_enabled=os.getenv("EMAIL_ENABLED", "true").lower() in ("true", "1", "yes"),
             # Redis write check strictness
-            redis_write_check_strict=os.getenv(
-                "REDIS_WRITE_CHECK_STRICT", "false"
-            ).lower()
+            redis_write_check_strict=os.getenv("REDIS_WRITE_CHECK_STRICT", "false").lower()
             in ("true", "1", "yes"),
         )
 
@@ -204,12 +194,8 @@ class BotConfig:
                 raise ValueError(
                     "Google Sheets logging enabled but no spreadsheet ID or name provided"
                 )
-            if not (
-                self.google_service_account_json or self.google_application_credentials
-            ):
-                raise ValueError(
-                    "Google Sheets logging enabled but no credentials provided"
-                )
+            if not (self.google_service_account_json or self.google_application_credentials):
+                raise ValueError("Google Sheets logging enabled but no credentials provided")
 
         # Validate SMTP settings
         if self.smtp_use_tls and self.smtp_use_ssl:

@@ -13,9 +13,7 @@ class TestPromptLoader:
 
     def test_init_default_directory(self):
         """Test PromptLoader initialization with default directory."""
-        with patch(
-            "telegram_bot.utils.prompt_loader.PromptLoader._load_prompts"
-        ) as mock_load:
+        with patch("telegram_bot.utils.prompt_loader.PromptLoader._load_prompts") as mock_load:
             loader = PromptLoader()
 
             expected_dir = os.path.join(
@@ -28,9 +26,7 @@ class TestPromptLoader:
         """Test PromptLoader initialization with custom directory."""
         custom_dir = "/custom/prompts"
 
-        with patch(
-            "telegram_bot.utils.prompt_loader.PromptLoader._load_prompts"
-        ) as mock_load:
+        with patch("telegram_bot.utils.prompt_loader.PromptLoader._load_prompts") as mock_load:
             loader = PromptLoader(custom_dir)
 
             assert loader.prompts_dir == custom_dir
@@ -74,9 +70,7 @@ class TestPromptLoader:
     def test_load_prompts_read_error(self):
         """Test loading prompts when file read fails."""
         with patch("builtins.open", side_effect=PermissionError("Permission denied")):
-            with pytest.raises(
-                Exception, match="Critical error: Cannot read prompt file"
-            ):
+            with pytest.raises(Exception, match="Critical error: Cannot read prompt file"):
                 PromptLoader("/test/prompts")
 
     def test_load_prompts_empty_file(self):
@@ -201,6 +195,3 @@ class TestPromptLoader:
             assert loader._prompts["craft_email"] == "CRAFT email prompt content"
             assert loader._prompts["lyra_email"] == "LYRA email prompt content"
             assert loader._prompts["ggl_email"] == "GGL email prompt content"
-
-
-

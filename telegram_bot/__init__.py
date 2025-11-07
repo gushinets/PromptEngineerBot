@@ -16,13 +16,14 @@ from telegram_bot.data.database import init_database_from_config
 from telegram_bot.services.llm.factory import LLMClientFactory
 from telegram_bot.utils.config import BotConfig
 
+
 __all__ = [
-    "BotHandler",
     "BotConfig",
+    "BotHandler",
     "LLMClientFactory",
-    "init_database_from_config",
-    "__version__",
     "__author__",
-    "__license__",
     "__description__",
+    "__license__",
+    "__version__",
+    "init_database_from_config",
 ]

@@ -71,9 +71,7 @@ class TestUserProfileMigration:
             )
 
             # Create initial indexes
-            conn.execute(
-                text("CREATE INDEX ix_users_telegram_id ON users (telegram_id)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_telegram_id ON users (telegram_id)"))
             conn.execute(text("CREATE INDEX ix_users_email ON users (email)"))
             conn.execute(
                 text(
@@ -98,9 +96,7 @@ class TestUserProfileMigration:
 
             conn.commit()
 
-    def test_migration_up_adds_all_columns_and_indexes(
-        self, alembic_config, engine_and_session
-    ):
+    def test_migration_up_adds_all_columns_and_indexes(self, alembic_config, engine_and_session):
         """Test that migration up operation adds all columns and indexes correctly."""
         engine, Session = engine_and_session
 
@@ -121,9 +117,7 @@ class TestUserProfileMigration:
             "language_code",
         ]
         for col in profile_columns:
-            assert col not in columns_before, (
-                f"Column {col} should not exist before migration"
-            )
+            assert col not in columns_before, f"Column {col} should not exist before migration"
 
         # Profile indexes should not exist yet
         profile_indexes = [
@@ -132,9 +126,7 @@ class TestUserProfileMigration:
             "ix_users_bot_premium",
         ]
         for idx in profile_indexes:
-            assert idx not in indexes_before, (
-                f"Index {idx} should not exist before migration"
-            )
+            assert idx not in indexes_before, f"Index {idx} should not exist before migration"
 
         # Apply the profile migration manually (simulating migration 002)
         with engine.connect() as conn:
@@ -147,18 +139,12 @@ class TestUserProfileMigration:
 
             # Update existing rows to set default values
             conn.execute(text("UPDATE users SET is_bot = 0 WHERE is_bot IS NULL"))
-            conn.execute(
-                text("UPDATE users SET is_premium = 0 WHERE is_premium IS NULL")
-            )
+            conn.execute(text("UPDATE users SET is_premium = 0 WHERE is_premium IS NULL"))
 
             # Create new indexes
-            conn.execute(
-                text("CREATE INDEX ix_users_language_code ON users (language_code)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_language_code ON users (language_code)"))
             conn.execute(text("CREATE INDEX ix_users_is_premium ON users (is_premium)"))
-            conn.execute(
-                text("CREATE INDEX ix_users_bot_premium ON users (is_bot, is_premium)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_bot_premium ON users (is_bot, is_premium)"))
 
             conn.commit()
 
@@ -249,13 +235,9 @@ class TestUserProfileMigration:
             conn.execute(text("ALTER TABLE users ADD COLUMN is_bot BOOLEAN DEFAULT 0"))
             conn.execute(text("ALTER TABLE users ADD COLUMN is_premium BOOLEAN"))
             conn.execute(text("ALTER TABLE users ADD COLUMN language_code TEXT"))
-            conn.execute(
-                text("CREATE INDEX ix_users_language_code ON users (language_code)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_language_code ON users (language_code)"))
             conn.execute(text("CREATE INDEX ix_users_is_premium ON users (is_premium)"))
-            conn.execute(
-                text("CREATE INDEX ix_users_bot_premium ON users (is_bot, is_premium)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_bot_premium ON users (is_bot, is_premium)"))
             conn.commit()
 
         # Verify profile columns and indexes exist
@@ -323,9 +305,7 @@ class TestUserProfileMigration:
             conn.execute(text("ALTER TABLE users_temp RENAME TO users"))
 
             # Recreate original indexes
-            conn.execute(
-                text("CREATE INDEX ix_users_telegram_id ON users (telegram_id)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_telegram_id ON users (telegram_id)"))
             conn.execute(text("CREATE INDEX ix_users_email ON users (email)"))
             conn.execute(
                 text(
@@ -342,15 +322,11 @@ class TestUserProfileMigration:
 
         # Check that all profile columns were removed
         for col in profile_columns:
-            assert col not in columns_after, (
-                f"Column {col} should not exist after downgrade"
-            )
+            assert col not in columns_after, f"Column {col} should not exist after downgrade"
 
         # Check that all profile indexes were removed
         for idx in profile_indexes:
-            assert idx not in indexes_after, (
-                f"Index {idx} should not exist after downgrade"
-            )
+            assert idx not in indexes_after, f"Index {idx} should not exist after downgrade"
 
         # Verify that original columns still exist
         original_columns = [
@@ -365,13 +341,9 @@ class TestUserProfileMigration:
             "updated_at",
         ]
         for col in original_columns:
-            assert col in columns_after, (
-                f"Original column {col} should still exist after downgrade"
-            )
+            assert col in columns_after, f"Original column {col} should still exist after downgrade"
 
-    def test_data_preservation_during_migration(
-        self, alembic_config, engine_and_session
-    ):
+    def test_data_preservation_during_migration(self, alembic_config, engine_and_session):
         """Test that existing data is preserved during migration process."""
         engine, Session = engine_and_session
 
@@ -423,9 +395,7 @@ class TestUserProfileMigration:
 
             # Update existing rows to set default values
             conn.execute(text("UPDATE users SET is_bot = 0 WHERE is_bot IS NULL"))
-            conn.execute(
-                text("UPDATE users SET is_premium = 0 WHERE is_premium IS NULL")
-            )
+            conn.execute(text("UPDATE users SET is_premium = 0 WHERE is_premium IS NULL"))
             conn.commit()
 
         # Verify data is preserved and new columns have appropriate defaults
@@ -534,9 +504,7 @@ class TestUserProfileMigration:
             assert "Model" in repr_str
             assert "mod***" in repr_str  # Email is masked as 'mod***'
 
-    def test_index_performance_after_migration(
-        self, alembic_config, engine_and_session
-    ):
+    def test_index_performance_after_migration(self, alembic_config, engine_and_session):
         """Test that indexes are working correctly after migration."""
         engine, Session = engine_and_session
 
@@ -550,13 +518,9 @@ class TestUserProfileMigration:
             conn.execute(text("ALTER TABLE users ADD COLUMN is_bot BOOLEAN DEFAULT 0"))
             conn.execute(text("ALTER TABLE users ADD COLUMN is_premium BOOLEAN"))
             conn.execute(text("ALTER TABLE users ADD COLUMN language_code TEXT"))
-            conn.execute(
-                text("CREATE INDEX ix_users_language_code ON users (language_code)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_language_code ON users (language_code)"))
             conn.execute(text("CREATE INDEX ix_users_is_premium ON users (is_premium)"))
-            conn.execute(
-                text("CREATE INDEX ix_users_bot_premium ON users (is_bot, is_premium)")
-            )
+            conn.execute(text("CREATE INDEX ix_users_bot_premium ON users (is_bot, is_premium)"))
             conn.commit()
 
         # Insert test data for index testing
@@ -630,9 +594,7 @@ class TestUserProfileMigration:
             ).scalar()
             assert non_bot_premium == 2
 
-    def test_actual_alembic_migration_execution(
-        self, alembic_config, engine_and_session
-    ):
+    def test_actual_alembic_migration_execution(self, alembic_config, engine_and_session):
         """Test that the actual Alembic migration files work correctly."""
         engine, Session = engine_and_session
 
@@ -643,9 +605,7 @@ class TestUserProfileMigration:
 
             # Verify initial schema exists
             inspector = inspect(engine)
-            assert inspector.has_table("users"), (
-                "Users table should exist after migration 001"
-            )
+            assert inspector.has_table("users"), "Users table should exist after migration 001"
 
             # Run profile migration
             command.upgrade(alembic_config, "002")
@@ -667,9 +627,7 @@ class TestUserProfileMigration:
             command.downgrade(alembic_config, "001")
 
             # Verify profile columns were removed
-            columns_after_rollback = [
-                col["name"] for col in inspector.get_columns("users")
-            ]
+            columns_after_rollback = [col["name"] for col in inspector.get_columns("users")]
             for col in profile_columns:
                 assert col not in columns_after_rollback, (
                     f"Column {col} should not exist after rollback"
@@ -678,9 +636,4 @@ class TestUserProfileMigration:
         except Exception as e:
             # If alembic migrations fail, that's expected in this test environment
             # The important thing is that our manual migration simulation works
-            pytest.skip(
-                f"Alembic migration test skipped due to environment issues: {e}"
-            )
-
-
-
+            pytest.skip(f"Alembic migration test skipped due to environment issues: {e}")

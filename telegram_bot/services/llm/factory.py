@@ -37,11 +37,9 @@ class LLMClientFactory:
                 max_wait_time=config.openai_max_wait_time,
             )
 
-        elif config.llm_backend == "OPENROUTER":
+        if config.llm_backend == "OPENROUTER":
             if not config.openrouter_api_key:
-                raise ValueError(
-                    "OpenRouter API key is required for OpenRouter backend"
-                )
+                raise ValueError("OpenRouter API key is required for OpenRouter backend")
 
             return OpenRouterClient(
                 api_key=config.openrouter_api_key,
@@ -49,5 +47,4 @@ class LLMClientFactory:
                 timeout=config.openrouter_timeout,
             )
 
-        else:
-            raise ValueError(f"Unsupported LLM backend: {config.llm_backend}")
+        raise ValueError(f"Unsupported LLM backend: {config.llm_backend}")

@@ -1,0 +1,313 @@
+# Semgrep Configuration for Pattern-Based Security Analysis
+# This configuration includes custom rules specific to the Telegram bot project
+# 
+# To use community rulesets (OWASP Top 10, Python security), run:
+#   semgrep --config "p/owasp-top-ten" --config "p/python" --config .semgrep.yml .
+#
+# Or configure in pre-commit to use multiple configs
+
+rules:
+  # ============================================================================
+  # CUSTOM RULE: Telegram Token Exposure in Logs
+  # ============================================================================
+  - id: telegram-token-in-logs
+    patterns:
+      - pattern-either:
+          - pattern: logging.$METHOD(..., $TOKEN, ...)
+          - pattern: logger.$METHOD(..., $TOKEN, ...)
+          - pattern: print(..., $TOKEN, ...)
+          - pattern: sys.stdout.write(..., $TOKEN, ...)
+          - pattern: sys.stderr.write(..., $TOKEN, ...)
+      - metavariable-regex:
+          metavariable: $TOKEN
+          regex: "^(token|api_key|secret|password|api_secret|access_token|refresh_token|private_key|auth_token)$"
+    message: |
+      Potential exposure of sensitive token/credential in logs.
+      Tokens, API keys, and secrets should never be logged directly.
+      Use redaction or masking before logging sensitive values.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [audit]
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      owasp: "A09:2021 - Security Logging and Monitoring Failures"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      references:
+        - https://cwe.mitre.org/data/definitions/532.html
+
+  - id: telegram-bot-token-in-logs
+    patterns:
+      - pattern-either:
+          - pattern: logging.$METHOD(..., $TOKEN, ...)
+          - pattern: logger.$METHOD(..., $TOKEN, ...)
+          - pattern: print(..., $TOKEN, ...)
+      - metavariable-regex:
+          metavariable: $TOKEN
+          regex: "^(token|bot_token|telegram_token)$"
+      - pattern-not: logging.$METHOD("...", ...)
+      - pattern-not: logger.$METHOD("...", ...)
+    message: |
+      Telegram bot token variable detected in logging statement.
+      Bot tokens should NEVER be logged as they provide full access to the bot.
+      If you need to log token information, use masking: token[:5] + "..." + token[-5:]
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [audit]
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: CRITICAL
+      references:
+        - https://core.telegram.org/bots/api#authorizing-your-bot
+
+  # ============================================================================
+  # CUSTOM RULE: SQL Injection via F-Strings
+  # ============================================================================
+  - id: sql-injection-f-string
+    patterns:
+      - pattern-either:
+          - pattern: $CONN.execute(f"... {$VAR} ...")
+          - pattern: $CONN.execute(f'... {$VAR} ...')
+          - pattern: $CURSOR.execute(f"... {$VAR} ...")
+          - pattern: $CURSOR.execute(f'... {$VAR} ...')
+          - pattern: $SESSION.execute(f"... {$VAR} ...")
+          - pattern: $SESSION.execute(f'... {$VAR} ...')
+      - pattern-not: $CONN.execute(f"... {$VAR} ...", ...)
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ".*"
+    message: |
+      Potential SQL injection vulnerability via f-string formatting.
+      User input embedded directly in SQL queries can lead to SQL injection attacks.
+      Use parameterized queries instead: execute("SELECT * FROM users WHERE id = ?", (user_id,))
+      For SQLAlchemy, use bound parameters: execute(text("SELECT * FROM users WHERE id = :id"), {"id": user_id})
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-89: SQL Injection"
+      owasp: "A03:2021 - Injection"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: CRITICAL
+      references:
+        - https://cwe.mitre.org/data/definitions/89.html
+        - https://owasp.org/www-community/attacks/SQL_Injection
+
+  - id: sql-injection-string-concat
+    patterns:
+      - pattern-either:
+          - pattern: $CONN.execute("..." + $VAR + "...")
+          - pattern: $CONN.execute('...' + $VAR + '...')
+          - pattern: $CURSOR.execute("..." + $VAR + "...")
+          - pattern: $CURSOR.execute('...' + $VAR + '...')
+          - pattern: $SESSION.execute("..." + $VAR + "...")
+          - pattern: $SESSION.execute('...' + $VAR + '...')
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ".*"
+    message: |
+      Potential SQL injection vulnerability via string concatenation.
+      User input concatenated into SQL queries can lead to SQL injection attacks.
+      Use parameterized queries with placeholders instead.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-89: SQL Injection"
+      owasp: "A03:2021 - Injection"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: CRITICAL
+
+  - id: sql-injection-percent-format
+    patterns:
+      - pattern-either:
+          - pattern: $CONN.execute("... %s ..." % $VAR)
+          - pattern: $CONN.execute('... %s ...' % $VAR)
+          - pattern: $CURSOR.execute("... %s ..." % $VAR)
+          - pattern: $CURSOR.execute('... %s ...' % $VAR)
+          - pattern: $SESSION.execute("... %s ..." % $VAR)
+          - pattern: $SESSION.execute('... %s ...' % $VAR)
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ".*"
+    message: |
+      Potential SQL injection vulnerability via % string formatting.
+      User input formatted into SQL queries can lead to SQL injection attacks.
+      Use parameterized queries with proper placeholders instead.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-89: SQL Injection"
+      owasp: "A03:2021 - Injection"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: CRITICAL
+
+  # ============================================================================
+  # ADDITIONAL SECURITY RULES FOR TELEGRAM BOT
+  # ============================================================================
+  - id: hardcoded-telegram-token
+    patterns:
+      - pattern-either:
+          - pattern: $VAR = "..."
+          - pattern: $VAR = '...'
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ".*(TELEGRAM_TOKEN|telegram_token|BOT_TOKEN|bot_token).*"
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ".*[0-9]{8,10}:[a-zA-Z0-9_-]{35}.*"
+    message: |
+      Hardcoded Telegram bot token detected.
+      Tokens should be stored in environment variables or secure configuration, never in source code.
+      Use os.getenv('TELEGRAM_TOKEN') or a configuration management system.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      owasp: "A07:2021 - Identification and Authentication Failures"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: CRITICAL
+
+  - id: eval-exec-usage
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+          - pattern: compile(..., ..., 'eval')
+          - pattern: compile(..., ..., 'exec')
+    message: |
+      Dangerous use of eval() or exec() detected.
+      These functions execute arbitrary code and can lead to code injection vulnerabilities.
+      Avoid using eval/exec, especially with user input. Consider safer alternatives like ast.literal_eval() for data parsing.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      owasp: "A03:2021 - Injection"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: CRITICAL
+      references:
+        - https://cwe.mitre.org/data/definitions/95.html
+
+  - id: unsafe-yaml-load
+    patterns:
+      - pattern-either:
+          - pattern: yaml.load($DATA)
+          - pattern: yaml.load($DATA, Loader=yaml.Loader)
+          - pattern: yaml.load($DATA, Loader=yaml.UnsafeLoader)
+    message: |
+      Unsafe YAML deserialization detected.
+      yaml.load() can execute arbitrary Python code and lead to remote code execution.
+      Use yaml.safe_load() instead, which only constructs simple Python objects.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      owasp: "A08:2021 - Software and Data Integrity Failures"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: CRITICAL
+      references:
+        - https://cwe.mitre.org/data/definitions/502.html
+
+  - id: command-injection-shell-true
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.$METHOD(..., shell=True, ...)
+          - pattern: os.system(...)
+          - pattern: os.popen(...)
+      - pattern-not: subprocess.$METHOD("...", shell=True)
+      - pattern-not: os.system("...")
+    message: |
+      Potential command injection vulnerability.
+      Using shell=True or os.system() with dynamic input can lead to command injection.
+      Use subprocess with shell=False and pass arguments as a list instead.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: "CWE-78: OS Command Injection"
+      owasp: "A03:2021 - Injection"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: CRITICAL
+      references:
+        - https://cwe.mitre.org/data/definitions/78.html
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION: Exclusion Patterns
+# ============================================================================
+# Exclude directories and files that don't need security scanning
+exclude:
+  # Python bytecode and cache
+  - "*.pyc"
+  - "*.pyo"
+  - "__pycache__"
+  - "*.py[cod]"
+  
+  # Virtual environments
+  - ".venv"
+  - "venv"
+  - "env"
+  - ".env"
+  
+  # Database migration files (auto-generated)
+  - "alembic/versions"
+  
+  # Test fixtures and mock data
+  - "tests/fixtures"
+  - "tests/mocks"
+  
+  # Build and distribution
+  - "build"
+  - "dist"
+  - "*.egg-info"
+  
+  # IDE and editor files
+  - ".vscode"
+  - ".idea"
+  - "*.swp"
+  - "*.swo"
+  - "*~"
+  
+  # Git directory
+  - ".git"
+  
+  # Documentation (may contain example code)
+  - "docs/examples"
+  
+  # Third-party dependencies
+  - "node_modules"
+  - "vendor"
+
+# ============================================================================
+# FILE INCLUSION: Scan Only Python Files
+# ============================================================================
+paths:
+  include:
+    - "*.py"
+    - "telegram_bot/**/*.py"
+    - "scripts/**/*.py"
+    - "tests/**/*.py"
+    - "alembic/**/*.py"

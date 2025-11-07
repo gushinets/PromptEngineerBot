@@ -9,6 +9,7 @@ import os
 import sys
 from io import StringIO
 
+
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -17,7 +18,6 @@ from telegram_bot.utils.logging_utils import (
     PIIProtectedFormatter,
     StructuredLogger,
     get_email_flow_logger,
-    get_logger,
     setup_application_logging,
 )
 

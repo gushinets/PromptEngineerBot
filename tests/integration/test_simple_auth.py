@@ -7,6 +7,7 @@ import sys
 
 import pytest
 
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # Mock redis module - skip this test as it's redundant with test_auth_service.py
@@ -52,6 +53,7 @@ def mock_normalize_email(email):
 # Mock the database imports
 import telegram_bot.database
 
+
 telegram_bot.data.database.get_db_session = mock_get_db_session
 telegram_bot.data.database.normalize_email = mock_normalize_email
 
@@ -81,6 +83,7 @@ def mock_get_redis_client():
 
 # Patch the import before importing auth_service
 import telegram_bot.auth_service
+
 
 telegram_bot.auth.auth_service.get_redis_client = mock_get_redis_client
 
@@ -131,9 +134,7 @@ def test_otp_hashing():
     assert auth_service.verify_otp_hash(otp, otp_hash), "Hash should verify correctly"
 
     # Should not verify with wrong OTP
-    assert not auth_service.verify_otp_hash("654321", otp_hash), (
-        "Wrong OTP should not verify"
-    )
+    assert not auth_service.verify_otp_hash("654321", otp_hash), "Wrong OTP should not verify"
 
     print("✓ OTP hashing test passed")
 
@@ -152,9 +153,7 @@ def test_email_validation():
     ]
 
     for email in valid_emails:
-        assert auth_service.validate_email_format(email), (
-            f"Should accept valid email: {email}"
-        )
+        assert auth_service.validate_email_format(email), f"Should accept valid email: {email}"
 
     # Invalid emails
     invalid_emails = ["", "invalid", "@example.com", "user@", "user@domain", None]
@@ -291,9 +290,7 @@ def test_otp_verification_system():
         # Test successful verification
         success, message = auth_service.verify_otp(telegram_id, otp)
         assert success, f"Should succeed with correct OTP, got message: {message}"
-        assert message == "verification_successful", (
-            f"Should indicate success, got: {message}"
-        )
+        assert message == "verification_successful", f"Should indicate success, got: {message}"
 
         # Test verification with non-existent OTP
         success, message = auth_service.verify_otp(999999999, "123456")
@@ -401,9 +398,7 @@ def test_authentication_persistence():
         assert new_user.email == email, "Should set correct email"
         assert new_user.is_authenticated == True, "Should set is_authenticated to True"
         assert new_user.email_verified_at is not None, "Should set email_verified_at"
-        assert new_user.last_authenticated_at is not None, (
-            "Should set last_authenticated_at"
-        )
+        assert new_user.last_authenticated_at is not None, "Should set last_authenticated_at"
 
         # Test persisting authentication for existing user
         persistence_session.committed = False  # Reset commit flag
@@ -413,9 +408,7 @@ def test_authentication_persistence():
 
         # The existing user should be updated
         existing_user = persistence_session.users[telegram_id]
-        assert existing_user.is_authenticated == True, (
-            "Should update is_authenticated to True"
-        )
+        assert existing_user.is_authenticated == True, "Should update is_authenticated to True"
         assert existing_user.last_authenticated_at is not None, (
             "Should update last_authenticated_at"
         )
@@ -455,10 +448,7 @@ def test_user_authentication_status():
                         def first(self):
                             telegram_id = self.filters.get("telegram_id")
                             is_authenticated = self.filters.get("is_authenticated")
-                            if (
-                                telegram_id in self.session.authenticated_users
-                                and is_authenticated
-                            ):
+                            if telegram_id in self.session.authenticated_users and is_authenticated:
                                 # Return a mock user object
                                 class MockUser:
                                     def __init__(self, telegram_id, email):

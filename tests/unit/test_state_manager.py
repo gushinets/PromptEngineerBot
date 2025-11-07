@@ -1,7 +1,5 @@
 """Tests for the state manager module."""
 
-import pytest
-
 from telegram_bot.core.state_manager import StateManager, UserState
 
 
@@ -257,6 +255,3 @@ class TestStateManager:
         assert state.waiting_for_followup_choice is False
         assert state.in_followup_conversation is False
         assert state.improved_prompt_cache is None
-
-
-

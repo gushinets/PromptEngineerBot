@@ -5,8 +5,8 @@ This module tests comprehensive audit event logging, data masking,
 PII protection, and audit event management.
 """
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 
@@ -30,7 +30,7 @@ def test_database():
     """Create test database with in-memory SQLite."""
     db_manager = init_database("sqlite:///:memory:")
     db_manager.create_tables()
-    yield db_manager
+    return db_manager
 
 
 class TestAuditService:
@@ -52,11 +52,7 @@ class TestAuditService:
 
         # Verify event was stored in database
         with get_db_session() as session:
-            event = (
-                session.query(AuthEvent)
-                .filter(AuthEvent.telegram_id == telegram_id)
-                .first()
-            )
+            event = session.query(AuthEvent).filter(AuthEvent.telegram_id == telegram_id).first()
 
             assert event is not None
             assert event.event_type == "OTP_SENT"
@@ -82,11 +78,7 @@ class TestAuditService:
 
         # Verify event was stored with reason
         with get_db_session() as session:
-            event = (
-                session.query(AuthEvent)
-                .filter(AuthEvent.telegram_id == telegram_id)
-                .first()
-            )
+            event = session.query(AuthEvent).filter(AuthEvent.telegram_id == telegram_id).first()
 
             assert event is not None
             assert event.event_type == "OTP_FAILED"
@@ -109,11 +101,7 @@ class TestAuditService:
 
         # Verify email was normalized
         with get_db_session() as session:
-            event = (
-                session.query(AuthEvent)
-                .filter(AuthEvent.telegram_id == telegram_id)
-                .first()
-            )
+            event = session.query(AuthEvent).filter(AuthEvent.telegram_id == telegram_id).first()
 
             assert event is not None
             assert event.email == "test@example.com"  # Normalized
@@ -308,9 +296,7 @@ class TestAuditService:
         assert all(event.telegram_id == telegram_id for event in events)
 
         # Test with event type filter
-        otp_events = audit_service.get_user_events(
-            telegram_id, event_type=AuditEventType.OTP_SENT
-        )
+        otp_events = audit_service.get_user_events(telegram_id, event_type=AuditEventType.OTP_SENT)
 
         assert len(otp_events) == 1
         assert otp_events[0].event_type == "OTP_SENT"
@@ -370,10 +356,9 @@ class TestAuditService:
         audit_service.log_otp_sent(telegram_id, email)
 
         # Test with future date range (should return 0)
-        from datetime import timezone
 
-        future_start = datetime.now(timezone.utc) + timedelta(days=1)
-        future_end = datetime.now(timezone.utc) + timedelta(days=2)
+        future_start = datetime.now(UTC) + timedelta(days=1)
+        future_end = datetime.now(UTC) + timedelta(days=2)
 
         counts = audit_service.get_event_counts(future_start, future_end)
 
@@ -391,7 +376,7 @@ class TestAuditService:
                 email=email,
                 event_type="OTP_SENT",
                 success=True,
-                created_at=datetime.now(timezone.utc) - timedelta(days=100),
+                created_at=datetime.now(UTC) - timedelta(days=100),
             )
             session.add(old_event)
             session.commit()
@@ -492,6 +477,3 @@ class TestDataMasking:
 
             assert event.telegram_id == telegram_id
             assert event.email == email  # Normalized but not masked
-
-
-

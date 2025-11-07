@@ -6,7 +6,6 @@ success rates, and observability features.
 """
 
 import time
-from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -244,9 +243,7 @@ class TestMetricsCollector:
 
         latency_stats = metrics_collector.get_latency_stats("smtp_connection_latency")
         assert latency_stats["count"] == 2
-        assert (
-            abs(latency_stats["avg"] - 0.15) < 0.001
-        )  # Allow for floating point precision
+        assert abs(latency_stats["avg"] - 0.15) < 0.001  # Allow for floating point precision
 
     def test_flow_metrics(self, metrics_collector):
         """Test email flow-specific metrics methods."""
@@ -370,9 +367,7 @@ class TestMetricsIntegration:
             for i in range(100):
                 metrics_collector.increment_counter("concurrent_test")
                 metrics_collector.record_latency("concurrent_latency", 0.001 * i)
-                metrics_collector.record_success_failure(
-                    "concurrent_success", i % 2 == 0
-                )
+                metrics_collector.record_success_failure("concurrent_success", i % 2 == 0)
 
         # Start multiple threads
         threads = []
@@ -442,6 +437,3 @@ class TestMetricsIntegration:
         assert all_metrics["success_rates"]["email_sending"]["success_rate"] == 100.0
         assert all_metrics["success_rates"]["otp_verification"]["success_rate"] == 100.0
         assert all_metrics["success_rates"]["email_flow"]["success_rate"] == 100.0
-
-
-

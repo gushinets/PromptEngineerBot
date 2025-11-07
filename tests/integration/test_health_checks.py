@@ -6,7 +6,7 @@ periodic monitoring, failure detection, and status reporting.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -70,9 +70,7 @@ class TestServiceHealth:
 
     def test_service_health_creation(self):
         """Test ServiceHealth creation."""
-        service_health = ServiceHealth(
-            service="smtp", current_status=HealthStatus.HEALTHY
-        )
+        service_health = ServiceHealth(service="smtp", current_status=HealthStatus.HEALTHY)
 
         assert service_health.service == "smtp"
         assert service_health.current_status == HealthStatus.HEALTHY
@@ -96,9 +94,7 @@ class TestHealthMonitor:
             assert service.consecutive_failures == 0
 
     @patch("telegram_bot.utils.health_checks.get_db_manager")
-    async def test_check_database_health_success(
-        self, mock_get_db_manager, health_monitor
-    ):
+    async def test_check_database_health_success(self, mock_get_db_manager, health_monitor):
         """Test successful database health check."""
         # Mock database manager
         mock_db_manager = MagicMock()
@@ -115,9 +111,7 @@ class TestHealthMonitor:
         assert result.details == {"connection_pool": "active"}
 
     @patch("telegram_bot.utils.health_checks.get_db_manager")
-    async def test_check_database_health_failure(
-        self, mock_get_db_manager, health_monitor
-    ):
+    async def test_check_database_health_failure(self, mock_get_db_manager, health_monitor):
         """Test database health check failure."""
         # Mock database manager failure
         mock_db_manager = MagicMock()
@@ -131,9 +125,7 @@ class TestHealthMonitor:
         assert result.error == "Database connectivity test failed"
 
     @patch("telegram_bot.utils.health_checks.get_db_manager")
-    async def test_check_database_health_exception(
-        self, mock_get_db_manager, health_monitor
-    ):
+    async def test_check_database_health_exception(self, mock_get_db_manager, health_monitor):
         """Test database health check with exception."""
         # Mock database manager exception
         mock_get_db_manager.side_effect = Exception("Connection error")
@@ -145,9 +137,7 @@ class TestHealthMonitor:
         assert "Connection error" in result.error
 
     @patch("telegram_bot.utils.health_checks.get_redis_client")
-    async def test_check_redis_health_success(
-        self, mock_get_redis_client, health_monitor
-    ):
+    async def test_check_redis_health_success(self, mock_get_redis_client, health_monitor):
         """Test successful Redis health check."""
         # Mock Redis client
         mock_redis_client = MagicMock()
@@ -164,9 +154,7 @@ class TestHealthMonitor:
         assert result.details == {"connection_pool": "active"}
 
     @patch("telegram_bot.utils.health_checks.get_redis_client")
-    async def test_check_redis_health_failure(
-        self, mock_get_redis_client, health_monitor
-    ):
+    async def test_check_redis_health_failure(self, mock_get_redis_client, health_monitor):
         """Test Redis health check failure."""
         # Mock Redis client failure
         mock_redis_client = MagicMock()
@@ -180,9 +168,7 @@ class TestHealthMonitor:
         assert result.error == "Redis connectivity test failed"
 
     @patch("telegram_bot.utils.health_checks.get_redis_client")
-    async def test_check_redis_health_exception(
-        self, mock_get_redis_client, health_monitor
-    ):
+    async def test_check_redis_health_exception(self, mock_get_redis_client, health_monitor):
         """Test Redis health check with exception."""
         # Mock Redis client exception
         mock_get_redis_client.side_effect = Exception("Redis connection error")
@@ -194,9 +180,7 @@ class TestHealthMonitor:
         assert "Redis connection error" in result.error
 
     @patch("telegram_bot.email_service.EmailService")
-    async def test_check_smtp_health_success(
-        self, mock_email_service_class, health_monitor
-    ):
+    async def test_check_smtp_health_success(self, mock_email_service_class, health_monitor):
         """Test successful SMTP health check."""
         # Mock EmailService
         mock_email_service = AsyncMock()
@@ -214,9 +198,7 @@ class TestHealthMonitor:
         assert "port" in result.details
 
     @patch("telegram_bot.email_service.EmailService")
-    async def test_check_smtp_health_failure(
-        self, mock_email_service_class, health_monitor
-    ):
+    async def test_check_smtp_health_failure(self, mock_email_service_class, health_monitor):
         """Test SMTP health check failure."""
         # Mock EmailService failure
         mock_email_service = AsyncMock()
@@ -230,9 +212,7 @@ class TestHealthMonitor:
         assert result.error == "SMTP connectivity test failed"
 
     @patch("telegram_bot.email_service.EmailService")
-    async def test_check_smtp_health_exception(
-        self, mock_email_service_class, health_monitor
-    ):
+    async def test_check_smtp_health_exception(self, mock_email_service_class, health_monitor):
         """Test SMTP health check with exception."""
         # Mock EmailService exception
         mock_email_service_class.side_effect = Exception("SMTP error")
@@ -246,9 +226,7 @@ class TestHealthMonitor:
     @patch.object(HealthMonitor, "check_database_health")
     @patch.object(HealthMonitor, "check_redis_health")
     @patch.object(HealthMonitor, "check_smtp_health")
-    async def test_check_all_services(
-        self, mock_smtp, mock_redis, mock_db, health_monitor
-    ):
+    async def test_check_all_services(self, mock_smtp, mock_redis, mock_db, health_monitor):
         """Test checking all services concurrently."""
         # Mock all health checks
         mock_db.return_value = HealthCheckResult("database", HealthStatus.HEALTHY)
@@ -321,18 +299,14 @@ class TestHealthMonitor:
     def test_update_service_health_recovery(self, health_monitor):
         """Test service recovery after failures."""
         # First make service unhealthy
-        unhealthy_result = HealthCheckResult(
-            "database", HealthStatus.UNHEALTHY, error="Error"
-        )
+        unhealthy_result = HealthCheckResult("database", HealthStatus.UNHEALTHY, error="Error")
         health_monitor._update_service_health(unhealthy_result)
 
         service = health_monitor._services["database"]
         assert service.consecutive_failures == 1
 
         # Then recover
-        healthy_result = HealthCheckResult(
-            "database", HealthStatus.HEALTHY, response_time_ms=30
-        )
+        healthy_result = HealthCheckResult("database", HealthStatus.HEALTHY, response_time_ms=30)
         health_monitor._update_service_health(healthy_result)
 
         assert service.current_status == HealthStatus.HEALTHY
@@ -342,18 +316,14 @@ class TestHealthMonitor:
     def test_update_service_health_average_response_time(self, health_monitor):
         """Test average response time calculation."""
         # First healthy check
-        result1 = HealthCheckResult(
-            "database", HealthStatus.HEALTHY, response_time_ms=100
-        )
+        result1 = HealthCheckResult("database", HealthStatus.HEALTHY, response_time_ms=100)
         health_monitor._update_service_health(result1)
 
         service = health_monitor._services["database"]
         assert service.average_response_time_ms == 100.0
 
         # Second healthy check (should update average)
-        result2 = HealthCheckResult(
-            "database", HealthStatus.HEALTHY, response_time_ms=50
-        )
+        result2 = HealthCheckResult("database", HealthStatus.HEALTHY, response_time_ms=50)
         health_monitor._update_service_health(result2)
 
         # Average should be weighted: 100 * 0.8 + 50 * 0.2 = 90
@@ -520,15 +490,9 @@ class TestHealthMonitorIntegration:
         """Test monitoring loop integration with service updates."""
         # Mock health check results
         mock_results = {
-            "database": HealthCheckResult(
-                "database", HealthStatus.HEALTHY, response_time_ms=50
-            ),
-            "redis": HealthCheckResult(
-                "redis", HealthStatus.UNHEALTHY, error="Connection failed"
-            ),
-            "smtp": HealthCheckResult(
-                "smtp", HealthStatus.HEALTHY, response_time_ms=100
-            ),
+            "database": HealthCheckResult("database", HealthStatus.HEALTHY, response_time_ms=50),
+            "redis": HealthCheckResult("redis", HealthStatus.UNHEALTHY, error="Connection failed"),
+            "smtp": HealthCheckResult("smtp", HealthStatus.HEALTHY, response_time_ms=100),
         }
         mock_check_all.return_value = mock_results
 
@@ -550,9 +514,7 @@ class TestHealthMonitorIntegration:
         assert mock_check_all.called
 
     @patch.object(HealthMonitor, "check_all_services")
-    async def test_monitoring_loop_exception_handling(
-        self, mock_check_all, health_monitor
-    ):
+    async def test_monitoring_loop_exception_handling(self, mock_check_all, health_monitor):
         """Test monitoring loop handles exceptions gracefully."""
         # Mock exception on first call, then success
         mock_check_all.side_effect = [
@@ -575,6 +537,3 @@ class TestHealthMonitorIntegration:
 
         # Verify monitoring continued after exception
         assert mock_check_all.call_count >= 2
-
-
-

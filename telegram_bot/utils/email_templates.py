@@ -7,7 +7,6 @@ using the same translation pattern as the main messages module.
 
 import html
 import re
-from typing import Optional
 
 
 def _(text_ru: str, text_en: str, language: str = "EN") -> str:
@@ -315,9 +314,7 @@ class EmailTemplates:
         Returns:
             HTML formatted email body
         """
-        title = _(
-            "Ваши оптимизированные промпты", "Your Optimized Prompts", self.language
-        )
+        title = _("Ваши оптимизированные промпты", "Your Optimized Prompts", self.language)
 
         greeting = _(
             "Отлично! Ваши промпты готовы.",
@@ -331,9 +328,7 @@ class EmailTemplates:
             self.language,
         )
 
-        original_label = _(
-            "Ваш исходный промпт:", "Your Original Prompt:", self.language
-        )
+        original_label = _("Ваш исходный промпт:", "Your Original Prompt:", self.language)
 
         improved_label = _(
             "Улучшенный промпт (после уточняющих вопросов):",
@@ -353,9 +348,7 @@ class EmailTemplates:
             self.language,
         )
 
-        ggl_label = _(
-            "🔍 GGL - Фокус на цели:", "🔍 GGL - Goal-Focused:", self.language
-        )
+        ggl_label = _("🔍 GGL - Фокус на цели:", "🔍 GGL - Goal-Focused:", self.language)
 
         usage_note = _(
             "Выберите тот промпт, который лучше всего подходит для ваших задач, и используйте его в любом ИИ-помощнике:",
@@ -542,9 +535,7 @@ class EmailTemplates:
         Returns:
             Plain text formatted email body
         """
-        title = _(
-            "Ваши оптимизированные промпты", "Your Optimized Prompts", self.language
-        )
+        title = _("Ваши оптимизированные промпты", "Your Optimized Prompts", self.language)
 
         greeting = _(
             "Отлично! Ваши промпты готовы.",
@@ -558,9 +549,7 @@ class EmailTemplates:
             self.language,
         )
 
-        original_label = _(
-            "ВАШ ИСХОДНЫЙ ПРОМПТ:", "YOUR ORIGINAL PROMPT:", self.language
-        )
+        original_label = _("ВАШ ИСХОДНЫЙ ПРОМПТ:", "YOUR ORIGINAL PROMPT:", self.language)
 
         improved_label = _(
             "УЛУЧШЕННЫЙ ПРОМПТ (после уточняющих вопросов):",
@@ -580,9 +569,7 @@ class EmailTemplates:
             self.language,
         )
 
-        ggl_label = _(
-            "🔍 GGL - ФОКУС НА ЦЕЛИ:", "🔍 GGL - GOAL-FOCUSED:", self.language
-        )
+        ggl_label = _("🔍 GGL - ФОКУС НА ЦЕЛИ:", "🔍 GGL - GOAL-FOCUSED:", self.language)
 
         usage_note = _(
             "Выберите тот промпт, который лучше всего подходит для ваших задач, и используйте его в любом ИИ-помощнике:",
@@ -703,9 +690,7 @@ class EmailTemplates:
         Returns:
             HTML formatted email body
         """
-        title = _(
-            "Ваш оптимизированный промпт", "Your Optimized Prompt", self.language
-        )
+        title = _("Ваш оптимизированный промпт", "Your Optimized Prompt", self.language)
 
         greeting = _(
             "Отлично! Ваш промпт готов.",
@@ -719,9 +704,7 @@ class EmailTemplates:
             self.language,
         )
 
-        original_label = _(
-            "Ваш исходный промпт:", "Your Original Prompt:", self.language
-        )
+        original_label = _("Ваш исходный промпт:", "Your Original Prompt:", self.language)
 
         optimized_label = _(
             f"Оптимизированный промпт ({method_name}):",
@@ -879,9 +862,7 @@ class EmailTemplates:
         Returns:
             Plain text formatted email body
         """
-        title = _(
-            "Ваш оптимизированный промпт", "Your Optimized Prompt", self.language
-        )
+        title = _("Ваш оптимизированный промпт", "Your Optimized Prompt", self.language)
 
         greeting = _(
             "Отлично! Ваш промпт готов.",
@@ -895,9 +876,7 @@ class EmailTemplates:
             self.language,
         )
 
-        original_label = _(
-            "ВАШ ИСХОДНЫЙ ПРОМПТ:", "YOUR ORIGINAL PROMPT:", self.language
-        )
+        original_label = _("ВАШ ИСХОДНЫЙ ПРОМПТ:", "YOUR ORIGINAL PROMPT:", self.language)
 
         optimized_label = _(
             f"ОПТИМИЗИРОВАННЫЙ ПРОМПТ ({method_name}):",
@@ -965,9 +944,7 @@ class EmailTemplates:
             Tuple of (subject, html_body, plain_body)
         """
         subject = self.get_single_result_subject()
-        html_body = self.get_single_result_html_body(
-            original_prompt, method_name, optimized_result
-        )
+        html_body = self.get_single_result_html_body(original_prompt, method_name, optimized_result)
         plain_body = self.get_single_result_plain_body(
             original_prompt, method_name, optimized_result
         )

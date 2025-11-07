@@ -327,6 +327,31 @@ And then you can tail the file in the container:
 docker exec -it prompt-improver-bot sh -lc 'tail -f /app/bot.log'
 ```
 
+## 🔒 Security
+
+This project uses automated security scanning to catch vulnerabilities before they reach production. Pre-commit hooks run on every commit to check for:
+
+- **Secrets Detection**: Prevents hardcoded API keys, tokens, and passwords
+- **Python Security Issues**: Identifies SQL injection, command injection, and other vulnerabilities
+- **Dependency Vulnerabilities**: Scans for known CVEs in third-party packages
+- **Code Quality**: Enforces security best practices and coding standards
+
+### Quick Start
+
+Install the security tools:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+The hooks will run automatically on every commit. For more information, see:
+
+- **[Pre-commit Setup Guide](docs/security/pre-commit-setup.md)** - Installation and configuration
+- **[Security Tools Reference](docs/security/tool-reference.md)** - Detailed tool documentation
+- **[Troubleshooting Guide](docs/security/troubleshooting.md)** - Common issues and solutions
+- **[CI Integration Guide](docs/security/ci-integration.md)** - Running security checks in CI/CD
+
 ## 📚 Documentation
 
 Comprehensive documentation is available in the [docs/](docs/) directory:
@@ -337,6 +362,7 @@ Comprehensive documentation is available in the [docs/](docs/) directory:
 - **[Deployment](docs/deployment/)** - Deployment guides and best practices
 - **[User Guides](docs/guides/)** - End-to-end user documentation
 - **[Guidelines](docs/guidelines/)** - Development and contribution guidelines
+- **[Security](docs/security/)** - Security configuration and best practices
 
 ## 🏛️ Architecture Details
 

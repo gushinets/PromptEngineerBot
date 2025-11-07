@@ -7,6 +7,7 @@ for consistent messaging and easier maintenance.
 
 from telegram import ReplyKeyboardMarkup
 
+
 # ===== Language Settings =====
 # Set to 'ru' for Russian or 'en' for English
 LANGUAGE = "ru"
@@ -33,9 +34,7 @@ BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Gene
 
 # Email delivery buttons
 BTN_EMAIL_DELIVERY = _("📧 Отправить 3 промпта на email", "📧 Send 3 prompts to email")
-BTN_POST_OPTIMIZATION_EMAIL = _(
-    "📧 Отправить промпт на e-mail", "📧 Send prompt to e-mail"
-)
+BTN_POST_OPTIMIZATION_EMAIL = _("📧 Отправить промпт на e-mail", "📧 Send prompt to e-mail")
 
 # ===== Welcome and Help Messages =====
 WELCOME_MESSAGE = _(
@@ -228,8 +227,7 @@ ERROR_EMAIL_INVALID = _(
 
 EMAIL_OTP_SENT = _(
     "📧 Код подтверждения отправлен на {email}.\n\n🔢 Введите 6-значный код из письма:",
-    "📧 Verification code sent to {email}.\n\n"
-    "🔢 Please enter the 6-digit code from the email:",
+    "📧 Verification code sent to {email}.\n\n🔢 Please enter the 6-digit code from the email:",
 )
 
 ERROR_EMAIL_RATE_LIMITED = _(
@@ -416,9 +414,7 @@ GENERATING_RESPONSE = _(
 )
 
 # ===== Success Messages =====
-RESPONSE_READY = _(
-    "✅ Вот ваш оптимизированный промпт:", "✅ Here's your optimized prompt:"
-)
+RESPONSE_READY = _("✅ Вот ваш оптимизированный промпт:", "✅ Here's your optimized prompt:")
 
 SUCCESS_ALL_PROMPTS_SENT_TO_CHAT = _(
     "✅ Все оптимизированные промпты отправлены в чат!",
@@ -485,9 +481,7 @@ SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 # Follow-up feature keyboards
-FOLLOWUP_CHOICE_KEYBOARD = ReplyKeyboardMarkup(
-    [[BTN_YES, BTN_NO]], resize_keyboard=True
-)
+FOLLOWUP_CHOICE_KEYBOARD = ReplyKeyboardMarkup([[BTN_YES, BTN_NO]], resize_keyboard=True)
 
 FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
     [[BTN_GENERATE_PROMPT], [BTN_RESET]], resize_keyboard=True
@@ -560,14 +554,9 @@ def format_improved_prompt_response(
         str: Formatted response with the original and improved prompts
     """
     # Escape potential Markdown characters in user content
-    safe_user_prompt = (
-        user_prompt.replace("`", "\\`").replace("*", "\\*").replace("_", "\\_")
-    )
+    safe_user_prompt = user_prompt.replace("`", "\\`").replace("*", "\\*").replace("_", "\\_")
     safe_improved_prompt = (
-        improved_prompt.strip()
-        .replace("`", "\\`")
-        .replace("*", "\\*")
-        .replace("_", "\\_")
+        improved_prompt.strip().replace("`", "\\`").replace("*", "\\*").replace("_", "\\_")
     )
 
     return IMPROVED_PROMPT_RESPONSE.format(
@@ -681,9 +670,8 @@ def parse_followup_response(response: str) -> tuple[str, bool]:
             # Validate extracted content
             if extracted.strip():
                 return extracted, True
-            else:
-                # Empty content, fall back to original response
-                return response.strip(), False
+            # Empty content, fall back to original response
+            return response.strip(), False
 
         # No REFINED_PROMPT tag found, return original response
         return response.strip(), False
@@ -692,5 +680,5 @@ def parse_followup_response(response: str) -> tuple[str, bool]:
         # Parsing error, return original response
         import logging
 
-        logging.error(f"Error parsing follow-up response: {e}")
+        logging.exception(f"Error parsing follow-up response: {e}")
         return response.strip(), False

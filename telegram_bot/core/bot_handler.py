@@ -3,7 +3,6 @@ Telegram bot message handlers and core logic.
 """
 
 import logging
-import re
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -15,7 +14,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from telegram_bot.core.conversation_manager import ConversationManager
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
 from telegram_bot.services.llm.base import LLMClientBase
@@ -31,24 +29,14 @@ from telegram_bot.utils.messages import (
     BTN_POST_OPTIMIZATION_EMAIL,
     BTN_RESET,
     BTN_YES,
-    EMAIL_ALREADY_AUTHENTICATED,
-    EMAIL_INPUT_MESSAGE,
-    EMAIL_OTP_SENT,
     ERROR_EMAIL_INPUT_FAILED,
-    ERROR_EMAIL_INVALID,
-    ERROR_EMAIL_RATE_LIMITED,
-    ERROR_EMAIL_SEND_FAILED,
     ERROR_EMAIL_SERVICE_ERROR,
     ERROR_EMAIL_SERVICE_UNAVAILABLE,
     ERROR_GENERIC,
-    ERROR_OTP_ATTEMPTS_EXCEEDED,
-    ERROR_OTP_EXPIRED,
-    ERROR_OTP_INVALID,
     ERROR_OTP_VERIFICATION_FAILED,
     ERROR_PROMPT_GENERATION_FAILED,
     ERROR_PROMPT_RETRIEVAL_FALLBACK,
     ERROR_REDIS_UNAVAILABLE,
-    ERROR_SMTP_UNAVAILABLE,
     ERROR_STATE_CORRUPTED_RESTART,
     ERROR_STATE_RECOVERY_FAILED,
     ERROR_STATE_RECOVERY_SUCCESS,
@@ -65,7 +53,6 @@ from telegram_bot.utils.messages import (
     FOLLOWUP_RATE_LIMIT_RESTART,
     FOLLOWUP_TIMEOUT_FALLBACK,
     FOLLOWUP_TIMEOUT_RESTART,
-    OTP_VERIFICATION_SUCCESS,
     POST_FOLLOWUP_COMPLETION_KEYBOARD,
     POST_FOLLOWUP_DECLINE_KEYBOARD,
     PROMPT_READY_FOLLOW_UP,
@@ -78,6 +65,7 @@ from telegram_bot.utils.messages import (
     parse_followup_response,
     parse_llm_response,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -123,9 +111,7 @@ def _is_network_error(exception: Exception) -> bool:
 class BotHandler:
     """Handles Telegram bot interactions and message processing."""
 
-    def __init__(
-        self, config: BotConfig, llm_client: LLMClientBase, sheets_logger_func=None
-    ):
+    def __init__(self, config: BotConfig, llm_client: LLMClientBase, sheets_logger_func=None):
         self.config = config
         self.llm_client = llm_client
 
@@ -321,13 +307,9 @@ class BotHandler:
                         await self._safe_reply(
                             update,
                             ERROR_REDIS_UNAVAILABLE,
-                            reply_markup=ReplyKeyboardMarkup(
-                                [[BTN_RESET]], resize_keyboard=True
-                            ),
+                            reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
                         )
-                        logger.warning(
-                            f"email_flow_blocked_redis_unhealthy | user_id={user_id}"
-                        )
+                        logger.warning(f"email_flow_blocked_redis_unhealthy | user_id={user_id}")
                         return
 
                     # Check if SMTP is healthy - warn but allow to proceed with chat fallback
@@ -337,19 +319,15 @@ class BotHandler:
                         )
                         # SMTP unhealthy, but we can still proceed with chat fallback
                         # The email flow orchestrator will handle the fallback
-                        pass
 
                 except Exception as e:
                     # Health monitor not available, log warning but proceed
                     logger.warning(
                         f"health_monitor_unavailable_proceeding | user_id={user_id} | error={e}"
                     )
-                    pass
 
                 try:
-                    await self.email_flow_orchestrator.start_email_flow(
-                        update, context, user_id
-                    )
+                    await self.email_flow_orchestrator.start_email_flow(update, context, user_id)
                 except Exception as e:
                     logger.error(f"Email flow error for user {user_id}: {e}")
                     await self._safe_reply(update, ERROR_EMAIL_SERVICE_ERROR)
@@ -409,9 +387,7 @@ class BotHandler:
 
         # Add additional message if specified (for LYRA variants)
         if additional_message:
-            self.conversation_manager.append_message(
-                user_id, "user", additional_message
-            )
+            self.conversation_manager.append_message(user_id, "user", additional_message)
 
         self.conversation_manager.set_waiting_for_method(user_id, False)
         self.conversation_manager.set_current_method(user_id, method_name)
@@ -456,9 +432,7 @@ class BotHandler:
                     await self._safe_reply(
                         update,
                         ERROR_REDIS_UNAVAILABLE,
-                        reply_markup=ReplyKeyboardMarkup(
-                            [[BTN_RESET]], resize_keyboard=True
-                        ),
+                        reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
                     )
                     logger.warning(
                         f"post_optimization_email_blocked_redis_unhealthy | user_id={user_id}"
@@ -483,9 +457,7 @@ class BotHandler:
                     update, context, user_id
                 )
             except Exception as e:
-                logger.error(
-                    f"Post-optimization email flow error for user {user_id}: {e}"
-                )
+                logger.error(f"Post-optimization email flow error for user {user_id}: {e}")
                 await self._safe_reply(update, ERROR_EMAIL_SERVICE_ERROR)
         else:
             await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
@@ -541,9 +513,7 @@ class BotHandler:
             self.state_manager.set_waiting_for_followup_choice(user_id, False)
             self.state_manager.set_waiting_for_prompt(user_id, True)
             self.state_manager.set_improved_prompt_cache(user_id, None)  # Clear cache
-            self.state_manager.set_cached_method_name(
-                user_id, None
-            )  # Clear cached method
+            self.state_manager.set_cached_method_name(user_id, None)  # Clear cached method
             self.conversation_manager.reset(user_id)
 
             logger.info(f"followup_declined | user_id={user_id}")
@@ -569,9 +539,7 @@ class BotHandler:
             self.state_manager.set_waiting_for_followup_choice(user_id, False)
 
             # Start follow-up conversation using cached improved prompt
-            self.conversation_manager.start_followup_conversation(
-                user_id, improved_prompt
-            )
+            self.conversation_manager.start_followup_conversation(user_id, improved_prompt)
 
             logger.info(f"followup_accepted | user_id={user_id}")
 
@@ -587,9 +555,7 @@ class BotHandler:
             logger.warning(f"invalid_followup_choice | user_id={user_id} | text={text}")
             # Keep the same state and don't respond - user should use buttons
 
-    async def _handle_followup_conversation(
-        self, update: Update, user_id: int, text: str
-    ):
+    async def _handle_followup_conversation(self, update: Update, user_id: int, text: str):
         """Handle follow-up conversation during question-answer phase."""
 
         # Check if user clicked the generate prompt button
@@ -617,9 +583,7 @@ class BotHandler:
         logger.info(f"followup_generate_requested | user_id={user_id}")
 
         try:
-            await self._process_followup_llm_request(
-                update, user_id, expect_refined_prompt=True
-            )
+            await self._process_followup_llm_request(update, user_id, expect_refined_prompt=True)
 
         except Exception as e:
             await self._handle_followup_error(update, user_id, e, "generation")
@@ -650,9 +614,7 @@ class BotHandler:
         # Log conversation totals for follow-up
         # Use cached improved prompt as UserRequest for follow-up logging
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
-        self._log_conversation_totals(
-            user_id, "FOLLOWUP", refined_prompt, improved_prompt
-        )
+        self._log_conversation_totals(user_id, "FOLLOWUP", refined_prompt, improved_prompt)
 
         # Preserve the refined prompt for post-optimization email button
         # Store it BEFORE resetting state
@@ -712,15 +674,13 @@ class BotHandler:
             self.conversation_manager.append_message(user_id, "assistant", raw_response)
 
             # Parse response with enhanced error handling
-            parsed_response, is_refined_prompt = (
-                self._parse_followup_response_with_fallback(raw_response, user_id)
+            parsed_response, is_refined_prompt = self._parse_followup_response_with_fallback(
+                raw_response, user_id
             )
 
             if is_refined_prompt:
                 # LLM provided refined prompt, complete the follow-up flow
-                await self._complete_followup_conversation(
-                    update, user_id, parsed_response
-                )
+                await self._complete_followup_conversation(update, user_id, parsed_response)
             elif expect_refined_prompt:
                 # We expected a refined prompt but didn't get one
                 logger.warning(f"followup_expected_refined_prompt | user_id={user_id}")
@@ -752,7 +712,7 @@ class BotHandler:
             context: Context where error occurred ('conversation', 'generation', etc.)
         """
         logger.error(
-            f"followup_error | user_id={user_id} | context={context} | error={str(error)}",
+            f"followup_error | user_id={user_id} | context={context} | error={error!s}",
             exc_info=True,
         )
 
@@ -785,22 +745,17 @@ class BotHandler:
 
         if "timeout" in error_str or "timed out" in error_str:
             return "timeout"
-        elif "connection" in error_str or "network" in error_str:
+        if "connection" in error_str or "network" in error_str:
             return "network"
-        elif "rate limit" in error_str or "too many requests" in error_str:
+        if "rate limit" in error_str or "too many requests" in error_str:
             return "rate_limit"
-        elif "api" in error_str and ("error" in error_str or "invalid" in error_str):
+        if "api" in error_str and ("error" in error_str or "invalid" in error_str):
             return "api_error"
-        else:
-            return "generic"
+        return "generic"
 
-    async def _handle_followup_timeout(
-        self, update: Update, user_id: int, context: str
-    ):
+    async def _handle_followup_timeout(self, update: Update, user_id: int, context: str):
         """Handle timeout errors during follow-up conversations."""
-        logger.info(
-            f"followup_timeout_fallback | user_id={user_id} | context={context}"
-        )
+        logger.info(f"followup_timeout_fallback | user_id={user_id} | context={context}")
 
         # Try to fallback to cached improved prompt
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
@@ -818,13 +773,9 @@ class BotHandler:
                 FOLLOWUP_TIMEOUT_RESTART,
             )
 
-    async def _handle_followup_network_error(
-        self, update: Update, user_id: int, context: str
-    ):
+    async def _handle_followup_network_error(self, update: Update, user_id: int, context: str):
         """Handle network errors during follow-up conversations."""
-        logger.info(
-            f"followup_network_error_fallback | user_id={user_id} | context={context}"
-        )
+        logger.info(f"followup_network_error_fallback | user_id={user_id} | context={context}")
 
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
         if improved_prompt:
@@ -835,17 +786,11 @@ class BotHandler:
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
-            await self._fallback_to_prompt_input(
-                update, user_id, FOLLOWUP_NETWORK_RESTART
-            )
+            await self._fallback_to_prompt_input(update, user_id, FOLLOWUP_NETWORK_RESTART)
 
-    async def _handle_followup_rate_limit(
-        self, update: Update, user_id: int, context: str
-    ):
+    async def _handle_followup_rate_limit(self, update: Update, user_id: int, context: str):
         """Handle rate limit errors during follow-up conversations."""
-        logger.info(
-            f"followup_rate_limit_fallback | user_id={user_id} | context={context}"
-        )
+        logger.info(f"followup_rate_limit_fallback | user_id={user_id} | context={context}")
 
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
         if improved_prompt:
@@ -856,17 +801,11 @@ class BotHandler:
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
-            await self._fallback_to_prompt_input(
-                update, user_id, FOLLOWUP_RATE_LIMIT_RESTART
-            )
+            await self._fallback_to_prompt_input(update, user_id, FOLLOWUP_RATE_LIMIT_RESTART)
 
-    async def _handle_followup_api_error(
-        self, update: Update, user_id: int, context: str
-    ):
+    async def _handle_followup_api_error(self, update: Update, user_id: int, context: str):
         """Handle API errors during follow-up conversations."""
-        logger.info(
-            f"followup_api_error_fallback | user_id={user_id} | context={context}"
-        )
+        logger.info(f"followup_api_error_fallback | user_id={user_id} | context={context}")
 
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
         if improved_prompt:
@@ -877,25 +816,17 @@ class BotHandler:
             )
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
-            await self._fallback_to_prompt_input(
-                update, user_id, FOLLOWUP_API_ERROR_RESTART
-            )
+            await self._fallback_to_prompt_input(update, user_id, FOLLOWUP_API_ERROR_RESTART)
 
-    async def _handle_followup_generic_error(
-        self, update: Update, user_id: int, context: str
-    ):
+    async def _handle_followup_generic_error(self, update: Update, user_id: int, context: str):
         """Handle generic errors during follow-up conversations."""
-        logger.info(
-            f"followup_generic_error_fallback | user_id={user_id} | context={context}"
-        )
+        logger.info(f"followup_generic_error_fallback | user_id={user_id} | context={context}")
 
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
         if improved_prompt:
             await self._complete_followup_conversation(update, user_id, improved_prompt)
         else:
-            await self._fallback_to_prompt_input(
-                update, user_id, FOLLOWUP_GENERIC_ERROR_RESTART
-            )
+            await self._fallback_to_prompt_input(update, user_id, FOLLOWUP_GENERIC_ERROR_RESTART)
 
     async def _handle_missing_refined_prompt(self, update: Update, user_id: int):
         """Handle cases where we expected a refined prompt but didn't get one."""
@@ -916,9 +847,7 @@ class BotHandler:
                 ERROR_PROMPT_GENERATION_FAILED,
             )
 
-    async def _fallback_to_prompt_input(
-        self, update: Update, user_id: int, message: str
-    ):
+    async def _fallback_to_prompt_input(self, update: Update, user_id: int, message: str):
         """Fallback to prompt input state with error message."""
         await self._safe_reply(
             update,
@@ -1011,13 +940,9 @@ class BotHandler:
                 await self._safe_reply(
                     update,
                     ERROR_STATE_RECOVERY_SUCCESS,
-                    reply_markup=ReplyKeyboardMarkup(
-                        [[BTN_RESET]], resize_keyboard=True
-                    ),
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
                 )
-                await self._complete_followup_conversation(
-                    update, user_id, improved_prompt
-                )
+                await self._complete_followup_conversation(update, user_id, improved_prompt)
             else:
                 # No cached prompt, reset to prompt input
                 await self._fallback_to_prompt_input(
@@ -1027,9 +952,7 @@ class BotHandler:
                 )
 
         except Exception as e:
-            logger.error(
-                f"Error during follow-up state recovery for user {user_id}: {e}"
-            )
+            logger.error(f"Error during follow-up state recovery for user {user_id}: {e}")
             # Complete fallback
             await self._fallback_to_prompt_input(
                 update,
@@ -1063,14 +986,12 @@ class BotHandler:
             return parsed_response, is_refined_prompt
 
         except Exception as e:
-            logger.error(f"followup_parse_error | user_id={user_id} | error={str(e)}")
+            logger.error(f"followup_parse_error | user_id={user_id} | error={e!s}")
 
             # On parse error, return original response as fallback
             return response.strip(), False
 
-    def _fallback_parse_refined_prompt(
-        self, response: str, user_id: int
-    ) -> tuple[str, bool]:
+    def _fallback_parse_refined_prompt(self, response: str, user_id: int) -> tuple[str, bool]:
         """
         Fallback parsing strategy for malformed refined prompt responses.
 
@@ -1117,9 +1038,7 @@ class BotHandler:
             return response.strip(), False
 
         except Exception as e:
-            logger.error(
-                f"followup_fallback_parse_error | user_id={user_id} | error={str(e)}"
-            )
+            logger.error(f"followup_fallback_parse_error | user_id={user_id} | error={e!s}")
             return response.strip(), False
 
     async def _process_with_llm(self, update: Update, user_id: int, method_name: str):
@@ -1135,20 +1054,14 @@ class BotHandler:
             # Handle follow-up conversation differently
             if method_name == "FOLLOWUP":
                 # This is the initial LLM response in follow-up conversation
-                self.conversation_manager.append_message(
-                    user_id, "assistant", raw_response
-                )
+                self.conversation_manager.append_message(user_id, "assistant", raw_response)
 
                 # Parse response to check if it's a refined prompt (shouldn't happen on first response)
-                parsed_response, is_refined_prompt = parse_followup_response(
-                    raw_response
-                )
+                parsed_response, is_refined_prompt = parse_followup_response(raw_response)
 
                 if is_refined_prompt:
                     # Unexpected refined prompt on first response, complete flow
-                    await self._complete_followup_conversation(
-                        update, user_id, parsed_response
-                    )
+                    await self._complete_followup_conversation(update, user_id, parsed_response)
                 else:
                     # Send LLM's initial questions with generate button
                     await self._safe_reply(
@@ -1175,9 +1088,7 @@ class BotHandler:
                     update,
                     optimized_prompt,
                     parse_mode="Markdown",
-                    reply_markup=ReplyKeyboardMarkup(
-                        [[BTN_RESET]], resize_keyboard=True
-                    ),
+                    reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
                 )
 
                 # Cache the improved prompt AND method name for potential follow-up use
@@ -1212,9 +1123,7 @@ class BotHandler:
 
         except Exception as e:
             logger.error(f"Error processing LLM request: {e}", exc_info=True)
-            logger.error(
-                f"error | stage={method_name} | user_id={user_id} | error={str(e)}"
-            )
+            logger.error(f"error | stage={method_name} | user_id={user_id} | error={e!s}")
 
             await self._safe_reply(
                 update,
@@ -1240,9 +1149,7 @@ class BotHandler:
                 return
 
             # Use provided user_request or fall back to stored user prompt
-            request_text = (
-                user_request or self.conversation_manager.get_user_prompt(user_id) or ""
-            )
+            request_text = user_request or self.conversation_manager.get_user_prompt(user_id) or ""
 
             payload = {
                 "BotID": self.config.bot_id or "UNKNOWN",
@@ -1309,13 +1216,8 @@ class BotHandler:
                     )
                 except Exception as e:
                     # If it's a Markdown parsing error, try without parse_mode
-                    if (
-                        "parse entities" in str(e).lower()
-                        or "markdown" in str(e).lower()
-                    ):
-                        kwargs_no_parse = {
-                            k: v for k, v in kwargs.items() if k != "parse_mode"
-                        }
+                    if "parse entities" in str(e).lower() or "markdown" in str(e).lower():
+                        kwargs_no_parse = {k: v for k, v in kwargs.items() if k != "parse_mode"}
                         await update.message.reply_text(chunk, **kwargs_no_parse)
                         logger.info(
                             f"message_chunk_sent_no_markdown | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
@@ -1333,9 +1235,7 @@ class BotHandler:
             except Exception as e:
                 # If it's a Markdown parsing error, try without parse_mode
                 if "parse entities" in str(e).lower() or "markdown" in str(e).lower():
-                    kwargs_no_parse = {
-                        k: v for k, v in kwargs.items() if k != "parse_mode"
-                    }
+                    kwargs_no_parse = {k: v for k, v in kwargs.items() if k != "parse_mode"}
                     await update.message.reply_text(text, **kwargs_no_parse)
                     logger.info("Message sent successfully without Markdown parsing")
                 else:

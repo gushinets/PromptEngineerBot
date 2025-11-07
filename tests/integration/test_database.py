@@ -287,9 +287,7 @@ class TestSchemaConstraints:
         db_session.rollback()
         user2 = User(
             telegram_id=987654321,
-            email=normalize_email(
-                "user+different@example.com"
-            ),  # Same normalized result
+            email=normalize_email("user+different@example.com"),  # Same normalized result
             email_original="user+different@example.com",
         )
         db_session.add(user2)
@@ -340,9 +338,7 @@ class TestSchemaConstraints:
         ]
 
         for col in expected_auth_columns:
-            assert col in auth_column_names, (
-                f"Column {col} missing from auth_events table"
-            )
+            assert col in auth_column_names, f"Column {col} missing from auth_events table"
 
         # Verify indexes exist (this is database-specific, so we'll test functionality)
         # The indexes are tested implicitly through query performance and constraint enforcement
@@ -579,9 +575,7 @@ class TestUserModelProfileExtensions:
             db_session.commit()
 
             # Assert
-            retrieved_user = (
-                db_session.query(User).filter_by(telegram_id=300000000 + i).first()
-            )
+            retrieved_user = db_session.query(User).filter_by(telegram_id=300000000 + i).first()
             assert retrieved_user is not None
             assert retrieved_user.language_code == lang_code
             assert retrieved_user.first_name == f"User_{description}"
@@ -749,6 +743,3 @@ class TestDatabaseManager:
         import telegram_bot.database
 
         telegram_bot.data.database.db_manager = None
-
-
-

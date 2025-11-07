@@ -6,9 +6,8 @@ ensuring proper data masking and PII protection while maintaining comprehensive 
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import and_, func
 from sqlalchemy.exc import SQLAlchemyError
@@ -19,6 +18,7 @@ from telegram_bot.data.database import (
     mask_email,
     mask_telegram_id,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +59,8 @@ class AuditService:
         telegram_id: int,
         event_type: AuditEventType,
         success: bool,
-        email: Optional[str] = None,
-        reason: Optional[str] = None,
+        email: str | None = None,
+        reason: str | None = None,
     ) -> bool:
         """
         Log an audit event to the database with proper data masking.
@@ -91,7 +91,7 @@ class AuditService:
                     event_type=event_type.value,
                     success=success,
                     reason=reason,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
 
                 session.add(audit_event)
@@ -146,9 +146,7 @@ class AuditService:
             email=email,
         )
 
-    def log_otp_failed(
-        self, telegram_id: int, email: str, reason: str = "invalid_code"
-    ) -> bool:
+    def log_otp_failed(self, telegram_id: int, email: str, reason: str = "invalid_code") -> bool:
         """Log failed OTP verification event."""
         return self.log_event(
             telegram_id=telegram_id,
@@ -247,7 +245,7 @@ class AuditService:
         self,
         telegram_id: int,
         limit: int = 100,
-        event_type: Optional[AuditEventType] = None,
+        event_type: AuditEventType | None = None,
     ) -> list[AuthEvent]:
         """
         Get audit events for a specific user.
@@ -262,9 +260,7 @@ class AuditService:
         """
         try:
             with get_db_session() as session:
-                query = session.query(AuthEvent).filter(
-                    AuthEvent.telegram_id == telegram_id
-                )
+                query = session.query(AuthEvent).filter(AuthEvent.telegram_id == telegram_id)
 
                 if event_type:
                     query = query.filter(AuthEvent.event_type == event_type.value)
@@ -274,13 +270,11 @@ class AuditService:
                 return events
 
         except SQLAlchemyError as e:
-            self.logger.error(
-                f"Failed to get user events for {mask_telegram_id(telegram_id)}: {e}"
-            )
+            self.logger.error(f"Failed to get user events for {mask_telegram_id(telegram_id)}: {e}")
             return []
 
     def get_email_events(
-        self, email: str, limit: int = 100, event_type: Optional[AuditEventType] = None
+        self, email: str, limit: int = 100, event_type: AuditEventType | None = None
     ) -> list[AuthEvent]:
         """
         Get audit events for a specific email.
@@ -299,9 +293,7 @@ class AuditService:
             normalized_email = normalize_email(email)
 
             with get_db_session() as session:
-                query = session.query(AuthEvent).filter(
-                    AuthEvent.email == normalized_email
-                )
+                query = session.query(AuthEvent).filter(AuthEvent.email == normalized_email)
 
                 if event_type:
                     query = query.filter(AuthEvent.event_type == event_type.value)
@@ -311,13 +303,11 @@ class AuditService:
                 return events
 
         except SQLAlchemyError as e:
-            self.logger.error(
-                f"Failed to get email events for {mask_email(email)}: {e}"
-            )
+            self.logger.error(f"Failed to get email events for {mask_email(email)}: {e}")
             return []
 
     def get_event_counts(
-        self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
+        self, start_date: datetime | None = None, end_date: datetime | None = None
     ) -> dict[str, int]:
         """
         Get event counts by type for a date range.
@@ -331,15 +321,13 @@ class AuditService:
         """
         try:
             if start_date is None:
-                start_date = datetime.now(timezone.utc) - timedelta(days=1)
+                start_date = datetime.now(UTC) - timedelta(days=1)
             if end_date is None:
-                end_date = datetime.now(timezone.utc)
+                end_date = datetime.now(UTC)
 
             with get_db_session() as session:
                 results = (
-                    session.query(
-                        AuthEvent.event_type, func.count(AuthEvent.id).label("count")
-                    )
+                    session.query(AuthEvent.event_type, func.count(AuthEvent.id).label("count"))
                     .filter(
                         and_(
                             AuthEvent.created_at >= start_date,
@@ -367,7 +355,7 @@ class AuditService:
             Number of events purged
         """
         try:
-            cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=retention_days)
 
             with get_db_session() as session:
                 # Count events to be purged
@@ -382,9 +370,7 @@ class AuditService:
 
                 # Delete old events
                 deleted_count = (
-                    session.query(AuthEvent)
-                    .filter(AuthEvent.created_at < cutoff_date)
-                    .delete()
+                    session.query(AuthEvent).filter(AuthEvent.created_at < cutoff_date).delete()
                 )
 
                 session.commit()
@@ -401,7 +387,7 @@ class AuditService:
 
 
 # Global audit service instance
-audit_service: Optional[AuditService] = None
+audit_service: AuditService | None = None
 
 
 def init_audit_service() -> AuditService:
@@ -427,7 +413,5 @@ def get_audit_service() -> AuditService:
         RuntimeError: If audit service is not initialized
     """
     if audit_service is None:
-        raise RuntimeError(
-            "Audit service not initialized. Call init_audit_service() first."
-        )
+        raise RuntimeError("Audit service not initialized. Call init_audit_service() first.")
     return audit_service

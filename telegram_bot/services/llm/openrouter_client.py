@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Dict, List
 
 import aiohttp
 
@@ -29,9 +28,7 @@ class OpenRouterClient(LLMClientBase):
             "Content-Type": "application/json",
         }
 
-    async def send_prompt(
-        self, messages: List[Dict[str, str]], log_prefix: str = ""
-    ) -> str:
+    async def send_prompt(self, messages: list[dict[str, str]], log_prefix: str = "") -> str:
         """
         Send messages to the OpenRouter chat completion API asynchronously.
         Args:
@@ -49,9 +46,7 @@ class OpenRouterClient(LLMClientBase):
 
             async def _do_request():
                 # Support both real session.post (async CM) and AsyncMock returning coroutine in tests
-                post_result = session.post(
-                    self.base_url, headers=self.headers, json=payload
-                )
+                post_result = session.post(self.base_url, headers=self.headers, json=payload)
                 # If the result is an async context manager, use it; otherwise await it and wrap
                 if hasattr(post_result, "__aenter__"):
                     response_cm = post_result
@@ -93,15 +88,11 @@ class OpenRouterClient(LLMClientBase):
                             f"Total: {self.last_usage.total_tokens} tokens"
                         )
 
-                    self.logger.info(
-                        f"{log_prefix} Received response from model: {response_text}"
-                    )
+                    self.logger.info(f"{log_prefix} Received response from model: {response_text}")
                     return response_text
 
             try:
                 return await asyncio.wait_for(_do_request(), timeout=self.timeout)
-            except asyncio.TimeoutError:
-                self.logger.error(
-                    f"{log_prefix} Request timed out after {self.timeout} seconds"
-                )
+            except TimeoutError:
+                self.logger.error(f"{log_prefix} Request timed out after {self.timeout} seconds")
                 raise

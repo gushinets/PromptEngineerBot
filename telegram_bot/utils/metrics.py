@@ -9,9 +9,9 @@ import logging
 import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import Lock
-from typing import Dict, List, Optional, Tuple
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +30,16 @@ class MetricsCollector:
         self._lock = Lock()
 
         # Counter metrics (cumulative)
-        self._counters: Dict[str, int] = defaultdict(int)
+        self._counters: dict[str, int] = defaultdict(int)
 
         # Time-series metrics (sliding window)
-        self._time_series: Dict[str, deque] = defaultdict(lambda: deque())
+        self._time_series: dict[str, deque] = defaultdict(lambda: deque())
 
         # Latency metrics (histogram-like storage)
-        self._latencies: Dict[str, List[float]] = defaultdict(list)
+        self._latencies: dict[str, list[float]] = defaultdict(list)
 
         # Success/failure rates
-        self._success_rates: Dict[str, Tuple[int, int]] = defaultdict(
+        self._success_rates: dict[str, tuple[int, int]] = defaultdict(
             lambda: (0, 0)
         )  # (success, total)
 
@@ -47,7 +47,7 @@ class MetricsCollector:
 
     def _cleanup_old_entries(self, metric_name: str):
         """Remove entries older than the window size."""
-        cutoff_time = datetime.now(timezone.utc) - self.window_size
+        cutoff_time = datetime.now(UTC) - self.window_size
         time_series = self._time_series[metric_name]
 
         while time_series and time_series[0][0] < cutoff_time:
@@ -65,7 +65,7 @@ class MetricsCollector:
             self._counters[metric_name] += value
 
             # Also add to time series for rate calculations
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
             self._time_series[metric_name].append((timestamp, value))
             self._cleanup_old_entries(metric_name)
 
@@ -140,7 +140,7 @@ class MetricsCollector:
         with self._lock:
             return self._get_rate_unlocked(metric_name)
 
-    def get_latency_stats(self, metric_name: str) -> Dict[str, float]:
+    def get_latency_stats(self, metric_name: str) -> dict[str, float]:
         """
         Get latency statistics for a metric.
 
@@ -153,7 +153,7 @@ class MetricsCollector:
         with self._lock:
             return self._get_latency_stats_unlocked(metric_name)
 
-    def get_success_rate(self, metric_name: str) -> Dict[str, float]:
+    def get_success_rate(self, metric_name: str) -> dict[str, float]:
         """
         Get success rate for a metric.
 
@@ -179,7 +179,7 @@ class MetricsCollector:
 
         return total_value / window_minutes if window_minutes > 0 else 0.0
 
-    def _get_latency_stats_unlocked(self, metric_name: str) -> Dict[str, float]:
+    def _get_latency_stats_unlocked(self, metric_name: str) -> dict[str, float]:
         """Get latency statistics for a metric (assumes lock is already held)."""
         latencies = self._latencies[metric_name]
 
@@ -207,7 +207,7 @@ class MetricsCollector:
             "count": count,
         }
 
-    def _get_success_rate_unlocked(self, metric_name: str) -> Dict[str, float]:
+    def _get_success_rate_unlocked(self, metric_name: str) -> dict[str, float]:
         """Get success rate for a metric (assumes lock is already held)."""
         success_count, total_count = self._success_rates[metric_name]
 
@@ -219,7 +219,7 @@ class MetricsCollector:
             "success_rate": success_rate,
         }
 
-    def get_all_metrics(self) -> Dict[str, any]:
+    def get_all_metrics(self) -> dict[str, any]:
         """
         Get all metrics in a structured format.
 
@@ -240,15 +240,11 @@ class MetricsCollector:
 
             # Get latency stats for all latency metrics
             for metric_name in self._latencies.keys():
-                metrics["latencies"][metric_name] = self._get_latency_stats_unlocked(
-                    metric_name
-                )
+                metrics["latencies"][metric_name] = self._get_latency_stats_unlocked(metric_name)
 
             # Get success rates for all success/failure metrics
             for metric_name in self._success_rates.keys():
-                metrics["success_rates"][metric_name] = self._get_success_rate_unlocked(
-                    metric_name
-                )
+                metrics["success_rates"][metric_name] = self._get_success_rate_unlocked(metric_name)
 
             return metrics
 
@@ -290,7 +286,7 @@ class MetricsCollector:
         self.increment_counter(f"otp_rate_limited_{reason}")
 
     # Email-specific metrics methods
-    def record_email_sent(self, success: bool, latency_seconds: Optional[float] = None):
+    def record_email_sent(self, success: bool, latency_seconds: float | None = None):
         """Record an email sending attempt."""
         self.increment_counter("email_sent_attempts")
         if success:
@@ -309,9 +305,7 @@ class MetricsCollector:
         self.increment_counter(f"email_failed_{reason}")
 
     # LLM-specific metrics methods
-    def record_llm_request(
-        self, model: str, success: bool, latency_seconds: Optional[float] = None
-    ):
+    def record_llm_request(self, model: str, success: bool, latency_seconds: float | None = None):
         """Record an LLM request."""
         self.increment_counter("llm_requests")
         self.increment_counter(f"llm_requests_{model}")
@@ -331,9 +325,7 @@ class MetricsCollector:
             self.record_latency(f"llm_latency_{model}", latency_seconds)
 
     # SMTP-specific metrics methods
-    def record_smtp_connection(
-        self, success: bool, latency_seconds: Optional[float] = None
-    ):
+    def record_smtp_connection(self, success: bool, latency_seconds: float | None = None):
         """Record an SMTP connection attempt."""
         self.increment_counter("smtp_connections")
         if success:
@@ -398,9 +390,7 @@ class MetricsCollector:
         for metric_name in self._success_rates.keys():
             rate_stats = self.get_success_rate(metric_name)
             lines.append(f"# TYPE {metric_name}_success_rate gauge")
-            lines.append(
-                f"{metric_name}_success_rate {rate_stats['success_rate']:.2f} {timestamp}"
-            )
+            lines.append(f"{metric_name}_success_rate {rate_stats['success_rate']:.2f} {timestamp}")
 
         return "\n".join(lines)
 
@@ -443,7 +433,7 @@ class MetricsCollector:
 
 
 # Global metrics collector instance
-metrics_collector: Optional[MetricsCollector] = None
+metrics_collector: MetricsCollector | None = None
 
 
 def init_metrics_collector(window_size_minutes: int = 60) -> MetricsCollector:

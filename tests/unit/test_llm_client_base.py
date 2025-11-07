@@ -1,7 +1,5 @@
 """Tests for the LLM client base classes."""
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from telegram_bot.services.llm.base import LLMClientBase, TokenUsage
@@ -77,9 +75,7 @@ class TestLLMClientBase:
                 return "test response"
 
         client = TestLLMClient("test_key", "test_model")
-        client.last_usage = TokenUsage(
-            prompt_tokens=10, completion_tokens=20, total_tokens=30
-        )
+        client.last_usage = TokenUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30)
 
         result = client.get_last_usage()
         expected = {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
@@ -96,6 +92,3 @@ class TestLLMClientBase:
         client = TestLLMClient("test_key", "test_model")
 
         assert client.logger.name == "TestLLMClient"
-
-
-

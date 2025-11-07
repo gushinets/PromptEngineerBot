@@ -2,12 +2,8 @@
 Dependency injection container for managing shared instances.
 """
 
-from typing import Optional
-
 from telegram_bot.core.conversation_manager import ConversationManager
 from telegram_bot.core.state_manager import StateManager
-from telegram_bot.services.llm.base import LLMClientBase
-from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.prompt_loader import PromptLoader
 
 
@@ -15,9 +11,9 @@ class DependencyContainer:
     """Container for managing shared instances across the application."""
 
     def __init__(self):
-        self._state_manager: Optional[StateManager] = None
-        self._prompt_loader: Optional[PromptLoader] = None
-        self._conversation_manager: Optional[ConversationManager] = None
+        self._state_manager: StateManager | None = None
+        self._prompt_loader: PromptLoader | None = None
+        self._conversation_manager: ConversationManager | None = None
 
     def get_state_manager(self) -> StateManager:
         """Get or create StateManager instance."""
@@ -49,13 +45,11 @@ class DependencyContainer:
         """Create fresh instances, replacing any existing ones."""
         self._state_manager = StateManager()
         self._prompt_loader = PromptLoader()
-        self._conversation_manager = ConversationManager(
-            self._prompt_loader, self._state_manager
-        )
+        self._conversation_manager = ConversationManager(self._prompt_loader, self._state_manager)
 
 
 # Global container instance
-_container: Optional[DependencyContainer] = None
+_container: DependencyContainer | None = None
 
 
 def get_container() -> DependencyContainer:
