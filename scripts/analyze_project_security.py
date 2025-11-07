@@ -5,13 +5,11 @@ Analyzes project structure, Python version, and identifies sensitive files/direc
 """
 
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
 
 
-def check_python_version() -> Dict[str, str]:
+def check_python_version() -> dict[str, str]:
     """Check Python version compatibility."""
     version_info = sys.version_info
     version_str = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
@@ -29,7 +27,7 @@ def check_python_version() -> Dict[str, str]:
     }
 
 
-def detect_project_languages(root_path: Path) -> Dict[str, List[str]]:
+def detect_project_languages(root_path: Path) -> dict[str, list[str]]:
     """Detect programming languages and file types in the project."""
     languages = {
         "python": [],
@@ -69,9 +67,7 @@ def detect_project_languages(root_path: Path) -> Dict[str, List[str]]:
         if item.is_file():
             # Skip hidden directories and common excludes
             if any(part.startswith(".") for part in item.parts[1:]):
-                if not any(
-                    part in [".kiro", ".vscode", ".github"] for part in item.parts
-                ):
+                if not any(part in [".kiro", ".vscode", ".github"] for part in item.parts):
                     continue
 
             # Skip virtual environments and cache
@@ -100,7 +96,7 @@ def detect_project_languages(root_path: Path) -> Dict[str, List[str]]:
     return languages
 
 
-def identify_sensitive_files(root_path: Path) -> Dict[str, List[str]]:
+def identify_sensitive_files(root_path: Path) -> dict[str, list[str]]:
     """Identify files and directories that may contain sensitive information."""
     sensitive_patterns = {
         "environment_files": [".env", ".env.local", ".env.production"],
@@ -135,15 +131,14 @@ def identify_sensitive_files(root_path: Path) -> Dict[str, List[str]]:
                         # Extension match
                         if item.suffix == pattern[1:]:
                             found_sensitive[category].append(rel_path)
-                    else:
-                        # Exact name match
-                        if item.name == pattern:
-                            found_sensitive[category].append(rel_path)
+                    # Exact name match
+                    elif item.name == pattern:
+                        found_sensitive[category].append(rel_path)
 
     return found_sensitive
 
 
-def identify_directories_for_scanning(root_path: Path) -> Dict[str, List[str]]:
+def identify_directories_for_scanning(root_path: Path) -> dict[str, list[str]]:
     """Identify directories that should be included/excluded from security scanning."""
 
     # Directories to scan
@@ -179,7 +174,7 @@ def identify_directories_for_scanning(root_path: Path) -> Dict[str, List[str]]:
     }
 
 
-def analyze_dependencies(root_path: Path) -> Dict[str, any]:
+def analyze_dependencies(root_path: Path) -> dict[str, any]:
     """Analyze project dependencies from requirements.txt and pyproject.toml."""
     deps_info = {
         "requirements_txt": None,
@@ -191,10 +186,8 @@ def analyze_dependencies(root_path: Path) -> Dict[str, any]:
     # Check requirements.txt
     req_file = root_path / "requirements.txt"
     if req_file.exists():
-        with open(req_file, "r") as f:
-            lines = [
-                line.strip() for line in f if line.strip() and not line.startswith("#")
-            ]
+        with open(req_file) as f:
+            lines = [line.strip() for line in f if line.strip() and not line.startswith("#")]
             deps_info["requirements_txt"] = len(lines)
             deps_info["total_dependencies"] += len(lines)
 
@@ -221,7 +214,7 @@ def analyze_dependencies(root_path: Path) -> Dict[str, any]:
     return deps_info
 
 
-def get_project_structure_summary(root_path: Path) -> Dict[str, int]:
+def get_project_structure_summary(root_path: Path) -> dict[str, int]:
     """Get summary statistics about project structure."""
     stats = {
         "total_python_files": 0,
@@ -233,8 +226,7 @@ def get_project_structure_summary(root_path: Path) -> Dict[str, int]:
     for item in root_path.rglob("*"):
         # Skip excluded directories
         if any(
-            part in ["venv", ".venv", "__pycache__", "node_modules", ".git"]
-            for part in item.parts
+            part in ["venv", ".venv", "__pycache__", "node_modules", ".git"] for part in item.parts
         ):
             continue
 
@@ -305,7 +297,7 @@ def main():
         print(f"   pyproject.toml: {deps['pyproject_toml']}")
     print(f"   Total Dependencies: {deps['total_dependencies']}")
     if deps["security_relevant"]:
-        print(f"   Security-Relevant Packages:")
+        print("   Security-Relevant Packages:")
         for pkg in deps["security_relevant"][:5]:
             print(f"      - {pkg}")
     print()
@@ -373,7 +365,7 @@ def main():
     print("=" * 80)
     print()
     print(f"✓ Python Version: {py_version['version']} ({py_version['status']})")
-    print(f"✓ Project Type: Python Telegram Bot")
+    print("✓ Project Type: Python Telegram Bot")
     print(f"✓ Total Python Files: {structure['total_python_files']}")
     print(f"✓ Sensitive Files Found: {sum(len(files) for files in sensitive.values())}")
     print(f"✓ Dependencies to Scan: {deps['total_dependencies']}")
