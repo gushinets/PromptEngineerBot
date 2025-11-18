@@ -14,7 +14,7 @@
     "python.testing.unittestEnabled": false,
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
     // Code Analysis
-    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.typeCheckingMode": "off",
     "python.analysis.autoImportCompletions": true,
     "python.analysis.completeFunctionParens": true,
     // Formatting and Linting
@@ -35,7 +35,6 @@
         }
     },
     "ruff.lint.enable": true,
-    "ruff.lint.run": "onSave",
     // File Associations
     "files.associations": {
         "*.env*": "dotenv",

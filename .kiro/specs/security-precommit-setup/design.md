@@ -574,7 +574,6 @@ pre-commit autoupdate           # Update hook versions
   },
   
   "ruff.lint.enable": true,
-  "ruff.lint.run": "onSave",
   
   "files.associations": {
     ".gitleaks.toml": "toml",
