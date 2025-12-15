@@ -211,6 +211,13 @@ async def main():
             init_auth_service(config)
             logger.info("Auth service initialized successfully")
 
+            # Initialize user tracking service
+            from telegram_bot.services.user_tracking import init_user_tracking_service
+
+            user_tracking_service = init_user_tracking_service()
+            bot_handler.set_user_tracking_service(user_tracking_service)
+            logger.info("User tracking service initialized successfully")
+
             # Initialize audit service
             from telegram_bot.utils.audit_service import init_audit_service
 

@@ -69,7 +69,7 @@ class RedisClient:
 
             return True
         except Exception as e:
-            logger.error(f"Redis health check failed: {e}")
+            logger.exception(f"Redis health check failed: {e}")
             return False
 
     # OTP Storage Operations

@@ -395,6 +395,12 @@ class AuthService:
         """
         Persist authentication state on OTP success.
 
+        This method handles two scenarios:
+        1. Existing user (created on first interaction with email=null): Updates email
+           and authentication status while preserving first_interaction_at and created_at
+        2. New user (direct email verification without prior interaction): Creates user
+           with all required fields including activity tracking timestamps
+
         Args:
             telegram_id: User's Telegram ID
             email: Normalized email address
@@ -403,27 +409,42 @@ class AuthService:
 
         Returns:
             True if persisted successfully, False otherwise
+
+        Requirements addressed:
+            - 5.1: Update existing user record with verified email
+            - 5.2: Set is_authenticated to true and update email_verified_at
+            - 5.3: Preserve original first_interaction_at and created_at values
+            - 5.4: Use should_update_user_profile to determine if updates are needed
         """
         try:
             with get_db_session() as session:
-                # Try to find existing user
+                # Try to find existing user by telegram_id first (Requirement 5.1)
                 user = session.query(User).filter_by(telegram_id=telegram_id).first()
 
                 current_time = datetime.now(UTC)
 
                 if user:
-                    # Existing user - update authentication timestamps
+                    # Existing user - update authentication fields
+                    # This handles the case where user was created on first interaction
+                    # with email=null (Requirement 5.1)
+
+                    # Update email and authentication status (Requirement 5.2)
                     user.email = email  # Update normalized email
                     user.email_original = email_original  # Update original email
                     user.is_authenticated = True
                     user.last_authenticated_at = current_time
                     user.updated_at = current_time
 
+                    # IMPORTANT: Do NOT modify first_interaction_at or created_at
+                    # These values must be preserved from when the user was first created
+                    # (Requirement 5.3)
+                    # The fields are intentionally not touched here to preserve history
+
                     # Set email_verified_at only if it's not already set (first success)
                     if user.email_verified_at is None:
                         user.email_verified_at = current_time
 
-                    # Check if profile data should be updated for existing user
+                    # Check if profile data should be updated for existing user (Requirement 5.4)
                     try:
                         if should_update_user_profile(user, effective_user):
                             # Extract new profile data
@@ -450,7 +471,17 @@ class AuthService:
                             "Continuing with authentication without profile update."
                         )
 
-                    logger.debug(f"Updated existing user for {mask_telegram_id(telegram_id)}")
+                    first_interaction_str = (
+                        user.first_interaction_at.isoformat()
+                        if user.first_interaction_at
+                        else "None"
+                    )
+                    created_at_str = user.created_at.isoformat() if user.created_at else "None"
+                    logger.debug(
+                        f"Updated existing user for {mask_telegram_id(telegram_id)}, "
+                        f"preserved first_interaction_at={first_interaction_str}, "
+                        f"created_at={created_at_str}"
+                    )
 
                 else:
                     # New user - check for email conflicts first
@@ -483,6 +514,7 @@ class AuthService:
                         }
 
                     # Create new user with all required fields including profile data
+                    # and activity tracking timestamps
                     user = User(
                         telegram_id=telegram_id,
                         email=email,
@@ -492,6 +524,9 @@ class AuthService:
                         last_authenticated_at=current_time,
                         created_at=current_time,
                         updated_at=current_time,
+                        # Activity tracking fields - set to current time for new users
+                        first_interaction_at=current_time,
+                        last_interaction_at=current_time,
                         # Profile fields from Telegram
                         first_name=profile_data.get("first_name"),
                         last_name=profile_data.get("last_name"),

@@ -33,3 +33,6 @@ htmlcov/
 *_verification.json
 *_analysis.json
 docs/security/scan-results/*.json
+
+# hypothesis files
+.hypothesis/

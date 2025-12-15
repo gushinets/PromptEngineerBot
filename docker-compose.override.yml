@@ -24,18 +24,11 @@ services:
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
 
   postgres:
-    # Development PostgreSQL settings
+    # Use same settings as production for consistency
     ports:
-      - "5432:5432" # Expose PostgreSQL port for development tools
+      - "5432:5432"
     environment:
-      POSTGRES_DB: botdb_dev
+      POSTGRES_DB: botdb
       POSTGRES_USER: botuser
-      POSTGRES_PASSWORD: botpass_dev
-    # Add development database initialization
-    volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-
-volumes:
-  postgres_dev_data:
-    driver: local
+      POSTGRES_PASSWORD: botpass
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"

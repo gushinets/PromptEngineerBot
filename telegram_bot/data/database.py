@@ -63,7 +63,7 @@ class User(Base):
     # Core identification and authentication fields
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     email_original: Mapped[str | None] = mapped_column(Text)
     is_authenticated: Mapped[bool] = mapped_column(Boolean, default=False)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -72,6 +72,17 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now(), onupdate=func.now()
     )
+
+    # Activity tracking fields
+    first_interaction_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now()
+    )
+    """Timestamp of user's first interaction with the bot. Set once on user creation."""
+
+    last_interaction_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now()
+    )
+    """Timestamp of user's most recent interaction with the bot. Updated on every interaction."""
 
     # Telegram profile fields extracted from update.effective_user
     # These fields are automatically populated during user interactions
@@ -100,7 +111,8 @@ class User(Base):
 
     def __repr__(self) -> str:
         name_part = f", name='{self.first_name}'" if self.first_name else ""
-        return f"<User(id={self.id}, telegram_id={self.telegram_id}, email='{self.email[:3]}***'{name_part})>"
+        email_part = f", email='{self.email[:3]}***'" if self.email else ""
+        return f"<User(id={self.id}, telegram_id={self.telegram_id}{email_part}{name_part})>"
 
 
 class AuthEvent(Base):
@@ -129,6 +141,10 @@ Index("ix_users_authenticated", User.is_authenticated, User.last_authenticated_a
 Index("ix_users_language_code", User.language_code)  # Language-based user segmentation
 Index("ix_users_is_premium", User.is_premium)  # Premium user filtering and analytics
 Index("ix_users_bot_premium", User.is_bot, User.is_premium)  # Composite index for user type queries
+
+# Activity tracking indexes for efficient queries on user interaction timestamps
+Index("ix_users_first_interaction_at", User.first_interaction_at)  # First interaction queries
+Index("ix_users_last_interaction_at", User.last_interaction_at)  # Last interaction queries
 
 # Essential Indexes for AuthEvents Model
 Index("ix_auth_events_telegram_time", AuthEvent.telegram_id, AuthEvent.created_at.desc())

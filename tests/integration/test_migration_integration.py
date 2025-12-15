@@ -468,6 +468,17 @@ class TestUserProfileMigration:
             conn.execute(text("ALTER TABLE users ADD COLUMN is_bot BOOLEAN DEFAULT 0"))
             conn.execute(text("ALTER TABLE users ADD COLUMN is_premium BOOLEAN"))
             conn.execute(text("ALTER TABLE users ADD COLUMN language_code TEXT"))
+            # Apply activity tracking migration (003)
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN first_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN last_interaction_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
             conn.commit()
 
         # Test that SQLAlchemy User model works with migrated database

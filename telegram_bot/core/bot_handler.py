@@ -17,6 +17,7 @@ from tenacity import (
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
 from telegram_bot.services.llm.base import LLMClientBase
+from telegram_bot.services.user_tracking import get_user_tracking_service
 from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.messages import (
     BTN_CRAFT,
@@ -129,9 +130,20 @@ class BotHandler:
             # Email flow orchestrator not initialized - will be set later if email feature is enabled
             self.email_flow_orchestrator = None
 
+        # Initialize user tracking service if available (Requirement 7.1)
+        try:
+            self.user_tracking_service = get_user_tracking_service()
+        except RuntimeError:
+            # User tracking service not initialized - will be set later if tracking is enabled
+            self.user_tracking_service = None
+
     def set_email_flow_orchestrator(self, orchestrator):
         """Set the email flow orchestrator after initialization."""
         self.email_flow_orchestrator = orchestrator
+
+    def set_user_tracking_service(self, service):
+        """Set the user tracking service after initialization."""
+        self.user_tracking_service = service
 
     def reset_user_state(self, user_id: int, preserve_post_optimization: bool = False):
         """
@@ -161,6 +173,19 @@ class BotHandler:
         """Handle the /start command or New Prompt button."""
         user_id = update.effective_user.id
 
+        # Track user interaction early in /start processing (Requirement 7.1)
+        # This creates user on first interaction or updates last_interaction_at
+        if self.user_tracking_service:
+            tracked_user, is_first_time = self.user_tracking_service.track_user_interaction(
+                user_id, update.effective_user
+            )
+            # Handle None return gracefully - database error case (Requirement 7.3)
+            # Continue processing even if tracking fails
+            if tracked_user is None:
+                logger.warning(
+                    f"User tracking returned None for user_id={user_id} in handle_start, continuing with request"
+                )
+
         # Reset user state without logging tokens
         # Token logging should only happen when optimized prompts are generated
         self.reset_user_state(user_id)
@@ -180,6 +205,20 @@ class BotHandler:
         """Handle incoming messages from users."""
         user_id = update.effective_user.id
         text = update.message.text
+
+        # Track user interaction early in message processing (Requirement 7.1)
+        # This creates user on first interaction or updates last_interaction_at
+        if self.user_tracking_service:
+            tracked_user, is_first_time = self.user_tracking_service.track_user_interaction(
+                user_id, update.effective_user
+            )
+            # Handle None return gracefully - database error case (Requirement 7.3)
+            # Continue processing even if tracking fails
+            if tracked_user is None:
+                logger.warning(
+                    f"User tracking returned None for user_id={user_id}, continuing with request"
+                )
+
         user_state = self.state_manager.get_user_state(user_id)
 
         # Reset button always resets conversation
