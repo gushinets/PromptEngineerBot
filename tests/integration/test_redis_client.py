@@ -433,14 +433,14 @@ class TestGlobalRedisClient:
         assert retrieved_client is original_client
 
         # Reset global state for other tests
-        import telegram_bot.redis_client
+        import telegram_bot.services.redis_client
 
         telegram_bot.services.redis_client.redis_client = None
 
     def test_get_redis_client_not_initialized(self):
         """Test getting Redis client when not initialized."""
         # Ensure global state is clean
-        import telegram_bot.redis_client
+        import telegram_bot.services.redis_client
 
         telegram_bot.services.redis_client.redis_client = None
 

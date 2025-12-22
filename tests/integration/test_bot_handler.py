@@ -311,7 +311,7 @@ class TestBotHandler:
         user_id = 12345
         method_name = "CRAFT"
 
-        with patch("telegram_bot.bot_handler.logger") as mock_logger:
+        with patch("telegram_bot.core.bot_handler.logger") as mock_logger:
             bot_handler._log_method_selection(user_id, method_name)
 
             mock_logger.info.assert_called_once()
@@ -927,7 +927,7 @@ class TestBotHandler:
         user_id = 12345
 
         # Mock parse_followup_response to raise an exception
-        with patch("telegram_bot.bot_handler.parse_followup_response") as mock_parse:
+        with patch("telegram_bot.core.bot_handler.parse_followup_response") as mock_parse:
             mock_parse.side_effect = Exception("Parse error")
 
             parsed, is_refined = bot_handler._parse_followup_response_with_fallback(

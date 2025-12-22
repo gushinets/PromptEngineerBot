@@ -51,7 +51,7 @@ def mock_normalize_email(email):
 
 
 # Mock the database imports
-import telegram_bot.database
+import telegram_bot.data.database
 
 
 telegram_bot.data.database.get_db_session = mock_get_db_session
@@ -82,7 +82,7 @@ def mock_get_redis_client():
 
 
 # Patch the import before importing auth_service
-import telegram_bot.auth_service
+import telegram_bot.auth.auth_service
 
 
 telegram_bot.auth.auth_service.get_redis_client = mock_get_redis_client
@@ -272,7 +272,7 @@ def test_otp_verification_system():
     verification_redis_client = VerificationMockRedisClient()
 
     # Patch the auth service to use our verification mock
-    import telegram_bot.auth_service
+    import telegram_bot.auth.auth_service
 
     original_get_redis_client = telegram_bot.auth.auth_service.get_redis_client
     telegram_bot.auth.auth_service.get_redis_client = lambda: verification_redis_client
@@ -377,7 +377,7 @@ def test_authentication_persistence():
         return persistence_session
 
     # Patch the database function
-    import telegram_bot.auth_service
+    import telegram_bot.auth.auth_service
 
     original_get_db_session = telegram_bot.auth.auth_service.get_db_session
     telegram_bot.auth.auth_service.get_db_session = mock_get_db_session_persistence
@@ -469,7 +469,7 @@ def test_user_authentication_status():
         return auth_status_session
 
     # Patch the database function
-    import telegram_bot.auth_service
+    import telegram_bot.auth.auth_service
 
     original_get_db_session = telegram_bot.auth.auth_service.get_db_session
     telegram_bot.auth.auth_service.get_db_session = mock_get_db_session_auth_status

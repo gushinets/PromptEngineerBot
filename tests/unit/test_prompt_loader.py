@@ -16,9 +16,11 @@ class TestPromptLoader:
         with patch("telegram_bot.utils.prompt_loader.PromptLoader._load_prompts") as mock_load:
             loader = PromptLoader()
 
-            expected_dir = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "telegram_bot", "prompts"
-            )
+            # The default directory is telegram_bot/prompts/ relative to the package
+            import telegram_bot.utils.prompt_loader as prompt_loader_module
+
+            package_root = os.path.dirname(os.path.dirname(prompt_loader_module.__file__))
+            expected_dir = os.path.join(package_root, "prompts")
             assert loader.prompts_dir == expected_dir
             mock_load.assert_called_once()
 

@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from telegram import KeyboardButton, ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
 
 from telegram_bot.core.bot_handler import BotHandler
 from telegram_bot.utils.config import BotConfig
@@ -14,7 +14,9 @@ from telegram_bot.utils.messages import (
     BTN_YES,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
+    FOLLOWUP_DECLINED_MESSAGE,
     FOLLOWUP_OFFER_MESSAGE,
+    POST_FOLLOWUP_DECLINE_KEYBOARD,
     PROMPT_READY_FOLLOW_UP,
     RESET_CONFIRMATION,
     SYSTEM_FOLLOWUP_PROMPT_INDICATOR,
@@ -180,16 +182,14 @@ class TestFollowupIntegration:
         mock_update.message.text = BTN_NO
         await bot_handler._handle_followup_choice(mock_update, user_id, BTN_NO)
 
-        # Step 3: Verify RESET_CONFIRMATION message was sent
+        # Step 3: Verify FOLLOWUP_DECLINED_MESSAGE was sent with post-optimization email keyboard
         mock_update.message.reply_text.assert_called()
         call_args = mock_update.message.reply_text.call_args
-        assert RESET_CONFIRMATION in call_args[0][0]
+        assert FOLLOWUP_DECLINED_MESSAGE in call_args[0][0]
 
-        # Verify reset button keyboard was set
+        # Verify POST_FOLLOWUP_DECLINE_KEYBOARD was set (includes email button and reset button)
         assert isinstance(call_args[1]["reply_markup"], ReplyKeyboardMarkup)
-        assert call_args[1]["reply_markup"].keyboard == (
-            (KeyboardButton(text="🔄 Сбросить диалог"),),
-        )
+        assert call_args[1]["reply_markup"] == POST_FOLLOWUP_DECLINE_KEYBOARD
 
         # Step 4: Verify state was properly reset
         user_state = bot_handler.state_manager.get_user_state(user_id)

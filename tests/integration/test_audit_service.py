@@ -424,7 +424,7 @@ class TestAuditServiceGlobal:
     def test_get_audit_service_not_initialized(self):
         """Test getting audit service when not initialized."""
         # Reset global service
-        import telegram_bot.audit_service
+        import telegram_bot.utils.audit_service
 
         telegram_bot.utils.audit_service.audit_service = None
 

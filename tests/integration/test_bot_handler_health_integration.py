@@ -77,7 +77,7 @@ def mock_health_monitor():
 @pytest.fixture
 def bot_handler(mock_config, mock_llm_client, mock_email_flow_orchestrator):
     """Create bot handler with mocked dependencies."""
-    with patch("telegram_bot.bot_handler.get_container") as mock_container:
+    with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
         # Mock container dependencies
         container = MagicMock()
         container.get_state_manager.return_value = MagicMock()

@@ -740,6 +740,6 @@ class TestDatabaseManager:
         assert retrieved_manager is manager
 
         # Reset global state for other tests
-        import telegram_bot.database
+        import telegram_bot.data.database
 
         telegram_bot.data.database.db_manager = None

@@ -26,7 +26,7 @@ def create_mock_config():
 def create_email_service():
     """Create email service instance for testing."""
     mock_config = create_mock_config()
-    with patch("telegram_bot.email_service.EmailTemplates"):
+    with patch("telegram_bot.services.email_service.EmailTemplates"):
         return EmailService(mock_config)
 
 
@@ -119,7 +119,7 @@ class TestProviderErrorExtraction:
 class TestEmailFailureAuditLogging:
     """Test email failure audit logging with provider error info."""
 
-    @patch("telegram_bot.email_service.get_audit_service")
+    @patch("telegram_bot.services.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
     async def test_otp_email_failure_logs_provider_error(self, mock_send, mock_get_audit):
         """Test that OTP email failures log provider error info to audit."""
@@ -143,9 +143,9 @@ class TestEmailFailureAuditLogging:
         )
         assert not result.success
 
-    @patch("telegram_bot.email_service.get_audit_service")
+    @patch("telegram_bot.services.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
-    @patch("telegram_bot.email_service.EmailTemplates")
+    @patch("telegram_bot.services.email_service.EmailTemplates")
     async def test_optimization_email_failure_logs_provider_error(
         self, mock_templates_class, mock_send, mock_get_audit
     ):
@@ -190,7 +190,7 @@ class TestEmailFailureAuditLogging:
         )
         assert not result.success
 
-    @patch("telegram_bot.email_service.get_audit_service")
+    @patch("telegram_bot.services.email_service.get_audit_service")
     async def test_unexpected_error_logs_provider_error(self, mock_get_audit):
         """Test that unexpected errors during email sending log provider error info."""
         # Setup mocks
@@ -213,7 +213,7 @@ class TestEmailFailureAuditLogging:
         )
         assert not result.success
 
-    @patch("telegram_bot.email_service.get_audit_service")
+    @patch("telegram_bot.services.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
     async def test_email_success_logs_without_error_reason(self, mock_send, mock_get_audit):
         """Test that successful email sending logs success without error reason."""
@@ -236,7 +236,7 @@ class TestEmailFailureAuditLogging:
         mock_audit.log_email_send_failure.assert_not_called()
         assert result.success
 
-    @patch("telegram_bot.email_service.get_audit_service")
+    @patch("telegram_bot.services.email_service.get_audit_service")
     @patch.object(EmailService, "_send_email_with_queue_fallback")
     async def test_audit_service_failure_does_not_break_email_flow(self, mock_send, mock_get_audit):
         """Test that audit service failures don't break the email flow."""

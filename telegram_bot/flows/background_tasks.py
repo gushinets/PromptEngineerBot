@@ -18,6 +18,10 @@ from telegram_bot.utils.config import BotConfig
 logger = logging.getLogger(__name__)
 
 
+# Session timeout task interval in hours (1 hour)
+SESSION_TIMEOUT_CHECK_INTERVAL_HOURS = 1
+
+
 class BackgroundTaskScheduler:
     """Background task scheduler for periodic maintenance operations."""
 
@@ -203,6 +207,56 @@ def audit_purge_task() -> dict[str, any]:
         }
 
 
+def session_timeout_task() -> dict[str, any]:
+    """
+    Background task for timing out stale sessions.
+
+    Periodically checks for sessions that have been inactive for longer than
+    the configured timeout period and marks them as unsuccessful.
+
+    Returns:
+        Dictionary with task execution results including:
+        - success: Whether the task completed without errors
+        - message: Human-readable result description
+        - timed_out_count: Number of sessions that were timed out
+        - timeout_seconds: The configured timeout threshold
+
+    Note:
+        This task follows graceful degradation principles. If the session
+        service is not available or encounters errors, the task logs the
+        failure and returns a failure result without affecting other
+        background tasks or the main bot functionality.
+    """
+    try:
+        config = BotConfig.from_env()
+        timeout_seconds = config.session_timeout_seconds
+
+        # Get session service from dependency container
+        from telegram_bot.dependencies import get_container
+
+        container = get_container()
+        session_service = container.get_session_service()
+
+        # Call timeout_stale_sessions with configured timeout
+        timed_out_count = session_service.timeout_stale_sessions(timeout_seconds)
+
+        return {
+            "success": True,
+            "message": f"Timed out {timed_out_count} stale sessions "
+            f"(threshold: {timeout_seconds}s / {timeout_seconds // 3600}h)",
+            "timed_out_count": timed_out_count,
+            "timeout_seconds": timeout_seconds,
+        }
+
+    except Exception as e:
+        logger.error(f"Session timeout task failed: {e}")
+        return {
+            "success": False,
+            "message": f"Session timeout task failed: {e}",
+            "timed_out_count": 0,
+        }
+
+
 # Global background task scheduler instance
 background_scheduler: BackgroundTaskScheduler | None = None
 
@@ -225,7 +279,17 @@ def init_background_tasks() -> BackgroundTaskScheduler:
         run_immediately=False,  # Don't run immediately on startup
     )
 
-    logger.info("Background task scheduler initialized with audit purge task")
+    # Add session timeout task (runs hourly)
+    # This task checks for stale sessions and marks them as unsuccessful
+    # The timeout threshold is configured via SESSION_TIMEOUT_SECONDS env var
+    background_scheduler.add_task(
+        name="session_timeout",
+        func=session_timeout_task,
+        interval_hours=SESSION_TIMEOUT_CHECK_INTERVAL_HOURS,
+        run_immediately=False,  # Don't run immediately on startup
+    )
+
+    logger.info("Background task scheduler initialized with audit purge and session timeout tasks")
     return background_scheduler
 
 

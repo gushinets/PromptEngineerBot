@@ -870,7 +870,7 @@ class TestAuthServiceGlobals:
     def test_get_auth_service_not_initialized(self):
         """Test getting auth service when not initialized."""
         # Reset global state
-        import telegram_bot.auth_service
+        import telegram_bot.auth.auth_service
 
         telegram_bot.auth.auth_service.auth_service = None
 

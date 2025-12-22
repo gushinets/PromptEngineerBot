@@ -29,7 +29,7 @@ class TestEmailServiceSingleResult:
         config.smtp_use_tls = True
         config.smtp_use_ssl = False
 
-        with patch("telegram_bot.email_service.get_audit_service"):
+        with patch("telegram_bot.services.email_service.get_audit_service"):
             service = EmailService(config)
             return service
 

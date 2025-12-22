@@ -17,6 +17,7 @@ from tenacity import (
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
 from telegram_bot.services.llm.base import LLMClientBase
+from telegram_bot.services.session_service import OptimizationMethod
 from telegram_bot.services.user_tracking import get_user_tracking_service
 from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.messages import (
@@ -137,6 +138,13 @@ class BotHandler:
             # User tracking service not initialized - will be set later if tracking is enabled
             self.user_tracking_service = None
 
+        # Initialize session service for session tracking if database is available
+        try:
+            self.session_service = container.get_session_service()
+        except RuntimeError:
+            # Database not initialized - session tracking will be disabled
+            self.session_service = None
+
     def set_email_flow_orchestrator(self, orchestrator):
         """Set the email flow orchestrator after initialization."""
         self.email_flow_orchestrator = orchestrator
@@ -145,14 +153,31 @@ class BotHandler:
         """Set the user tracking service after initialization."""
         self.user_tracking_service = service
 
-    def reset_user_state(self, user_id: int, preserve_post_optimization: bool = False):
+    def set_session_service(self, service):
+        """Set the session service after initialization."""
+        self.session_service = service
+
+    def reset_user_state(
+        self,
+        user_id: int,
+        preserve_post_optimization: bool = False,
+        skip_session_reset: bool = False,
+    ):
         """
         Reset the user's state and conversation history.
 
         Args:
             user_id: User ID to reset
             preserve_post_optimization: If True, preserve post_optimization_result for email button
+            skip_session_reset: If True, skip marking session as unsuccessful (used when session
+                               is already completed successfully, e.g., after followup completion)
         """
+        # Reset current session as unsuccessful before clearing state (Requirements 3.1)
+        # This must happen BEFORE clearing the session ID from state
+        # Skip if session was already completed successfully (e.g., after followup)
+        if not skip_session_reset:
+            self._reset_current_session(user_id)
+
         self.state_manager.set_waiting_for_prompt(user_id, True)
         self.state_manager.set_last_interaction(user_id, None)
         # Reset follow-up states
@@ -167,6 +192,9 @@ class BotHandler:
         # Reset post-optimization result (unless we want to preserve it)
         if not preserve_post_optimization:
             self.state_manager.set_post_optimization_result(user_id, None)
+            # Reset session tracking state only when not preserving post-optimization
+            # Session ID should remain available for post-completion email tracking (Requirements 7.4)
+            self.state_manager.set_current_session_id(user_id, None)
         self.conversation_manager.reset(user_id)
 
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -302,6 +330,9 @@ class BotHandler:
 
     async def _handle_prompt_input(self, update: Update, user_id: int, text: str):
         """Handle user prompt input."""
+        # Clear any previous session_id before creating a new session (Requirements 1.7)
+        self.state_manager.set_current_session_id(user_id, None)
+
         self.conversation_manager.reset(user_id)
         self.conversation_manager.set_user_prompt(user_id, text)
         self.conversation_manager.append_message(user_id, "user", text)
@@ -314,6 +345,10 @@ class BotHandler:
         logger.info(
             f"prompt_received | user_id={user_id} | length={len(text)} | preview={text[:120]}"
         )
+
+        # Start session tracking immediately when user sends prompt (Requirements 1.1, 1.5, 1.6)
+        # Session is created with optimization_method=None, to be set when user selects method
+        await self._start_session_for_prompt(user_id, text)
 
         # Show method selection with reset button
         method_keyboard = list(SELECT_METHOD_KEYBOARD.keyboard)
@@ -434,6 +469,10 @@ class BotHandler:
         # Log method selection
         self._log_method_selection(user_id, method_name)
 
+        # Update session with selected optimization method (Requirements 6.1)
+        # Session was already created in _handle_prompt_input, now we set the method
+        self._set_session_optimization_method(user_id, method_name)
+
         # Send processing message
         processing_method = method_name.lower().replace(" ", "_")
         try:
@@ -451,6 +490,9 @@ class BotHandler:
     async def _handle_conversation_turn(self, update: Update, user_id: int, text: str):
         """Handle multi-turn conversation."""
         self.conversation_manager.append_message(user_id, "user", text)
+
+        # Track user message in session (Requirements 10.1)
+        self._track_session_message(user_id, "user", text)
 
         method_name = self.conversation_manager.get_current_method(user_id)
         await self._process_with_llm(update, user_id, method_name)
@@ -573,6 +615,9 @@ class BotHandler:
                 self.reset_user_state(user_id)
                 return
 
+            # Mark session as using followup optimization (Requirements 6.2)
+            self._set_session_followup_used(user_id)
+
             # Start follow-up conversation immediately
             # Update state transitions to go directly from choice to conversation
             self.state_manager.set_waiting_for_followup_choice(user_id, False)
@@ -604,6 +649,9 @@ class BotHandler:
 
         # Add user response to conversation history
         self.conversation_manager.append_message(user_id, "user", text)
+
+        # Track user message in session (Requirements 10.1)
+        self._track_session_message(user_id, "user", text)
 
         logger.info(f"followup_user_response | user_id={user_id} | length={len(text)}")
 
@@ -655,6 +703,12 @@ class BotHandler:
         improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
         self._log_conversation_totals(user_id, "FOLLOWUP", refined_prompt, improved_prompt)
 
+        # Complete followup tracking - sets followup_finish_time and duration (Requirements 6a.2, 6a.3)
+        self._complete_followup_tracking(user_id)
+
+        # Complete session tracking - refined prompt delivered (Requirements 2.1)
+        self._complete_current_session(user_id)
+
         # Preserve the refined prompt for post-optimization email button
         # Store it BEFORE resetting state
         self.state_manager.set_post_optimization_result(
@@ -672,7 +726,8 @@ class BotHandler:
         )
 
         # Reset state to prompt input ready, but preserve post-optimization result
-        self.reset_user_state(user_id, preserve_post_optimization=True)
+        # Skip session reset since we already completed the session successfully above
+        self.reset_user_state(user_id, preserve_post_optimization=True, skip_session_reset=True)
 
         logger.info(f"followup_completed | user_id={user_id}")
 
@@ -705,12 +760,18 @@ class BotHandler:
         try:
             raw_response = await self.llm_client.send_prompt(transcript)
 
-            # Track token usage
+            # Track token usage for conversation manager (existing behavior)
             usage = self.llm_client.get_last_usage()
             self.conversation_manager.accumulate_token_usage(user_id, usage)
 
+            # Track token usage for session tracking (Requirements 5.2, 5.3)
+            self._track_session_tokens(user_id, usage)
+
             # Add LLM response to conversation history
             self.conversation_manager.append_message(user_id, "assistant", raw_response)
+
+            # Track LLM response in session (Requirements 10.2)
+            self._track_session_message(user_id, "assistant", raw_response)
 
             # Parse response with enhanced error handling
             parsed_response, is_refined_prompt = self._parse_followup_response_with_fallback(
@@ -1086,14 +1147,20 @@ class BotHandler:
             transcript = self.conversation_manager.get_transcript(user_id)
             raw_response = await self.llm_client.send_prompt(transcript)
 
-            # Track token usage
+            # Track token usage for conversation manager (existing behavior)
             usage = self.llm_client.get_last_usage()
             self.conversation_manager.accumulate_token_usage(user_id, usage)
+
+            # Track token usage for session tracking (Requirements 5.2, 5.3)
+            self._track_session_tokens(user_id, usage)
 
             # Handle follow-up conversation differently
             if method_name == "FOLLOWUP":
                 # This is the initial LLM response in follow-up conversation
                 self.conversation_manager.append_message(user_id, "assistant", raw_response)
+
+                # Track LLM response in session (Requirements 10.2)
+                self._track_session_message(user_id, "assistant", raw_response)
 
                 # Parse response to check if it's a refined prompt (shouldn't happen on first response)
                 parsed_response, is_refined_prompt = parse_followup_response(raw_response)
@@ -1118,6 +1185,9 @@ class BotHandler:
             response, is_question, is_improved_prompt = parse_llm_response(raw_response)
             self.conversation_manager.append_message(user_id, "assistant", raw_response)
 
+            # Track LLM response in session (Requirements 10.2)
+            self._track_session_message(user_id, "assistant", raw_response)
+
             if is_improved_prompt:
                 # Store the optimized prompt before formatting
                 optimized_prompt = response
@@ -1137,6 +1207,9 @@ class BotHandler:
                 # Log conversation totals for initial optimization phase
                 # This logs tokens with initial prompt as UserRequest and optimized prompt as Answer
                 self._log_conversation_totals(user_id, method_name, optimized_prompt)
+
+                # Complete session tracking - improved prompt delivered (Requirements 2.1)
+                self._complete_current_session(user_id)
 
                 # Send follow-up offer message with YES/NO buttons
                 await self._safe_reply(
@@ -1173,6 +1246,537 @@ class BotHandler:
     def _log_method_selection(self, user_id: int, method_name: str):
         """Log method selection to file only."""
         logger.info(f"method_selected | user_id={user_id} | method={method_name}")
+
+    def _track_session_message(self, telegram_user_id: int, role: str, content: str):
+        """
+        Track a message in the current session's conversation history.
+
+        This method adds a message to the session's conversation_history JSONB field.
+        It follows graceful degradation - if session tracking fails, the user's
+        experience is not affected.
+
+        Args:
+            telegram_user_id: Telegram user ID
+            role: Message role - "user" or "assistant"
+            content: Message content text
+
+        Requirements: 10.1, 10.2
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_message_tracking_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_message_tracking_skipped | user_id={telegram_user_id} | "
+                    "reason=no_active_session"
+                )
+                return
+
+            # Add message to session
+            result = self.session_service.add_message(
+                session_id=session_id,
+                role=role,
+                content=content,
+            )
+
+            if result:
+                logger.debug(
+                    f"session_message_tracked | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | role={role} | content_length={len(content)}"
+                )
+            else:
+                # Graceful degradation - log warning but continue
+                logger.warning(
+                    f"session_message_tracking_failed | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | role={role} | continuing_without_tracking"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_message_tracking_error | user_id={telegram_user_id} | "
+                f"role={role} | error={e}",
+                exc_info=True,
+            )
+
+    def _track_session_tokens(self, telegram_user_id: int, usage: dict | None):
+        """
+        Track token usage for the current session.
+
+        This method adds token counts from an LLM interaction to the current session.
+        It follows graceful degradation - if session tracking fails, the user's
+        experience is not affected.
+
+        When in followup mode, tokens are tracked separately using add_followup_tokens()
+        to maintain separate metrics for the followup conversation phase.
+
+        Args:
+            telegram_user_id: Telegram user ID
+            usage: Token usage dict with prompt_tokens and completion_tokens
+
+        Requirements: 5.2, 5.3, 6a.4, 6a.5
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_token_tracking_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_token_tracking_skipped | user_id={telegram_user_id} | "
+                    "reason=no_active_session"
+                )
+                return
+
+            # Extract token counts from usage dict
+            if not usage:
+                logger.debug(
+                    f"session_token_tracking_skipped | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | reason=no_usage_data"
+                )
+                return
+
+            input_tokens = usage.get("prompt_tokens", 0)
+            output_tokens = usage.get("completion_tokens", 0)
+
+            # Check if we're in followup mode to determine which token tracking method to use
+            # Requirements 6a.4, 6a.5: Track followup tokens separately
+            user_state = self.state_manager.get_user_state(telegram_user_id)
+            is_in_followup = user_state.in_followup_conversation
+
+            if is_in_followup:
+                # Add tokens to followup tracking (Requirements 6a.4, 6a.5)
+                result = self.session_service.add_followup_tokens(
+                    session_id=session_id,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                )
+                token_type = "followup"
+            else:
+                # Add tokens to main session tracking (Requirements 5.2, 5.3)
+                result = self.session_service.add_tokens(
+                    session_id=session_id,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                )
+                token_type = "initial"
+
+            if result:
+                logger.debug(
+                    f"session_tokens_tracked | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | type={token_type} | "
+                    f"input={input_tokens} | output={output_tokens}"
+                )
+            else:
+                # Graceful degradation - log warning but continue
+                logger.warning(
+                    f"session_token_tracking_failed | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | type={token_type} | continuing_without_tracking"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_token_tracking_error | user_id={telegram_user_id} | error={e}",
+                exc_info=True,
+            )
+
+    def _complete_current_session(self, telegram_user_id: int):
+        """
+        Complete the current session when improved prompt is delivered.
+
+        This method marks the current session as successful when the user receives
+        their improved prompt. It follows graceful degradation - if session tracking
+        fails, the user's experience is not affected.
+
+        Args:
+            telegram_user_id: Telegram user ID
+
+        Requirements: 2.1
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_complete_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_complete_skipped | user_id={telegram_user_id} | "
+                    "reason=no_active_session"
+                )
+                return
+
+            # Complete the session
+            result = self.session_service.complete_session(session_id)
+
+            if result:
+                logger.info(
+                    f"session_completed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | status=successful | "
+                    f"duration={result.duration_seconds}s"
+                )
+                # NOTE: Do NOT clear session_id from state here
+                # Session_id must remain available for post-completion tracking
+                # (followup conversations and email events) - Requirements 6.2, 7.4
+            else:
+                # Session completion failed - graceful degradation, continue
+                logger.warning(
+                    f"session_complete_failed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | continuing_without_completion"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_complete_error | telegram_user_id={telegram_user_id} | error={e}",
+                exc_info=True,
+            )
+
+    def _reset_current_session(self, telegram_user_id: int):
+        """
+        Reset the current session as unsuccessful when user resets dialog.
+
+        This method marks the current session as unsuccessful when the user presses
+        the "reset dialog" button. It follows graceful degradation - if session tracking
+        fails, the user's experience is not affected.
+
+        Args:
+            telegram_user_id: Telegram user ID
+
+        Requirements: 3.1
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_reset_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_reset_skipped | user_id={telegram_user_id} | reason=no_active_session"
+                )
+                return
+
+            # Reset the session as unsuccessful
+            result = self.session_service.reset_session(session_id)
+
+            if result:
+                logger.info(
+                    f"session_reset | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | status=unsuccessful | "
+                    f"duration={result.duration_seconds}s | "
+                    f"tokens={result.tokens_total}"
+                )
+                # Note: session ID will be cleared by reset_user_state after this method returns
+            else:
+                # Session reset failed - graceful degradation, continue
+                logger.warning(
+                    f"session_reset_failed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | continuing_without_reset"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_reset_error | telegram_user_id={telegram_user_id} | error={e}",
+                exc_info=True,
+            )
+
+    def _set_session_followup_used(self, telegram_user_id: int):
+        """
+        Mark that FOLLOWUP optimization was used in the current session.
+
+        This method sets the used_followup flag to True when the user opts for
+        the secondary FOLLOWUP optimization phase. It follows graceful degradation -
+        if session tracking fails, the user's experience is not affected.
+
+        Args:
+            telegram_user_id: Telegram user ID
+
+        Requirements: 6.2
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_followup_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_followup_skipped | user_id={telegram_user_id} | "
+                    "reason=no_active_session"
+                )
+                return
+
+            # Start followup tracking (sets used_followup=True and followup_start_time)
+            result = self.session_service.start_followup(session_id)
+
+            if result:
+                followup_time = (
+                    result.followup_start_time.isoformat() if result.followup_start_time else "None"
+                )
+                logger.info(
+                    f"session_followup_started | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | used_followup=True | "
+                    f"followup_start_time={followup_time}"
+                )
+            else:
+                # Starting followup failed - graceful degradation, continue
+                logger.warning(
+                    f"session_followup_start_failed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | continuing_without_tracking"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_followup_error | telegram_user_id={telegram_user_id} | error={e}",
+                exc_info=True,
+            )
+
+    def _complete_followup_tracking(self, telegram_user_id: int):
+        """
+        Complete followup conversation tracking for the current session.
+
+        This method sets followup_finish_time and calculates followup_duration_seconds
+        when the followup conversation completes. It follows graceful degradation -
+        if session tracking fails, the user's experience is not affected.
+
+        Args:
+            telegram_user_id: Telegram user ID
+
+        Requirements: 6a.2, 6a.3
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_followup_complete_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_followup_complete_skipped | user_id={telegram_user_id} | "
+                    "reason=no_active_session"
+                )
+                return
+
+            # Complete followup tracking (sets followup_finish_time and calculates duration)
+            result = self.session_service.complete_followup(session_id)
+
+            if result:
+                followup_finish = (
+                    result.followup_finish_time.isoformat()
+                    if result.followup_finish_time
+                    else "None"
+                )
+                logger.info(
+                    f"session_followup_completed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | "
+                    f"followup_finish_time={followup_finish} | "
+                    f"followup_duration_seconds={result.followup_duration_seconds}"
+                )
+            else:
+                # Completing followup failed - graceful degradation, continue
+                logger.warning(
+                    f"session_followup_complete_failed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | continuing_without_tracking"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_followup_complete_error | telegram_user_id={telegram_user_id} | "
+                f"error={e}",
+                exc_info=True,
+            )
+
+    async def _start_session_for_prompt(self, telegram_user_id: int, initial_prompt: str):
+        """
+        Start a new session when user sends their initial prompt.
+
+        This method creates a new session record immediately when a user submits
+        a prompt for optimization (before method selection). The session is created
+        with optimization_method=None, which will be set later when user selects a method.
+
+        Args:
+            telegram_user_id: Telegram user ID (not database user ID)
+            initial_prompt: The user's initial prompt text
+
+        Requirements: 1.1, 1.5, 1.6
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_start_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get the database user to obtain user_id foreign key
+            if not self.user_tracking_service:
+                logger.warning(
+                    f"session_start_skipped | user_id={telegram_user_id} | "
+                    "reason=user_tracking_service_not_available"
+                )
+                return
+
+            # Get user from tracking service (user should already exist from handle_message)
+            user, _ = self.user_tracking_service.get_or_create_user(telegram_user_id, None)
+            if user is None:
+                logger.warning(
+                    f"session_start_skipped | telegram_user_id={telegram_user_id} | "
+                    "reason=user_not_found"
+                )
+                return
+
+            # Start the session with user_id (database ID), model_name, and method=None
+            # Method will be set later when user selects optimization method
+            session = self.session_service.start_session(
+                user_id=user.id,
+                model_name=self.config.model_name,
+                method=None,  # Will be set when user selects method (Requirements 1.5)
+            )
+
+            if session:
+                # Store session ID in state for later use (token tracking, completion, etc.)
+                self.state_manager.set_current_session_id(telegram_user_id, session.id)
+                logger.info(
+                    f"session_started | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session.id} | method=None | "
+                    f"model={self.config.model_name}"
+                )
+
+                # Track the initial user prompt immediately after session creation (Requirements 1.6)
+                self._track_session_message(telegram_user_id, "user", initial_prompt)
+                logger.debug(
+                    f"session_initial_prompt_tracked | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session.id} | prompt_length={len(initial_prompt)}"
+                )
+            else:
+                # Session creation failed - graceful degradation, continue without session
+                logger.warning(
+                    f"session_start_failed | telegram_user_id={telegram_user_id} | "
+                    "continuing_without_session"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_start_error | telegram_user_id={telegram_user_id} | error={e}",
+                exc_info=True,
+            )
+
+    def _set_session_optimization_method(self, telegram_user_id: int, method_name: str):
+        """
+        Set the optimization method for the current session.
+
+        This method updates the session's optimization_method field when the user
+        selects a method (LYRA, CRAFT, GGL). The session was already created in
+        _start_session_for_prompt with method=None.
+
+        Args:
+            telegram_user_id: Telegram user ID (not database user ID)
+            method_name: Selected optimization method name (LYRA, LYRA Basic, LYRA Detail, CRAFT, GGL)
+
+        Requirements: 6.1
+        """
+        try:
+            # Check if session service is available
+            if not self.session_service:
+                logger.debug(
+                    f"session_method_update_skipped | user_id={telegram_user_id} | "
+                    "reason=session_service_not_available"
+                )
+                return
+
+            # Get current session ID from state
+            session_id = self.state_manager.get_current_session_id(telegram_user_id)
+            if session_id is None:
+                logger.debug(
+                    f"session_method_update_skipped | telegram_user_id={telegram_user_id} | "
+                    "reason=no_current_session"
+                )
+                return
+
+            # Map method name to OptimizationMethod enum
+            # LYRA Basic and LYRA Detail both map to LYRA
+            method_mapping = {
+                "LYRA": OptimizationMethod.LYRA,
+                "LYRA Basic": OptimizationMethod.LYRA,
+                "LYRA Detail": OptimizationMethod.LYRA,
+                "CRAFT": OptimizationMethod.CRAFT,
+                "GGL": OptimizationMethod.GGL,
+            }
+
+            optimization_method = method_mapping.get(method_name)
+            if optimization_method is None:
+                logger.warning(
+                    f"session_method_update_skipped | user_id={telegram_user_id} | "
+                    f"reason=unknown_method | method={method_name}"
+                )
+                return
+
+            # Update the session with the selected method
+            session = self.session_service.set_optimization_method(
+                session_id=session_id,
+                method=optimization_method,
+            )
+
+            if session:
+                logger.info(
+                    f"session_method_set | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | method={optimization_method.value}"
+                )
+            else:
+                # Method update failed - graceful degradation, continue without update
+                logger.warning(
+                    f"session_method_update_failed | telegram_user_id={telegram_user_id} | "
+                    f"session_id={session_id} | method={method_name}"
+                )
+
+        except Exception as e:
+            # Graceful degradation - session tracking failure should not block user
+            logger.error(
+                f"session_method_update_error | telegram_user_id={telegram_user_id} | "
+                f"method={method_name} | error={e}",
+                exc_info=True,
+            )
 
     def _log_conversation_totals(
         self,

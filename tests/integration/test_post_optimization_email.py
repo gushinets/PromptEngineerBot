@@ -48,7 +48,7 @@ class TestPostOptimizationEmailButton:
         config = MagicMock()
         llm_client = AsyncMock()
 
-        with patch("telegram_bot.bot_handler.get_container") as mock_container:
+        with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
             mock_container.return_value.get_conversation_manager.return_value = MagicMock()
@@ -88,9 +88,9 @@ class TestPostOptimizationEmailFlow:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service"),
-            patch("telegram_bot.email_flow.get_email_service"),
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service"),
+            patch("telegram_bot.flows.email_flow.get_email_service"),
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -260,6 +260,7 @@ class TestPostOptimizationEmailFlow:
         user_id = 12345
         user_email = "test@example.com"
         original_prompt = "Original user prompt"
+        session_id = 42
         current_result = {
             "type": "follow_up",
             "method_name": "Follow-up Optimization",
@@ -269,6 +270,9 @@ class TestPostOptimizationEmailFlow:
         # Mock dependencies
         update = MagicMock()
         context = MagicMock()
+
+        # Mock state manager to return session_id (Requirements 7.1, 7.4)
+        email_flow_orchestrator.state_manager.get_current_session_id.return_value = session_id
 
         # Mock email service
         email_result = MagicMock()
@@ -290,6 +294,7 @@ class TestPostOptimizationEmailFlow:
             current_result["method_name"],
             current_result["content"],
             user_id,
+            session_id,  # session_id passed for session tracking (Requirements 7.1, 7.4)
         )
         email_flow_orchestrator._reset_user_state.assert_called_once_with(user_id)
 
@@ -407,9 +412,9 @@ class TestPostOptimizationEmailIntegration:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service") as mock_auth,
-            patch("telegram_bot.email_flow.get_email_service") as mock_email,
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -458,9 +463,9 @@ class TestPostOptimizationEmailIntegration:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service") as mock_auth,
-            patch("telegram_bot.email_flow.get_email_service") as mock_email,
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -499,12 +504,12 @@ class TestPostOptimizationEmailIntegration:
         config = MagicMock()
         llm_client = AsyncMock()
 
-        with patch("telegram_bot.bot_handler.get_container") as mock_container:
+        with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
             mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
-            from telegram_bot.bot_handler import BotHandler
+            from telegram_bot.core.bot_handler import BotHandler
 
             bot_handler = BotHandler(config, llm_client)
 
@@ -550,7 +555,7 @@ class TestPostOptimizationEmailIntegration:
                 mock_choice.side_effect = mock_choice_side_effect
                 bot_handler._safe_reply = AsyncMock()
 
-                from telegram_bot.messages import BTN_NO
+                from telegram_bot.utils.messages import BTN_NO
 
                 await mock_choice(update, user_id, BTN_NO)
 
@@ -572,9 +577,9 @@ class TestPostOptimizationEmailIntegration:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service") as mock_auth,
-            patch("telegram_bot.email_flow.get_email_service") as mock_email,
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -637,9 +642,9 @@ class TestPostOptimizationEmailIntegration:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service") as mock_auth,
-            patch("telegram_bot.email_flow.get_email_service") as mock_email,
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -689,9 +694,9 @@ class TestPostOptimizationEmailIntegration:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service") as mock_auth,
-            patch("telegram_bot.email_flow.get_email_service") as mock_email,
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -747,7 +752,7 @@ class TestPostOptimizationButtonDisplayLogic:
 
     def test_button_display_after_followup_completion(self):
         """Test button appears after successful follow-up completion."""
-        from telegram_bot.messages import (
+        from telegram_bot.utils.messages import (
             BTN_POST_OPTIMIZATION_EMAIL,
             POST_FOLLOWUP_COMPLETION_KEYBOARD,
         )
@@ -766,7 +771,7 @@ class TestPostOptimizationButtonDisplayLogic:
 
     def test_button_display_after_followup_decline(self):
         """Test button appears after follow-up decline."""
-        from telegram_bot.messages import (
+        from telegram_bot.utils.messages import (
             BTN_POST_OPTIMIZATION_EMAIL,
             POST_FOLLOWUP_DECLINE_KEYBOARD,
         )
@@ -779,7 +784,7 @@ class TestPostOptimizationButtonDisplayLogic:
 
     def test_button_not_in_regular_keyboards(self):
         """Test button does not appear in regular keyboards."""
-        from telegram_bot.messages import (
+        from telegram_bot.utils.messages import (
             BTN_POST_OPTIMIZATION_EMAIL,
             FOLLOWUP_CHOICE_KEYBOARD,
             FOLLOWUP_CONVERSATION_KEYBOARD,
@@ -802,12 +807,12 @@ class TestPostOptimizationButtonDisplayLogic:
         config = MagicMock()
         llm_client = AsyncMock()
 
-        with patch("telegram_bot.bot_handler.get_container") as mock_container:
+        with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
             mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
-            from telegram_bot.bot_handler import BotHandler
+            from telegram_bot.core.bot_handler import BotHandler
 
             bot_handler = BotHandler(config, llm_client)
 
@@ -846,12 +851,12 @@ class TestPostOptimizationErrorHandling:
         config = MagicMock()
         llm_client = AsyncMock()
 
-        with patch("telegram_bot.bot_handler.get_container") as mock_container:
+        with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
             mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
-            from telegram_bot.bot_handler import BotHandler
+            from telegram_bot.core.bot_handler import BotHandler
 
             bot_handler = BotHandler(config, llm_client)
             bot_handler.email_flow_orchestrator = MagicMock()
@@ -889,11 +894,11 @@ class TestPostOptimizationErrorHandling:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service"),
-            patch("telegram_bot.email_flow.get_email_service"),
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service"),
+            patch("telegram_bot.flows.email_flow.get_email_service"),
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
-            from telegram_bot.email_flow import EmailFlowOrchestrator
+            from telegram_bot.flows.email_flow import EmailFlowOrchestrator
 
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -919,12 +924,12 @@ class TestPostOptimizationErrorHandling:
         config = MagicMock()
         llm_client = AsyncMock()
 
-        with patch("telegram_bot.bot_handler.get_container") as mock_container:
+        with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
             mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
-            from telegram_bot.bot_handler import BotHandler
+            from telegram_bot.core.bot_handler import BotHandler
 
             bot_handler = BotHandler(config, llm_client)
             bot_handler.email_flow_orchestrator = None  # Simulate unavailable service
@@ -951,12 +956,12 @@ class TestPostOptimizationErrorHandling:
         config = MagicMock()
         llm_client = AsyncMock()
 
-        with patch("telegram_bot.bot_handler.get_container") as mock_container:
+        with patch("telegram_bot.core.bot_handler.get_container") as mock_container:
             mock_container.return_value.get_state_manager.return_value = MagicMock()
             mock_container.return_value.get_prompt_loader.return_value = MagicMock()
             mock_container.return_value.get_conversation_manager.return_value = MagicMock()
 
-            from telegram_bot.bot_handler import BotHandler
+            from telegram_bot.core.bot_handler import BotHandler
 
             bot_handler = BotHandler(config, llm_client)
 
@@ -995,11 +1000,11 @@ class TestPostOptimizationFlowValidation:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service") as mock_auth,
-            patch("telegram_bot.email_flow.get_email_service") as mock_email,
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
-            from telegram_bot.email_flow import EmailFlowOrchestrator
+            from telegram_bot.flows.email_flow import EmailFlowOrchestrator
 
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -1011,7 +1016,7 @@ class TestPostOptimizationFlowValidation:
             orchestrator._safe_reply = AsyncMock()
 
             # Mock graceful degradation check
-            with patch("telegram_bot.email_flow.check_email_flow_readiness") as mock_check:
+            with patch("telegram_bot.flows.email_flow.check_email_flow_readiness") as mock_check:
                 mock_check.return_value = (True, None)
 
                 update = MagicMock()
@@ -1034,7 +1039,7 @@ class TestPostOptimizationFlowValidation:
 
     def test_button_text_localization(self):
         """Test that button text is properly localized."""
-        from telegram_bot.messages import BTN_POST_OPTIMIZATION_EMAIL, LANGUAGE
+        from telegram_bot.utils.messages import BTN_POST_OPTIMIZATION_EMAIL, LANGUAGE
 
         # Check that button text contains appropriate language elements
         if LANGUAGE == "ru":
@@ -1057,11 +1062,11 @@ class TestPostOptimizationFlowValidation:
         state_manager = MagicMock()
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service"),
-            patch("telegram_bot.email_flow.get_email_service"),
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service"),
+            patch("telegram_bot.flows.email_flow.get_email_service"),
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
-            from telegram_bot.email_flow import EmailFlowOrchestrator
+            from telegram_bot.flows.email_flow import EmailFlowOrchestrator
 
             orchestrator = EmailFlowOrchestrator(
                 config, llm_client, conversation_manager, state_manager
@@ -1107,7 +1112,7 @@ class TestPostOptimizationEmailTemplateIntegration:
 
     def test_single_result_template_content_validation(self):
         """Test that single result email templates contain required content."""
-        from telegram_bot.email_templates import EmailTemplates
+        from telegram_bot.utils.email_templates import EmailTemplates
 
         templates_ru = EmailTemplates("RU")
         templates_en = EmailTemplates("EN")
@@ -1138,7 +1143,7 @@ class TestPostOptimizationEmailTemplateIntegration:
 
     def test_template_security_validation(self):
         """Test that templates properly escape malicious content."""
-        from telegram_bot.email_templates import EmailTemplates
+        from telegram_bot.utils.email_templates import EmailTemplates
 
         templates = EmailTemplates("EN")
 
@@ -1172,8 +1177,8 @@ class TestPostOptimizationEmailTemplateIntegration:
         config.smtp_use_tls = True
         config.smtp_use_ssl = False
 
-        with patch("telegram_bot.email_service.get_audit_service"):
-            from telegram_bot.email_service import EmailDeliveryResult, EmailService
+        with patch("telegram_bot.services.email_service.get_audit_service"):
+            from telegram_bot.services.email_service import EmailDeliveryResult, EmailService
 
             service = EmailService(config)
             service._send_email_with_queue_fallback = AsyncMock(

@@ -220,7 +220,7 @@ async def email_flow_orchestrator(
             if email_failed:
                 # Send processing message first, then error message (no prompt sharing)
                 await update.message.reply_text("🔄 Processing your optimized prompts...")
-                from telegram_bot.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+                from telegram_bot.utils.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
 
                 await update.message.reply_text(ERROR_EMAIL_OPTIMIZATION_FAILED)
                 return False  # Return False when email delivery fails
@@ -286,7 +286,7 @@ async def email_flow_orchestrator(
         if email_failed:
             # Send error message for direct optimization failure
             await update.message.reply_text("🔄 Processing your optimized prompts...")
-            from telegram_bot.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+            from telegram_bot.utils.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
 
             await update.message.reply_text(ERROR_EMAIL_OPTIMIZATION_FAILED)
             return False
@@ -574,7 +574,7 @@ class TestEmailFlowIntegration:
 
         # Verify the error message is correct
         error_call_args = mock_update.message.reply_text.call_args_list[-1]
-        from telegram_bot.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+        from telegram_bot.utils.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
 
         assert ERROR_EMAIL_OPTIMIZATION_FAILED in error_call_args[0][0]
 
@@ -622,7 +622,7 @@ class TestEmailFlowIntegration:
 
         # Verify the error message is correct
         error_call_args = mock_update.message.reply_text.call_args_list[-1]
-        from telegram_bot.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
+        from telegram_bot.utils.messages import ERROR_EMAIL_OPTIMIZATION_FAILED
 
         assert ERROR_EMAIL_OPTIMIZATION_FAILED in error_call_args[0][0]
 
@@ -950,6 +950,526 @@ class TestEmailFlowConcurrency:
 
             # Verify all optimizations completed
             assert all(result is True for result in results if not isinstance(result, Exception))
+
+
+class TestEmailFlowSessionTrackingIntegration:
+    """
+    Integration tests for email flow session tracking.
+
+    These tests verify the complete integration of session tracking
+    with the email flow workflow, including:
+    - Session method set to "ALL"
+    - Token accumulation from all 3 methods
+    - Conversation history with method attribution
+    - Email event creation
+    - Session status based on email result
+
+    **Validates: Requirements 1.1, 1.2, 2.4, 3.1, 4.1, 5.1, 5.2**
+    """
+
+    @pytest.fixture
+    def mock_session_service(self):
+        """Create mock session service for testing."""
+        service = MagicMock()
+        service.set_optimization_method = MagicMock(return_value=MagicMock())
+        service.add_tokens = MagicMock(return_value=MagicMock())
+        service.add_message = MagicMock(return_value=MagicMock())
+        service.complete_session = MagicMock(return_value=MagicMock())
+        service.reset_session = MagicMock(return_value=MagicMock())
+        service.log_email_sent = MagicMock(return_value=MagicMock())
+        return service
+
+    @pytest.fixture
+    def real_email_flow_orchestrator(
+        self,
+        mock_config,
+        mock_llm_client,
+        mock_conversation_manager,
+        mock_state_manager,
+    ):
+        """Create real EmailFlowOrchestrator with mocked dependencies."""
+        from telegram_bot.flows.email_flow import EmailFlowOrchestrator
+
+        # Mock the service getters that are called in __init__
+        with (
+            patch("telegram_bot.flows.email_flow.get_auth_service") as mock_auth,
+            patch("telegram_bot.flows.email_flow.get_email_service") as mock_email,
+            patch("telegram_bot.flows.email_flow.get_redis_client") as mock_redis,
+        ):
+            mock_auth.return_value = MagicMock()
+            mock_email.return_value = MagicMock()
+            mock_redis.return_value = MagicMock()
+
+            orchestrator = EmailFlowOrchestrator(
+                config=mock_config,
+                llm_client=mock_llm_client,
+                conversation_manager=mock_conversation_manager,
+                state_manager=mock_state_manager,
+            )
+            return orchestrator
+
+    async def test_email_flow_sets_method_to_all(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+    ):
+        """
+        Test that email flow sets optimization method to "ALL".
+
+        Verifies: Requirements 1.1, 1.2 - Session uses existing session and
+        sets method to "ALL" when email flow starts.
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Test prompt for email flow"
+
+        # Mock state manager to return session_id
+        real_email_flow_orchestrator.state_manager.get_current_session_id = MagicMock(
+            return_value=session_id
+        )
+        real_email_flow_orchestrator.state_manager.get_email_flow_data = MagicMock(
+            return_value={"original_prompt": original_prompt, "email": "test@example.com"}
+        )
+
+        # Mock email service success
+        mock_email_result = MagicMock()
+        mock_email_result.success = True
+        mock_email_service = MagicMock()
+        mock_email_service.send_optimized_prompts_email = AsyncMock(return_value=mock_email_result)
+        real_email_flow_orchestrator.email_service = mock_email_service
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock optimization results
+            with patch.object(
+                real_email_flow_orchestrator,
+                "_run_all_optimizations_with_modified_prompts",
+                new_callable=AsyncMock,
+                return_value={
+                    "CRAFT": "CRAFT result",
+                    "LYRA": "LYRA result",
+                    "GGL": "GGL result",
+                },
+            ):
+                result = (
+                    await real_email_flow_orchestrator._run_direct_optimization_and_email_delivery(
+                        mock_update, mock_context, user_id, original_prompt
+                    )
+                )
+
+        # Verify session method was set to ALL
+        from telegram_bot.services.session_service import OptimizationMethod
+
+        mock_session_service.set_optimization_method.assert_called_once_with(
+            session_id, OptimizationMethod.ALL
+        )
+        assert result is True
+
+    async def test_email_flow_accumulates_tokens_from_all_methods(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+        mock_llm_client,
+    ):
+        """
+        Test that email flow accumulates tokens from all 3 optimization methods.
+
+        Verifies: Requirement 2.4 - tokens_total equals sum of all input and
+        output tokens from all three methods.
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Test prompt for token tracking"
+
+        # Mock LLM client to return different token counts for each call
+        token_usages = [
+            {"prompt_tokens": 100, "completion_tokens": 50},  # CRAFT
+            {"prompt_tokens": 120, "completion_tokens": 60},  # LYRA
+            {"prompt_tokens": 110, "completion_tokens": 55},  # GGL
+        ]
+        mock_llm_client.get_last_usage = MagicMock(side_effect=token_usages)
+        mock_llm_client.send_prompt = AsyncMock(return_value="Optimized result")
+
+        # Attach mocked llm_client to orchestrator
+        real_email_flow_orchestrator.llm_client = mock_llm_client
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock dependencies container
+            with patch("telegram_bot.flows.email_flow.get_container") as mock_container:
+                mock_prompt_loader = MagicMock()
+                mock_prompt_loader.craft_email_prompt = "CRAFT system prompt"
+                mock_prompt_loader.lyra_email_prompt = "LYRA system prompt"
+                mock_prompt_loader.ggl_email_prompt = "GGL system prompt"
+                mock_container.return_value.get_prompt_loader.return_value = mock_prompt_loader
+
+                # Call the method that tracks tokens
+                result = (
+                    await real_email_flow_orchestrator._run_all_optimizations_with_modified_prompts(
+                        original_prompt, user_id, session_id
+                    )
+                )
+
+        # Verify add_tokens was called 3 times (once per method)
+        assert mock_session_service.add_tokens.call_count == 3
+
+        # Verify the token values passed to add_tokens
+        calls = mock_session_service.add_tokens.call_args_list
+        assert calls[0] == ((session_id, 100, 50),)  # CRAFT
+        assert calls[1] == ((session_id, 120, 60),)  # LYRA
+        assert calls[2] == ((session_id, 110, 55),)  # GGL
+
+        # Verify result contains all methods
+        assert result is not None
+        assert "CRAFT" in result
+        assert "LYRA" in result
+        assert "GGL" in result
+
+    async def test_email_flow_conversation_history_has_method_attribution(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+        mock_llm_client,
+    ):
+        """
+        Test that conversation history contains 3 method-attributed messages.
+
+        Verifies: Requirement 3.1 - Each LLM response is added to conversation
+        history with method attribution (LYRA, CRAFT, GGL).
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Test prompt for conversation history"
+
+        # Mock LLM client
+        mock_llm_client.get_last_usage = MagicMock(
+            return_value={"prompt_tokens": 100, "completion_tokens": 50}
+        )
+        mock_llm_client.send_prompt = AsyncMock(return_value="Optimized result")
+
+        # Attach mocked llm_client to orchestrator
+        real_email_flow_orchestrator.llm_client = mock_llm_client
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock dependencies container
+            with patch("telegram_bot.flows.email_flow.get_container") as mock_container:
+                mock_prompt_loader = MagicMock()
+                mock_prompt_loader.craft_email_prompt = "CRAFT system prompt"
+                mock_prompt_loader.lyra_email_prompt = "LYRA system prompt"
+                mock_prompt_loader.ggl_email_prompt = "GGL system prompt"
+                mock_container.return_value.get_prompt_loader.return_value = mock_prompt_loader
+
+                # Call the method that adds messages
+                await real_email_flow_orchestrator._run_all_optimizations_with_modified_prompts(
+                    original_prompt, user_id, session_id
+                )
+
+        # Verify add_message was called 3 times (once per method)
+        assert mock_session_service.add_message.call_count == 3
+
+        # Verify the method attribution in each call
+        calls = mock_session_service.add_message.call_args_list
+
+        # Extract method values from calls (using kwargs)
+        methods_called = [call.kwargs.get("method") for call in calls]
+
+        # Verify all three methods are present
+        assert "CRAFT" in methods_called
+        assert "LYRA" in methods_called
+        assert "GGL" in methods_called
+
+    async def test_email_flow_creates_single_email_event(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+    ):
+        """
+        Test that email flow creates exactly one email event.
+
+        Verifies: Requirement 4.1 - Single email event is created per email flow,
+        regardless of how many optimization methods were used.
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Test prompt for email event"
+        user_email = "test@example.com"
+
+        # Mock state manager
+        real_email_flow_orchestrator.state_manager.get_current_session_id = MagicMock(
+            return_value=session_id
+        )
+        real_email_flow_orchestrator.state_manager.get_email_flow_data = MagicMock(
+            return_value={"original_prompt": original_prompt, "email": user_email}
+        )
+
+        # Mock email service success
+        mock_email_result = MagicMock()
+        mock_email_result.success = True
+        mock_email_service = MagicMock()
+        mock_email_service.send_optimized_prompts_email = AsyncMock(return_value=mock_email_result)
+        real_email_flow_orchestrator.email_service = mock_email_service
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock optimization results
+            with patch.object(
+                real_email_flow_orchestrator,
+                "_run_all_optimizations_with_modified_prompts",
+                new_callable=AsyncMock,
+                return_value={
+                    "CRAFT": "CRAFT result",
+                    "LYRA": "LYRA result",
+                    "GGL": "GGL result",
+                },
+            ):
+                await real_email_flow_orchestrator._run_direct_optimization_and_email_delivery(
+                    mock_update, mock_context, user_id, original_prompt
+                )
+
+        # Verify log_email_sent was called exactly once
+        mock_session_service.log_email_sent.assert_called_once()
+
+        # Verify the email event details
+        call_args = mock_session_service.log_email_sent.call_args
+        assert call_args[0][0] == session_id
+        assert call_args[0][1] == user_email
+        assert call_args[0][2] == "sent"
+
+    async def test_email_flow_session_successful_on_email_success(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+    ):
+        """
+        Test that session is marked successful when email is sent successfully.
+
+        Verifies: Requirement 5.1 - Session status is "successful" when email
+        delivery succeeds.
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Test prompt for success status"
+
+        # Mock state manager
+        real_email_flow_orchestrator.state_manager.get_current_session_id = MagicMock(
+            return_value=session_id
+        )
+        real_email_flow_orchestrator.state_manager.get_email_flow_data = MagicMock(
+            return_value={"original_prompt": original_prompt, "email": "test@example.com"}
+        )
+
+        # Mock email service success
+        mock_email_result = MagicMock()
+        mock_email_result.success = True
+        mock_email_service = MagicMock()
+        mock_email_service.send_optimized_prompts_email = AsyncMock(return_value=mock_email_result)
+        real_email_flow_orchestrator.email_service = mock_email_service
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock optimization results
+            with patch.object(
+                real_email_flow_orchestrator,
+                "_run_all_optimizations_with_modified_prompts",
+                new_callable=AsyncMock,
+                return_value={
+                    "CRAFT": "CRAFT result",
+                    "LYRA": "LYRA result",
+                    "GGL": "GGL result",
+                },
+            ):
+                result = (
+                    await real_email_flow_orchestrator._run_direct_optimization_and_email_delivery(
+                        mock_update, mock_context, user_id, original_prompt
+                    )
+                )
+
+        # Verify complete_session was called (not reset_session)
+        mock_session_service.complete_session.assert_called_once_with(session_id)
+        mock_session_service.reset_session.assert_not_called()
+        assert result is True
+
+    async def test_email_flow_session_unsuccessful_on_email_failure(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+    ):
+        """
+        Test that session is marked unsuccessful when email delivery fails.
+
+        Verifies: Requirement 5.2 - Session status is "unsuccessful" when email
+        delivery fails.
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Test prompt for failure status"
+        user_email = "test@example.com"
+
+        # Mock state manager
+        real_email_flow_orchestrator.state_manager.get_current_session_id = MagicMock(
+            return_value=session_id
+        )
+        real_email_flow_orchestrator.state_manager.get_email_flow_data = MagicMock(
+            return_value={"original_prompt": original_prompt, "email": user_email}
+        )
+
+        # Mock email service failure
+        mock_email_result = MagicMock()
+        mock_email_result.success = False
+        mock_email_result.error = "SMTP timeout"
+        mock_email_service = MagicMock()
+        mock_email_service.send_optimized_prompts_email = AsyncMock(return_value=mock_email_result)
+        real_email_flow_orchestrator.email_service = mock_email_service
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock optimization results
+            with patch.object(
+                real_email_flow_orchestrator,
+                "_run_all_optimizations_with_modified_prompts",
+                new_callable=AsyncMock,
+                return_value={
+                    "CRAFT": "CRAFT result",
+                    "LYRA": "LYRA result",
+                    "GGL": "GGL result",
+                },
+            ):
+                result = (
+                    await real_email_flow_orchestrator._run_direct_optimization_and_email_delivery(
+                        mock_update, mock_context, user_id, original_prompt
+                    )
+                )
+
+        # Verify reset_session was called (not complete_session)
+        mock_session_service.reset_session.assert_called_once_with(session_id)
+        mock_session_service.complete_session.assert_not_called()
+
+        # Verify email event logged with "failed" status
+        mock_session_service.log_email_sent.assert_called_once()
+        call_args = mock_session_service.log_email_sent.call_args
+        assert call_args[0][2] == "failed"
+
+        assert result is False
+
+    async def test_full_email_flow_session_tracking_integration(
+        self,
+        real_email_flow_orchestrator,
+        mock_update,
+        mock_context,
+        mock_session_service,
+        mock_llm_client,
+    ):
+        """
+        Test complete email flow with all session tracking aspects.
+
+        This is a comprehensive integration test that verifies:
+        - Session method set to "ALL"
+        - Tokens accumulated from all 3 methods
+        - Conversation history has 3 method-attributed messages
+        - Single email event created
+        - Session status based on email result
+
+        Verifies: Requirements 1.1, 1.2, 2.4, 3.1, 4.1, 5.1, 5.2
+        """
+        user_id = 12345
+        session_id = 100
+        original_prompt = "Complete integration test prompt"
+        user_email = "integration@example.com"
+
+        # Mock state manager
+        real_email_flow_orchestrator.state_manager.get_current_session_id = MagicMock(
+            return_value=session_id
+        )
+        real_email_flow_orchestrator.state_manager.get_email_flow_data = MagicMock(
+            return_value={"original_prompt": original_prompt, "email": user_email}
+        )
+
+        # Mock LLM client with different token counts per method
+        token_usages = [
+            {"prompt_tokens": 100, "completion_tokens": 50},  # CRAFT
+            {"prompt_tokens": 120, "completion_tokens": 60},  # LYRA
+            {"prompt_tokens": 110, "completion_tokens": 55},  # GGL
+        ]
+        mock_llm_client.get_last_usage = MagicMock(side_effect=token_usages)
+        mock_llm_client.send_prompt = AsyncMock(return_value="Optimized result")
+        real_email_flow_orchestrator.llm_client = mock_llm_client
+
+        # Mock email service success
+        mock_email_result = MagicMock()
+        mock_email_result.success = True
+        mock_email_service = MagicMock()
+        mock_email_service.send_optimized_prompts_email = AsyncMock(return_value=mock_email_result)
+        real_email_flow_orchestrator.email_service = mock_email_service
+
+        # Mock the session service getter
+        with patch.object(
+            real_email_flow_orchestrator, "_get_session_service", return_value=mock_session_service
+        ):
+            # Mock dependencies container
+            with patch("telegram_bot.flows.email_flow.get_container") as mock_container:
+                mock_prompt_loader = MagicMock()
+                mock_prompt_loader.craft_email_prompt = "CRAFT system prompt"
+                mock_prompt_loader.lyra_email_prompt = "LYRA system prompt"
+                mock_prompt_loader.ggl_email_prompt = "GGL system prompt"
+                mock_container.return_value.get_prompt_loader.return_value = mock_prompt_loader
+
+                result = (
+                    await real_email_flow_orchestrator._run_direct_optimization_and_email_delivery(
+                        mock_update, mock_context, user_id, original_prompt
+                    )
+                )
+
+        # Verify 1: Session method set to "ALL" (Requirements 1.1, 1.2)
+        from telegram_bot.services.session_service import OptimizationMethod
+
+        mock_session_service.set_optimization_method.assert_called_once_with(
+            session_id, OptimizationMethod.ALL
+        )
+
+        # Verify 2: Tokens accumulated from all 3 methods (Requirement 2.4)
+        assert mock_session_service.add_tokens.call_count == 3
+
+        # Verify 3: Conversation history has 3 method-attributed messages (Requirement 3.1)
+        assert mock_session_service.add_message.call_count == 3
+
+        # Verify 4: Single email event created (Requirement 4.1)
+        mock_session_service.log_email_sent.assert_called_once()
+        email_call = mock_session_service.log_email_sent.call_args
+        assert email_call[0][0] == session_id
+        assert email_call[0][1] == user_email
+        assert email_call[0][2] == "sent"
+
+        # Verify 5: Session marked successful (Requirement 5.1)
+        mock_session_service.complete_session.assert_called_once_with(session_id)
+        mock_session_service.reset_session.assert_not_called()
+
+        # Verify overall result
+        assert result is True
 
 
 if __name__ == "__main__":

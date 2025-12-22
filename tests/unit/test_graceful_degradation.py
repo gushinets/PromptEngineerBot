@@ -397,7 +397,7 @@ class TestGracefulDegradationManager:
         # Clean up
         await degradation_manager.stop_monitoring()
 
-    @patch("telegram_bot.graceful_degradation.get_health_monitor")
+    @patch("telegram_bot.utils.graceful_degradation.get_health_monitor")
     async def test_monitoring_loop_integration(self, mock_get_monitor, degradation_manager):
         """Test monitoring loop integration."""
         mock_monitor = MagicMock()

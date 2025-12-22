@@ -12,6 +12,7 @@ from telegram_bot.flows.background_tasks import (
     audit_purge_task,
     get_background_scheduler,
     init_background_tasks,
+    session_timeout_task,
 )
 
 
@@ -59,8 +60,8 @@ class TestBackgroundTaskScheduler:
 class TestAuditPurgeTask:
     """Test audit purge task functionality."""
 
-    @patch("telegram_bot.background_tasks.get_audit_service")
-    @patch("telegram_bot.background_tasks.BotConfig.from_env")
+    @patch("telegram_bot.flows.background_tasks.get_audit_service")
+    @patch("telegram_bot.flows.background_tasks.BotConfig.from_env")
     def test_audit_purge_task_success(self, mock_from_env, mock_get_audit_service):
         """Test successful audit purge task execution."""
         # Mock config
@@ -83,6 +84,75 @@ class TestAuditPurgeTask:
         mock_audit_service.purge_old_events.assert_called_once_with(retention_days=90)
 
 
+class TestSessionTimeoutTask:
+    """Test session timeout task functionality."""
+
+    @patch("telegram_bot.dependencies.get_container")
+    @patch("telegram_bot.flows.background_tasks.BotConfig.from_env")
+    def test_session_timeout_task_success(self, mock_from_env, mock_get_container):
+        """Test successful session timeout task execution."""
+        # Mock config
+        mock_config = MagicMock()
+        mock_config.session_timeout_seconds = 86400  # 24 hours
+        mock_from_env.return_value = mock_config
+
+        # Mock session service
+        mock_session_service = MagicMock()
+        mock_session_service.timeout_stale_sessions.return_value = 5
+        mock_container = MagicMock()
+        mock_container.get_session_service.return_value = mock_session_service
+        mock_get_container.return_value = mock_container
+
+        result = session_timeout_task()
+
+        assert result["success"] is True
+        assert result["timed_out_count"] == 5
+        assert result["timeout_seconds"] == 86400
+        assert "Timed out 5 stale sessions" in result["message"]
+
+        mock_session_service.timeout_stale_sessions.assert_called_once_with(86400)
+
+    @patch("telegram_bot.dependencies.get_container")
+    @patch("telegram_bot.flows.background_tasks.BotConfig.from_env")
+    def test_session_timeout_task_no_stale_sessions(self, mock_from_env, mock_get_container):
+        """Test session timeout task when no stale sessions exist."""
+        # Mock config
+        mock_config = MagicMock()
+        mock_config.session_timeout_seconds = 86400
+        mock_from_env.return_value = mock_config
+
+        # Mock session service returning 0 timed out sessions
+        mock_session_service = MagicMock()
+        mock_session_service.timeout_stale_sessions.return_value = 0
+        mock_container = MagicMock()
+        mock_container.get_session_service.return_value = mock_session_service
+        mock_get_container.return_value = mock_container
+
+        result = session_timeout_task()
+
+        assert result["success"] is True
+        assert result["timed_out_count"] == 0
+        assert "Timed out 0 stale sessions" in result["message"]
+
+    @patch("telegram_bot.dependencies.get_container")
+    @patch("telegram_bot.flows.background_tasks.BotConfig.from_env")
+    def test_session_timeout_task_failure(self, mock_from_env, mock_get_container):
+        """Test session timeout task handles errors gracefully."""
+        # Mock config
+        mock_config = MagicMock()
+        mock_config.session_timeout_seconds = 86400
+        mock_from_env.return_value = mock_config
+
+        # Mock container to raise an exception
+        mock_get_container.side_effect = RuntimeError("Database not initialized")
+
+        result = session_timeout_task()
+
+        assert result["success"] is False
+        assert result["timed_out_count"] == 0
+        assert "Session timeout task failed" in result["message"]
+
+
 class TestBackgroundTasksGlobal:
     """Test global background task management."""
 
@@ -98,3 +168,9 @@ class TestBackgroundTasksGlobal:
         task_info = scheduler._tasks["audit_purge"]
         assert task_info["interval"] == timedelta(hours=24)
         assert task_info["run_immediately"] is False
+
+        # Verify session timeout task was added
+        assert "session_timeout" in scheduler._tasks
+        session_task_info = scheduler._tasks["session_timeout"]
+        assert session_task_info["interval"] == timedelta(hours=1)
+        assert session_task_info["run_immediately"] is False

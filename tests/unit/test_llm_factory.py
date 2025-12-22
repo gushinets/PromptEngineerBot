@@ -23,7 +23,7 @@ class TestLLMClientFactory:
             openai_max_wait_time=120.0,
         )
 
-        with patch("telegram_bot.llm_factory.OpenAIClient") as mock_openai:
+        with patch("telegram_bot.services.llm.factory.OpenAIClient") as mock_openai:
             mock_client = MagicMock()
             mock_openai.return_value = mock_client
 
@@ -48,7 +48,7 @@ class TestLLMClientFactory:
             openrouter_timeout=45.0,
         )
 
-        with patch("telegram_bot.llm_factory.OpenRouterClient") as mock_openrouter:
+        with patch("telegram_bot.services.llm.factory.OpenRouterClient") as mock_openrouter:
             mock_client = MagicMock()
             mock_openrouter.return_value = mock_client
 

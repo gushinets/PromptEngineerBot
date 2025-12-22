@@ -460,6 +460,7 @@ class EmailService:
         ggl_result: str,
         telegram_id: int,
         improved_prompt: str = None,
+        session_id: int = None,
     ) -> EmailDeliveryResult:
         """
         Send optimized prompts email with all three optimization results and idempotency protection.
@@ -472,6 +473,7 @@ class EmailService:
             ggl_result: GGL optimization result
             telegram_id: User's telegram ID for audit logging
             improved_prompt: Improved prompt from follow-up questions (optional)
+            session_id: Session ID for session tracking (optional)
 
         Returns:
             EmailDeliveryResult with delivery status
@@ -529,6 +531,19 @@ class EmailService:
             except Exception as audit_error:
                 logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
 
+            # Log session email event (graceful degradation - don't block on failure)
+            if session_id is not None:
+                try:
+                    from telegram_bot.services.session_service import get_session_service
+
+                    session_service = get_session_service()
+                    delivery_status = "sent" if result.success else "failed"
+                    session_service.log_email_sent(session_id, to_email, delivery_status)
+                except Exception as session_error:
+                    logger.error(
+                        f"SESSION_LOG_ERROR: Failed to log email event for session {session_id} - {session_error}"
+                    )
+
             return result
 
         except Exception as e:
@@ -553,6 +568,7 @@ class EmailService:
         method_name: str,
         optimized_result: str,
         telegram_id: int = None,
+        session_id: int = None,
     ) -> EmailDeliveryResult:
         """
         Send single optimization result email with idempotency protection.
@@ -563,6 +579,7 @@ class EmailService:
             method_name: Name of the optimization method used
             optimized_result: The optimization result
             telegram_id: User's telegram ID for audit logging (optional)
+            session_id: Session ID for session tracking (optional)
 
         Returns:
             EmailDeliveryResult with delivery status
@@ -620,6 +637,19 @@ class EmailService:
                         audit_service.log_email_send_failure(telegram_id, to_email, error_reason)
                 except Exception as audit_error:
                     logger.error(f"AUDIT_ERROR: Failed to log email audit event - {audit_error}")
+
+            # Log session email event (graceful degradation - don't block on failure)
+            if session_id is not None:
+                try:
+                    from telegram_bot.services.session_service import get_session_service
+
+                    session_service = get_session_service()
+                    delivery_status = "sent" if result.success else "failed"
+                    session_service.log_email_sent(session_id, to_email, delivery_status)
+                except Exception as session_error:
+                    logger.error(
+                        f"SESSION_LOG_ERROR: Failed to log email event for session {session_id} - {session_error}"
+                    )
 
             return result
 

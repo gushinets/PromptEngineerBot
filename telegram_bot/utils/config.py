@@ -76,6 +76,9 @@ class BotConfig:
     # Follow-up conversation settings
     followup_timeout_seconds: int = 300  # 5 minutes
 
+    # Session tracking settings
+    session_timeout_seconds: int = 86400  # 24 hours default
+
     # Localization settings
     language: str = "EN"  # EN or RU
 
@@ -173,6 +176,8 @@ class BotConfig:
             in ("true", "1", "yes"),
             # Follow-up conversation settings
             followup_timeout_seconds=int(os.getenv("FOLLOWUP_TIMEOUT_SECONDS", 300)),
+            # Session tracking settings
+            session_timeout_seconds=int(os.getenv("SESSION_TIMEOUT_SECONDS", 86400)),
             # Localization settings
             language=os.getenv("LANGUAGE", "EN").upper(),
             # Email feature toggle
@@ -228,3 +233,7 @@ class BotConfig:
         # Validate follow-up settings
         if self.followup_timeout_seconds <= 0:
             raise ValueError("FOLLOWUP_TIMEOUT_SECONDS must be positive")
+
+        # Validate session tracking settings
+        if self.session_timeout_seconds <= 0:
+            raise ValueError("SESSION_TIMEOUT_SECONDS must be positive")

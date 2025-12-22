@@ -83,7 +83,7 @@ def mock_health_monitor():
 def bot_handler(mock_config, mock_llm_client):
     """Create real BotHandler instance with mocked dependencies."""
     # Import and create a real BotHandler instance
-    from telegram_bot.bot_handler import BotHandler
+    from telegram_bot.core.bot_handler import BotHandler
 
     # Create mock email flow orchestrator
     mock_email_flow = MagicMock()
@@ -107,7 +107,7 @@ def bot_handler(mock_config, mock_llm_client):
     mock_email_flow.handle_followup_conversation = AsyncMock(return_value=True)
 
     # Mock the email flow orchestrator to avoid initialization issues
-    with patch("telegram_bot.bot_handler.get_email_flow_orchestrator") as mock_get_flow:
+    with patch("telegram_bot.core.bot_handler.get_email_flow_orchestrator") as mock_get_flow:
         mock_get_flow.return_value = mock_email_flow
         handler = BotHandler(mock_config, mock_llm_client, lambda event, payload: None)
 
@@ -387,7 +387,9 @@ class TestBotHandlerHealthCheckIntegration:
             mock_health_monitor.is_service_healthy.return_value = True
 
             # Mock email flow orchestrator
-            with patch("telegram_bot.bot_handler.get_email_flow_orchestrator") as mock_get_flow:
+            with patch(
+                "telegram_bot.core.bot_handler.get_email_flow_orchestrator"
+            ) as mock_get_flow:
                 mock_email_flow = MagicMock()
                 mock_email_flow.start_email_flow = AsyncMock(return_value=True)
                 mock_get_flow.return_value = mock_email_flow

@@ -95,9 +95,9 @@ async def email_flow_orchestrator(
 ):
     """Create email flow orchestrator with mocked dependencies."""
     with (
-        patch("telegram_bot.email_flow.get_auth_service"),
-        patch("telegram_bot.email_flow.get_email_service"),
-        patch("telegram_bot.email_flow.get_redis_client") as mock_redis,
+        patch("telegram_bot.flows.email_flow.get_auth_service"),
+        patch("telegram_bot.flows.email_flow.get_email_service"),
+        patch("telegram_bot.flows.email_flow.get_redis_client") as mock_redis,
     ):
         # Mock Redis client
         mock_redis_client = MagicMock()
@@ -291,9 +291,9 @@ class TestEmailFlowTimeout:
         mock_config.followup_timeout_seconds = 120  # 2 minutes
 
         with (
-            patch("telegram_bot.email_flow.get_auth_service"),
-            patch("telegram_bot.email_flow.get_email_service"),
-            patch("telegram_bot.email_flow.get_redis_client"),
+            patch("telegram_bot.flows.email_flow.get_auth_service"),
+            patch("telegram_bot.flows.email_flow.get_email_service"),
+            patch("telegram_bot.flows.email_flow.get_redis_client"),
         ):
             orchestrator = EmailFlowOrchestrator(
                 mock_config,

@@ -16,6 +16,7 @@ class UserState:
         waiting_for_otp_input (bool): Whether the bot is waiting for user to enter OTP code.
         email_flow_data (Optional[dict]): Data for email authentication flow (email, original_prompt, etc.).
         post_optimization_result (Optional[dict]): Cached optimization result for post-optimization email button.
+        current_session_id (Optional[int]): ID of the current session for session tracking.
     """
 
     waiting_for_prompt: bool = True  # Default to True so new users start in prompt input mode
@@ -28,6 +29,7 @@ class UserState:
     waiting_for_otp_input: bool = False
     email_flow_data: dict | None = None
     post_optimization_result: dict | None = None
+    current_session_id: int | None = None
 
 
 class StateManager:
@@ -194,3 +196,24 @@ class StateManager:
         """
         state = self.get_user_state(user_id)
         return state.post_optimization_result
+
+    def set_current_session_id(self, user_id: int, session_id: int | None):
+        """
+        Set the current session ID for the user.
+        Args:
+            user_id (int): The Telegram user ID.
+            session_id (Optional[int]): The session ID or None to clear.
+        """
+        state = self.get_user_state(user_id)
+        state.current_session_id = session_id
+
+    def get_current_session_id(self, user_id: int) -> int | None:
+        """
+        Get the current session ID for the user.
+        Args:
+            user_id (int): The Telegram user ID.
+        Returns:
+            Optional[int]: The current session ID or None if not set.
+        """
+        state = self.get_user_state(user_id)
+        return state.current_session_id

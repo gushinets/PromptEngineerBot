@@ -179,7 +179,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert "Redis connection error" in result.error
 
-    @patch("telegram_bot.email_service.EmailService")
+    @patch("telegram_bot.services.email_service.EmailService")
     async def test_check_smtp_health_success(self, mock_email_service_class, health_monitor):
         """Test successful SMTP health check."""
         # Mock EmailService
@@ -197,7 +197,7 @@ class TestHealthMonitor:
         assert "host" in result.details
         assert "port" in result.details
 
-    @patch("telegram_bot.email_service.EmailService")
+    @patch("telegram_bot.services.email_service.EmailService")
     async def test_check_smtp_health_failure(self, mock_email_service_class, health_monitor):
         """Test SMTP health check failure."""
         # Mock EmailService failure
@@ -211,7 +211,7 @@ class TestHealthMonitor:
         assert result.status == HealthStatus.UNHEALTHY
         assert result.error == "SMTP connectivity test failed"
 
-    @patch("telegram_bot.email_service.EmailService")
+    @patch("telegram_bot.services.email_service.EmailService")
     async def test_check_smtp_health_exception(self, mock_email_service_class, health_monitor):
         """Test SMTP health check with exception."""
         # Mock EmailService exception
@@ -474,7 +474,7 @@ class TestHealthMonitorGlobalFunctions:
     def test_get_health_monitor_not_initialized(self):
         """Test getting health monitor when not initialized."""
         # Reset global state
-        import telegram_bot.health_checks
+        import telegram_bot.utils.health_checks
 
         telegram_bot.utils.health_checks.health_monitor = None
 

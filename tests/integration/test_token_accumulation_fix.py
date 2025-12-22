@@ -9,11 +9,19 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from telegram_bot.core.bot_handler import BotHandler
+from telegram_bot.dependencies import reset_container
 from telegram_bot.utils.config import BotConfig
 
 
 class TestTokenUsageFixes:
     """Comprehensive test cases for token usage fixes in follow-up questions feature."""
+
+    @pytest.fixture(autouse=True)
+    def reset_global_state(self):
+        """Reset global container before each test to ensure clean state."""
+        reset_container()
+        yield
+        reset_container()
 
     @pytest.fixture
     def bot_handler(self):

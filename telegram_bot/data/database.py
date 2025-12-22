@@ -28,11 +28,47 @@ Performance-optimized indexes are created for profile fields:
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Index, Text, create_engine, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    create_engine,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    sessionmaker,
+)
+from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.types import JSON, TypeDecorator
+
+
+class JSONBCompatible(TypeDecorator):
+    """
+    A type that uses JSONB on PostgreSQL and JSON on other databases (like SQLite).
+
+    This allows the Session model to work with both PostgreSQL (production) and
+    SQLite (testing) without requiring separate model definitions.
+    """
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(JSON())
 
 
 logger = logging.getLogger(__name__)
@@ -109,10 +145,232 @@ class User(Base):
     Examples: 'en', 'es', 'fr', 'de'. Nullable as not all users have language set.
     Used for localization and language-specific features."""
 
+    # Relationship to sessions
+    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="user")
+
     def __repr__(self) -> str:
         name_part = f", name='{self.first_name}'" if self.first_name else ""
         email_part = f", email='{self.email[:3]}***'" if self.email else ""
         return f"<User(id={self.id}, telegram_id={self.telegram_id}{email_part}{name_part})>"
+
+
+class Session(Base):
+    """
+    Session model for tracking prompt optimization workflows.
+
+    A session represents a complete prompt optimization workflow from initial
+    prompt submission to final delivery or termination. Sessions capture:
+    - Timing: start_time, finish_time, duration_seconds
+    - Status: in_progress, successful, unsuccessful
+    - Optimization method: LYRA, CRAFT, or GGL
+    - Token metrics: cumulative input/output token counts
+    - Conversation history: complete record of user-LLM exchanges (JSONB)
+    - Email events: linked records of emails sent during the session
+    """
+
+    __tablename__ = "sessions"
+
+    # Primary key
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # Foreign key to users table
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+    # Timing fields
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
+    """Session start timestamp. Set when session is created."""
+
+    finish_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Session end timestamp. Set when session completes or is terminated."""
+
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    """Calculated duration in seconds between start_time and finish_time."""
+
+    # Status field
+    status: Mapped[str] = mapped_column(Text, default="in_progress")
+    """Session status: 'in_progress', 'successful', or 'unsuccessful'."""
+
+    # Optimization method and model
+    optimization_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    """Selected optimization method: LYRA, CRAFT, or GGL. Nullable until user selects method."""
+
+    model_name: Mapped[str] = mapped_column(Text, nullable=False)
+    """LLM model identifier used for optimization (e.g., 'openai/gpt-4', 'gpt-4o')."""
+
+    used_followup: Mapped[bool] = mapped_column(Boolean, default=False)
+    """Whether FOLLOWUP optimization was used in this session."""
+
+    # Token metrics (cumulative for initial optimization phase)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    """Cumulative count of all tokens sent to the LLM during initial optimization phase."""
+
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    """Cumulative count of all tokens received from the LLM during initial optimization phase."""
+
+    tokens_total: Mapped[int] = mapped_column(Integer, default=0)
+    """Sum of input_tokens and output_tokens for initial optimization phase."""
+
+    # Followup timing fields (Requirements 6a.1, 6a.2, 6a.3)
+    followup_start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Timestamp when followup conversation starts. Set when user opts for followup."""
+
+    followup_finish_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Timestamp when followup conversation ends."""
+
+    followup_duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    """Calculated duration of followup conversation in seconds."""
+
+    # Followup token metrics (Requirements 6a.4, 6a.5, 6a.6)
+    followup_input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    """Cumulative count of all tokens sent to the LLM during followup phase."""
+
+    followup_output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    """Cumulative count of all tokens received from the LLM during followup phase."""
+
+    followup_tokens_total: Mapped[int] = mapped_column(Integer, default=0)
+    """Sum of followup_input_tokens and followup_output_tokens."""
+
+    # Conversation history as JSONB (PostgreSQL) or JSON (SQLite)
+    # Format: [{"role": "user"|"assistant", "content": "...", "timestamp": "ISO8601"}, ...]
+    conversation_history: Mapped[list] = mapped_column(JSONBCompatible, default=list)
+    """Complete record of all messages exchanged between user and LLM during the session."""
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="sessions")
+    email_events: Mapped[list["SessionEmailEvent"]] = relationship(
+        "SessionEmailEvent", back_populates="session", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Session(id={self.id}, user_id={self.user_id}, "
+            f"status='{self.status}', method='{self.optimization_method}')>"
+        )
+
+    def to_dict(self) -> dict:
+        """
+        Serialize session to a dictionary for JSON output.
+
+        Serializes all session fields including conversation_history and followup fields.
+        Uses ISO 8601 format with timezone information for datetime fields.
+
+        Returns:
+            Dictionary containing all session fields suitable for JSON serialization.
+
+        Requirements: 11.1, 11.3
+        """
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "finish_time": self.finish_time.isoformat() if self.finish_time else None,
+            "duration_seconds": self.duration_seconds,
+            "status": self.status,
+            "optimization_method": self.optimization_method,
+            "model_name": self.model_name,
+            "used_followup": self.used_followup,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "tokens_total": self.tokens_total,
+            # Followup timing fields
+            "followup_start_time": (
+                self.followup_start_time.isoformat() if self.followup_start_time else None
+            ),
+            "followup_finish_time": (
+                self.followup_finish_time.isoformat() if self.followup_finish_time else None
+            ),
+            "followup_duration_seconds": self.followup_duration_seconds,
+            # Followup token metrics
+            "followup_input_tokens": self.followup_input_tokens,
+            "followup_output_tokens": self.followup_output_tokens,
+            "followup_tokens_total": self.followup_tokens_total,
+            "conversation_history": self.conversation_history or [],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Session":
+        """
+        Deserialize a dictionary to a Session object.
+
+        Parses ISO 8601 datetime strings back to datetime objects.
+        Handles both main session fields and followup tracking fields.
+
+        Args:
+            data: Dictionary containing session fields (typically from JSON).
+
+        Returns:
+            Session object with all fields populated from the dictionary.
+
+        Requirements: 11.2
+        """
+
+        def parse_datetime(value: str | None) -> datetime | None:
+            """Parse ISO 8601 datetime string to datetime object."""
+            if value is None:
+                return None
+            # Handle ISO 8601 format with timezone
+            # Python's fromisoformat handles most ISO 8601 formats
+            dt = datetime.fromisoformat(value)
+            # Ensure timezone-aware (default to UTC if naive)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=UTC)
+            return dt
+
+        return cls(
+            id=data.get("id"),
+            user_id=data["user_id"],
+            start_time=parse_datetime(data.get("start_time")),
+            finish_time=parse_datetime(data.get("finish_time")),
+            duration_seconds=data.get("duration_seconds"),
+            status=data.get("status", "in_progress"),
+            optimization_method=data.get("optimization_method"),  # Now nullable
+            model_name=data["model_name"],
+            used_followup=data.get("used_followup", False),
+            input_tokens=data.get("input_tokens", 0),
+            output_tokens=data.get("output_tokens", 0),
+            tokens_total=data.get("tokens_total", 0),
+            # Followup timing fields
+            followup_start_time=parse_datetime(data.get("followup_start_time")),
+            followup_finish_time=parse_datetime(data.get("followup_finish_time")),
+            followup_duration_seconds=data.get("followup_duration_seconds"),
+            # Followup token metrics
+            followup_input_tokens=data.get("followup_input_tokens", 0),
+            followup_output_tokens=data.get("followup_output_tokens", 0),
+            followup_tokens_total=data.get("followup_tokens_total", 0),
+            conversation_history=data.get("conversation_history", []),
+        )
+
+
+class SessionEmailEvent(Base):
+    """
+    SessionEmailEvent model for tracking email deliveries per session.
+
+    Records each email sent containing an optimized prompt, linked to the
+    session that generated it.
+    """
+
+    __tablename__ = "session_email_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), nullable=False)
+
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
+    """Timestamp when the email was sent."""
+
+    recipient_email: Mapped[str] = mapped_column(Text, nullable=False)
+    """Email address the optimized prompt was sent to."""
+
+    delivery_status: Mapped[str] = mapped_column(Text, nullable=False)
+    """Delivery status: 'sent' or 'failed'."""
+
+    # Relationship
+    session: Mapped["Session"] = relationship("Session", back_populates="email_events")
+
+    def __repr__(self) -> str:
+        return (
+            f"<SessionEmailEvent(id={self.id}, session_id={self.session_id}, "
+            f"status='{self.delivery_status}')>"
+        )
 
 
 class AuthEvent(Base):
@@ -150,6 +408,19 @@ Index("ix_users_last_interaction_at", User.last_interaction_at)  # Last interact
 Index("ix_auth_events_telegram_time", AuthEvent.telegram_id, AuthEvent.created_at.desc())
 Index("ix_auth_events_email_time", AuthEvent.email, AuthEvent.created_at.desc())
 Index("ix_auth_events_type_time", AuthEvent.event_type, AuthEvent.created_at.desc())
+
+# Session indexes for efficient queries (Requirements 9.1, 9.2, 9.3)
+Index("ix_sessions_user_id", Session.user_id)  # User-based session queries
+Index("ix_sessions_status", Session.status)  # Status-based filtering
+Index("ix_sessions_start_time", Session.start_time)  # Time-range queries
+Index(
+    "ix_sessions_user_status", Session.user_id, Session.status
+)  # Composite for current session lookup
+
+# SessionEmailEvent indexes
+Index(
+    "ix_session_email_events_session_id", SessionEmailEvent.session_id
+)  # Session-based email queries
 
 
 class DatabaseManager:
@@ -207,7 +478,7 @@ class DatabaseManager:
             logger.error(f"Failed to create database tables: {e}")
             raise
 
-    def get_session(self) -> Session:
+    def get_session(self) -> DBSession:
         """Get a new database session."""
         session_factory = self.get_session_factory()
         return session_factory()
@@ -359,7 +630,7 @@ def get_db_manager() -> DatabaseManager:
     return db_manager
 
 
-def get_db_session() -> Session:
+def get_db_session() -> DBSession:
     """
     Get a new database session from the global database manager.
 

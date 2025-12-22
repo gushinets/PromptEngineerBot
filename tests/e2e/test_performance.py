@@ -395,7 +395,7 @@ class TestSystemLoadTesting:
                 # Mock services
                 with (
                     patch("telegram_bot.auth.auth_service.AuthService") as mock_auth_class,
-                    patch("telegram_bot.email_service.EmailService") as mock_email_class,
+                    patch("telegram_bot.services.email_service.EmailService") as mock_email_class,
                     patch("telegram_bot.services.redis_client.RedisClient") as mock_redis_class,
                 ):
                     # Set up mocks

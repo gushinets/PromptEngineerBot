@@ -19,6 +19,7 @@ from telegram_bot.dependencies import get_container
 from telegram_bot.services.email_service import get_email_service
 from telegram_bot.services.llm.base import LLMClientBase
 from telegram_bot.services.redis_client import get_redis_client
+from telegram_bot.services.session_service import OptimizationMethod, get_session_service
 from telegram_bot.utils.config import BotConfig
 from telegram_bot.utils.graceful_degradation import (
     check_email_flow_readiness,
@@ -102,6 +103,24 @@ class EmailFlowOrchestrator:
 
         # Timeout configuration for follow-up questions
         self.followup_timeout_seconds = config.followup_timeout_seconds
+
+    def _get_session_service(self):
+        """
+        Get the session service instance for session tracking.
+
+        Returns:
+            SessionService instance, or None if not initialized
+
+        Note:
+            This method follows graceful degradation - if session service
+            is not available, it returns None and logs a warning.
+            Session tracking should never block the email flow.
+        """
+        try:
+            return get_session_service()
+        except RuntimeError:
+            logger.warning("Session service not initialized, session tracking disabled")
+            return None
 
     async def start_email_authentication(
         self,
@@ -874,6 +893,10 @@ class EmailFlowOrchestrator:
         Run direct optimization workflow without follow-up questions and deliver via email.
         Implements requirements 4.1, 4.2, 4.3, 4.4, 4.5.
 
+        Session tracking is integrated following graceful degradation principles:
+        - Session tracking failures are logged but do not block email delivery
+        - Implements Requirements 1.2, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 7.1, 7.3
+
         Args:
             update: Telegram update object
             context: Telegram context
@@ -886,6 +909,26 @@ class EmailFlowOrchestrator:
         try:
             logger.info(f"direct_optimization_started | user_id={mask_telegram_id(user_id)}")
 
+            # Get session_id from state for session tracking (Requirements 1.2, 7.1)
+            session_id = self.state_manager.get_current_session_id(user_id)
+
+            # Set optimization method to ALL at flow start (Requirements 1.2, 6.2)
+            # Wrapped in try/except for graceful degradation (Requirement 7.1)
+            if session_id is not None:
+                try:
+                    session_service = self._get_session_service()
+                    if session_service:
+                        session_service.set_optimization_method(session_id, OptimizationMethod.ALL)
+                        logger.debug(
+                            f"session_method_set_all | session_id={session_id} | "
+                            f"user_id={mask_telegram_id(user_id)}"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"session_tracking_set_method_failed | session_id={session_id} | "
+                        f"user_id={mask_telegram_id(user_id)} | error={e}"
+                    )
+
             # Send processing message to user
             await self._safe_reply(
                 update,
@@ -895,7 +938,7 @@ class EmailFlowOrchestrator:
 
             # Run all three optimization methods with modified system prompts
             optimization_results = await self._run_all_optimizations_with_modified_prompts(
-                original_prompt, user_id
+                original_prompt, user_id, session_id
             )
 
             if not optimization_results:
@@ -943,6 +986,26 @@ class EmailFlowOrchestrator:
                     f"email_delivery_success | user_id={mask_telegram_id(user_id)} | email={mask_email(user_email)}"
                 )
 
+                # Session tracking on email success (Requirements 4.1, 5.1, 7.3)
+                # Wrapped in try/except for graceful degradation
+                if session_id is not None:
+                    try:
+                        session_service = self._get_session_service()
+                        if session_service:
+                            # Log email event (Requirements 4.1, 4.2)
+                            session_service.log_email_sent(session_id, user_email, "sent")
+                            # Mark session as successful (Requirement 5.1)
+                            session_service.complete_session(session_id)
+                            logger.debug(
+                                f"session_completed_success | session_id={session_id} | "
+                                f"user_id={mask_telegram_id(user_id)}"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"session_tracking_complete_failed | session_id={session_id} | "
+                            f"user_id={mask_telegram_id(user_id)} | error={e}"
+                        )
+
                 # Reset user state
                 self._reset_user_state(user_id)
                 return True
@@ -955,6 +1018,26 @@ class EmailFlowOrchestrator:
                 ERROR_EMAIL_OPTIMIZATION_FAILED,
                 reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
+
+            # Session tracking on email failure (Requirements 4.3, 5.2, 7.3)
+            # Wrapped in try/except for graceful degradation
+            if session_id is not None:
+                try:
+                    session_service = self._get_session_service()
+                    if session_service:
+                        # Log email event with failed status (Requirement 4.3)
+                        session_service.log_email_sent(session_id, user_email, "failed")
+                        # Mark session as unsuccessful (Requirement 5.2)
+                        session_service.reset_session(session_id)
+                        logger.debug(
+                            f"session_reset_email_failed | session_id={session_id} | "
+                            f"user_id={mask_telegram_id(user_id)}"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"session_tracking_reset_failed | session_id={session_id} | "
+                        f"user_id={mask_telegram_id(user_id)} | error={e}"
+                    )
 
             # Reset user state
             self._reset_user_state(user_id)
@@ -973,15 +1056,22 @@ class EmailFlowOrchestrator:
             return False
 
     async def _run_all_optimizations_with_modified_prompts(
-        self, original_prompt: str, user_id: int
+        self, original_prompt: str, user_id: int, session_id: int | None = None
     ) -> dict | None:
         """
         Run all three optimization methods (CRAFT, LYRA, GGL) with modified system prompts.
         Implements requirements 4.3, 4.4.
 
+        Session tracking is integrated following graceful degradation principles:
+        - Token usage from each LLM call is tracked via add_tokens()
+        - Each response is added to conversation history with method attribution
+        - Session tracking failures are logged but do not block optimization
+        - Implements Requirements 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 7.2
+
         Args:
             original_prompt: The original user prompt
             user_id: User's Telegram ID
+            session_id: Optional session ID for session tracking
 
         Returns:
             Dictionary with optimization results or None if failed
@@ -1020,6 +1110,48 @@ class EmailFlowOrchestrator:
                         logger.info(
                             f"{method_name} optimization completed for user {mask_telegram_id(user_id)}"
                         )
+
+                        # Session tracking: add tokens and message (Requirements 2.1-2.4, 3.1-3.2)
+                        # Wrapped in try/except for graceful degradation (Requirement 7.2)
+                        if session_id is not None:
+                            try:
+                                session_service = self._get_session_service()
+                                if session_service:
+                                    # Extract token usage from LLM response
+                                    token_usage = self.llm_client.get_last_usage()
+                                    if token_usage:
+                                        input_tokens = token_usage.get("prompt_tokens", 0)
+                                        output_tokens = token_usage.get("completion_tokens", 0)
+                                        # Add tokens to session (Requirements 2.1, 2.2, 2.3)
+                                        session_service.add_tokens(
+                                            session_id, input_tokens, output_tokens
+                                        )
+                                        logger.debug(
+                                            f"session_tokens_added | session_id={session_id} | "
+                                            f"method={method_name} | input={input_tokens} | "
+                                            f"output={output_tokens}"
+                                        )
+
+                                    # Add response to conversation history with method attribution
+                                    # (Requirements 3.1, 3.2)
+                                    session_service.add_message(
+                                        session_id,
+                                        "assistant",
+                                        response.strip(),
+                                        method=method_name,
+                                    )
+                                    logger.debug(
+                                        f"session_message_added | session_id={session_id} | "
+                                        f"method={method_name}"
+                                    )
+                            except Exception as e:
+                                # Graceful degradation: log error but continue optimization
+                                # (Requirement 7.2)
+                                logger.warning(
+                                    f"session_tracking_failed | session_id={session_id} | "
+                                    f"method={method_name} | user_id={mask_telegram_id(user_id)} | "
+                                    f"error={e}"
+                                )
                     else:
                         logger.warning(
                             f"{method_name} optimization returned empty response for user {mask_telegram_id(user_id)}"
@@ -1210,6 +1342,9 @@ class EmailFlowOrchestrator:
             # Send processing message
             await self._safe_reply(update, INFO_EMAIL_OPTIMIZATION_PROCESSING)
 
+            # Get session_id from state for session tracking (Requirements 7.1, 7.4)
+            session_id = self.state_manager.get_current_session_id(user_id)
+
             # Send the single result email
             result = await self.email_service.send_single_result_email(
                 user_email,
@@ -1217,6 +1352,7 @@ class EmailFlowOrchestrator:
                 current_result["method_name"],
                 current_result["content"],
                 user_id,  # Pass telegram_id for audit logging
+                session_id,  # Pass session_id for session tracking (Requirements 7.1, 7.4)
             )
             success = result.success
 

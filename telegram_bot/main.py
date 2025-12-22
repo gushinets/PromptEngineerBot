@@ -218,6 +218,13 @@ async def main():
             bot_handler.set_user_tracking_service(user_tracking_service)
             logger.info("User tracking service initialized successfully")
 
+            # Initialize session service for session tracking
+            from telegram_bot.dependencies import get_container
+
+            session_service = get_container().get_session_service()
+            bot_handler.set_session_service(session_service)
+            logger.info("Session service initialized successfully")
+
             # Initialize audit service
             from telegram_bot.utils.audit_service import init_audit_service
 
