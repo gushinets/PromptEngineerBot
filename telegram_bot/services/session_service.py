@@ -256,6 +256,10 @@ class SessionService:
         """
         Mark session as unsuccessful when user resets dialog.
 
+        IMPORTANT: This method implements terminal state protection.
+        Sessions that are already in a terminal state (successful or unsuccessful)
+        will NOT be modified. Only sessions with status="in_progress" can be reset.
+
         Sets status to UNSUCCESSFUL and finish_time to current UTC timestamp.
         Preserves all collected metrics (tokens, method, conversation) for analysis.
 
@@ -263,12 +267,15 @@ class SessionService:
             session_id: ID of the session to reset
 
         Returns:
-            Updated Session instance, or None on error (logged)
+            Session instance (existing if terminal, updated if was in_progress),
+            or None on error (logged)
 
         Note:
             This method follows graceful degradation - if reset fails,
             it logs the error and returns None. The user's reset action
             should always work regardless of session tracking status.
+
+        Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
         """
         try:
             session = self._db_session.get(SessionModel, session_id)
@@ -276,6 +283,15 @@ class SessionService:
                 logger.warning(f"Session {session_id} not found for reset")
                 return None
 
+            # Terminal state protection: don't overwrite completed sessions
+            if session.status != SessionStatus.IN_PROGRESS.value:
+                logger.debug(
+                    f"Session {session_id} already in terminal state '{session.status}', "
+                    "skipping reset"
+                )
+                return session  # Return existing session without modification
+
+            # Session is in_progress, proceed with reset
             finish_time = datetime.now(UTC)
             session.status = SessionStatus.UNSUCCESSFUL.value
             session.finish_time = finish_time
@@ -678,6 +694,37 @@ class SessionService:
             return session
         except Exception as e:
             logger.error(f"Failed to get session {session_id} with emails: {e}")
+            return None
+
+    def get_session(self, session_id: int) -> SessionModel | None:
+        """
+        Get a session by ID.
+
+        Retrieves a session record from the database by its primary key.
+        This method is used for checking session status before operations
+        that need to respect terminal state protection.
+
+        Args:
+            session_id: ID of the session to retrieve
+
+        Returns:
+            Session instance, or None if not found or on error (logged)
+
+        Note:
+            This method follows graceful degradation - if retrieval fails,
+            it logs the error and returns None. Session retrieval failure
+            should not block user operations.
+
+        Requirements: 2.1, 4.1
+        """
+        try:
+            session = self._db_session.get(SessionModel, session_id)
+            if session is None:
+                logger.debug(f"Session {session_id} not found")
+                return None
+            return session
+        except Exception as e:
+            logger.error(f"Failed to get session {session_id}: {e}")
             return None
 
     def get_user_current_session(self, user_id: int) -> SessionModel | None:

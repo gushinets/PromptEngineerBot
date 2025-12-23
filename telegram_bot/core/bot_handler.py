@@ -226,9 +226,6 @@ class BotHandler:
             reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True),
         )
 
-        # Log session start
-        logger.info(f"session_start | user_id={user_id}")
-
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming messages from users."""
         user_id = update.effective_user.id
@@ -1456,14 +1453,18 @@ class BotHandler:
         """
         Reset the current session as unsuccessful when user resets dialog.
 
-        This method marks the current session as unsuccessful when the user presses
-        the "reset dialog" button. It follows graceful degradation - if session tracking
-        fails, the user's experience is not affected.
+        This method implements Layer 1 of terminal state protection.
+        It checks if the session is already in a terminal state before
+        calling the SessionService, providing clear logging and avoiding
+        unnecessary operations.
+
+        Sessions that are already in a terminal state (successful or unsuccessful)
+        will NOT be modified. Only sessions with status="in_progress" can be reset.
 
         Args:
             telegram_user_id: Telegram user ID
 
-        Requirements: 3.1
+        Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3
         """
         try:
             # Check if session service is available
@@ -1482,7 +1483,25 @@ class BotHandler:
                 )
                 return
 
-            # Reset the session as unsuccessful
+            # Layer 1 Protection: Check session status before reset (Requirement 2.1)
+            session = self.session_service.get_session(session_id)
+            if session is None:
+                logger.warning(
+                    f"session_reset_skipped | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | reason=session_not_found"
+                )
+                return
+
+            # Skip reset if session is already in terminal state (Requirements 2.2, 2.3, 5.1)
+            if session.status != "in_progress":
+                logger.info(
+                    f"session_reset_skipped | user_id={telegram_user_id} | "
+                    f"session_id={session_id} | status={session.status} | "
+                    "reason=already_terminal_state"
+                )
+                return
+
+            # Session is in_progress, proceed with reset (Requirement 2.4)
             result = self.session_service.reset_session(session_id)
 
             if result:
@@ -1501,7 +1520,7 @@ class BotHandler:
                 )
 
         except Exception as e:
-            # Graceful degradation - session tracking failure should not block user
+            # Graceful degradation - session tracking failure should not block user (Requirement 4.1)
             logger.error(
                 f"session_reset_error | telegram_user_id={telegram_user_id} | error={e}",
                 exc_info=True,

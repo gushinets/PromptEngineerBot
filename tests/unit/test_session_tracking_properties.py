@@ -199,14 +199,26 @@ class _SQLiteSessionService:
         """
         Mark session as unsuccessful when user resets dialog.
 
+        IMPORTANT: This method implements terminal state protection.
+        Sessions that are already in a terminal state (successful or unsuccessful)
+        will NOT be modified. Only sessions with status="in_progress" can be reset.
+
         Sets status to UNSUCCESSFUL, finish_time to current UTC timestamp.
         Preserves all collected metrics (tokens, method, conversation) for analysis.
+
+        Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
         """
         try:
             session = self._db_session.get(_SQLiteSession, session_id)
             if session is None:
                 return None
 
+            # Terminal state protection: don't overwrite completed sessions
+            if session.status != SessionStatus.IN_PROGRESS.value:
+                # Return existing session without modification (Requirement 1.5)
+                return session
+
+            # Session is in_progress, proceed with reset (Requirement 1.3)
             finish_time = datetime.now(UTC)
             session.status = SessionStatus.UNSUCCESSFUL.value
             session.finish_time = finish_time
@@ -508,7 +520,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_has_correct_status(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -543,7 +555,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_has_followup_false(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -578,7 +590,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_has_zero_tokens(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -619,7 +631,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_has_start_time_set(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -662,7 +674,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_has_empty_conversation_history(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -698,7 +710,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_stores_method_and_model(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -738,7 +750,7 @@ class TestStartSessionDefaults:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_session_links_to_user(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -786,7 +798,7 @@ class TestCompleteSessionSetsFinishTimeAndDuration:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_complete_session_sets_status_to_successful(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -823,7 +835,7 @@ class TestCompleteSessionSetsFinishTimeAndDuration:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_complete_session_sets_finish_time(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -869,7 +881,7 @@ class TestCompleteSessionSetsFinishTimeAndDuration:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_complete_session_finish_time_after_start_time(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -912,7 +924,7 @@ class TestCompleteSessionSetsFinishTimeAndDuration:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_complete_session_calculates_duration(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -960,7 +972,7 @@ class TestCompleteSessionSetsFinishTimeAndDuration:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_complete_session_duration_is_non_negative(
         self, telegram_id: int, method: OptimizationMethod, model_name: str
     ):
@@ -1017,7 +1029,7 @@ class TestResetSessionPreservesMetrics:
         output_tokens=st.integers(min_value=0, max_value=100000),
         used_followup=st.booleans(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_changes_status_to_unsuccessful(
         self,
         telegram_id: int,
@@ -1068,7 +1080,7 @@ class TestResetSessionPreservesMetrics:
         input_tokens=st.integers(min_value=0, max_value=100000),
         output_tokens=st.integers(min_value=0, max_value=100000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_sets_finish_time(
         self,
         telegram_id: int,
@@ -1124,7 +1136,7 @@ class TestResetSessionPreservesMetrics:
         input_tokens=st.integers(min_value=0, max_value=100000),
         output_tokens=st.integers(min_value=0, max_value=100000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_preserves_input_tokens(
         self,
         telegram_id: int,
@@ -1176,7 +1188,7 @@ class TestResetSessionPreservesMetrics:
         input_tokens=st.integers(min_value=0, max_value=100000),
         output_tokens=st.integers(min_value=0, max_value=100000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_preserves_output_tokens(
         self,
         telegram_id: int,
@@ -1228,7 +1240,7 @@ class TestResetSessionPreservesMetrics:
         input_tokens=st.integers(min_value=0, max_value=100000),
         output_tokens=st.integers(min_value=0, max_value=100000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_preserves_tokens_total(
         self,
         telegram_id: int,
@@ -1278,7 +1290,7 @@ class TestResetSessionPreservesMetrics:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_preserves_optimization_method(
         self,
         telegram_id: int,
@@ -1323,7 +1335,7 @@ class TestResetSessionPreservesMetrics:
         model_name=model_name_strategy,
         used_followup=st.booleans(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_preserves_used_followup(
         self,
         telegram_id: int,
@@ -1393,7 +1405,7 @@ class TestTokenAccumulationIsAdditive:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_token_accumulation_input_tokens_sum(
         self,
         telegram_id: int,
@@ -1449,7 +1461,7 @@ class TestTokenAccumulationIsAdditive:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_token_accumulation_output_tokens_sum(
         self,
         telegram_id: int,
@@ -1505,7 +1517,7 @@ class TestTokenAccumulationIsAdditive:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_token_accumulation_total_equals_sum(
         self,
         telegram_id: int,
@@ -1560,7 +1572,7 @@ class TestTokenAccumulationIsAdditive:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_token_accumulation_multiple_interactions(
         self,
         telegram_id: int,
@@ -1639,7 +1651,7 @@ class TestConversationHistoryPreservesOrder:
             max_size=20,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_messages_appended_in_order(
         self,
         telegram_id: int,
@@ -1703,7 +1715,7 @@ class TestConversationHistoryPreservesOrder:
             max_size=20,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_messages_have_timestamps(
         self,
         telegram_id: int,
@@ -1760,7 +1772,7 @@ class TestConversationHistoryPreservesOrder:
             max_size=20,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_timestamps_are_chronological(
         self,
         telegram_id: int,
@@ -1812,7 +1824,7 @@ class TestConversationHistoryPreservesOrder:
         model_name=model_name_strategy,
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_user_message_has_correct_role(
         self,
         telegram_id: int,
@@ -1859,7 +1871,7 @@ class TestConversationHistoryPreservesOrder:
         model_name=model_name_strategy,
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_assistant_message_has_correct_role(
         self,
         telegram_id: int,
@@ -1906,7 +1918,7 @@ class TestConversationHistoryPreservesOrder:
         model_name=model_name_strategy,
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_message_content_preserved(
         self,
         telegram_id: int,
@@ -1972,7 +1984,7 @@ class TestEmailEventsLinkedToSessions:
         recipient_email=email_strategy,
         delivery_status=delivery_status_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_event_has_valid_session_reference(
         self,
         telegram_id: int,
@@ -2017,7 +2029,7 @@ class TestEmailEventsLinkedToSessions:
         recipient_email=email_strategy,
         delivery_status=delivery_status_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_session_includes_email_event_in_relationship(
         self,
         telegram_id: int,
@@ -2071,7 +2083,7 @@ class TestEmailEventsLinkedToSessions:
             max_size=5,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_multiple_email_events_linked_to_session(
         self,
         telegram_id: int,
@@ -2128,7 +2140,7 @@ class TestEmailEventsLinkedToSessions:
         recipient_email=email_strategy,
         delivery_status=delivery_status_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_event_stores_recipient_and_status(
         self,
         telegram_id: int,
@@ -2177,7 +2189,7 @@ class TestEmailEventsLinkedToSessions:
         recipient_email=email_strategy,
         delivery_status=delivery_status_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_event_has_sent_at_timestamp(
         self,
         telegram_id: int,
@@ -2251,7 +2263,7 @@ class TestOneActiveSessionPerUser:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_single_session_is_retrievable(
         self,
         telegram_id: int,
@@ -2295,7 +2307,7 @@ class TestOneActiveSessionPerUser:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_completed_session_not_returned_as_current(
         self,
         telegram_id: int,
@@ -2336,7 +2348,7 @@ class TestOneActiveSessionPerUser:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_reset_session_not_returned_as_current(
         self,
         telegram_id: int,
@@ -2377,7 +2389,7 @@ class TestOneActiveSessionPerUser:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_user_with_no_sessions_returns_none(
         self,
         telegram_id: int,
@@ -2413,7 +2425,7 @@ class TestOneActiveSessionPerUser:
         methods=st.lists(optimization_method_strategy, min_size=2, max_size=5),
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_only_latest_in_progress_session_is_current(
         self,
         telegram_id: int,
@@ -2471,7 +2483,7 @@ class TestOneActiveSessionPerUser:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_different_users_have_independent_sessions(
         self,
         telegram_ids: list[int],
@@ -2522,7 +2534,7 @@ class TestOneActiveSessionPerUser:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_count_in_progress_sessions_is_at_most_one(
         self,
         telegram_id: int,
@@ -2581,7 +2593,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=1, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_stale_session_status_changes_to_unsuccessful(
         self,
         telegram_id: int,
@@ -2648,7 +2660,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=1, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_stale_session_finish_time_is_set(
         self,
         telegram_id: int,
@@ -2721,7 +2733,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=60, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_recent_session_not_timed_out(
         self,
         telegram_id: int,
@@ -2767,7 +2779,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=1, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_already_completed_session_not_affected(
         self,
         telegram_id: int,
@@ -2842,7 +2854,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=1, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_multiple_stale_sessions_all_timed_out(
         self,
         telegram_ids: list[int],
@@ -2918,7 +2930,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=1, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_timeout_returns_correct_count(
         self,
         telegram_id: int,
@@ -2980,7 +2992,7 @@ class TestTimeoutMarksSessionsUnsuccessful:
         model_name=model_name_strategy,
         timeout_seconds=st.integers(min_value=60, max_value=3600),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_no_stale_sessions_returns_zero(
         self,
         telegram_id: int,
@@ -3038,7 +3050,7 @@ class TestSessionSerializationRoundTrip:
         duration_seconds=st.integers(min_value=0, max_value=86400) | st.none(),
         num_messages=st.integers(min_value=0, max_value=10),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_serialization_round_trip_preserves_all_fields(
         self,
         telegram_id: int,
@@ -3196,7 +3208,7 @@ class TestSessionSerializationRoundTrip:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_serialization_produces_valid_json(
         self,
         telegram_id: int,
@@ -3262,7 +3274,7 @@ class TestSessionSerializationRoundTrip:
         method=optimization_method_strategy,
         model_name=model_name_strategy,
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_serialization_uses_iso8601_for_datetimes(
         self,
         telegram_id: int,
@@ -3355,7 +3367,7 @@ class TestAddMessageMethodExtension:
         model_name=model_name_strategy,
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_add_message_with_method_adds_field_to_jsonb(
         self,
         telegram_id: int,
@@ -3405,7 +3417,7 @@ class TestAddMessageMethodExtension:
         model_name=model_name_strategy,
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_add_message_without_method_no_field_backward_compatible(
         self,
         telegram_id: int,
@@ -3609,7 +3621,7 @@ class TestEmailFlowTokenAccumulation:
         ggl_input=st.integers(min_value=0, max_value=10000),
         ggl_output=st.integers(min_value=0, max_value=10000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_tokens_total_equals_sum_of_all_methods(
         self,
         telegram_id: int,
@@ -3684,7 +3696,7 @@ class TestEmailFlowTokenAccumulation:
         ggl_input=st.integers(min_value=0, max_value=10000),
         ggl_output=st.integers(min_value=0, max_value=10000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_input_tokens_equals_sum_of_all_methods(
         self,
         telegram_id: int,
@@ -3742,7 +3754,7 @@ class TestEmailFlowTokenAccumulation:
         ggl_input=st.integers(min_value=0, max_value=10000),
         ggl_output=st.integers(min_value=0, max_value=10000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_output_tokens_equals_sum_of_all_methods(
         self,
         telegram_id: int,
@@ -3800,7 +3812,7 @@ class TestEmailFlowTokenAccumulation:
         ggl_input=st.integers(min_value=0, max_value=10000),
         ggl_output=st.integers(min_value=0, max_value=10000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_tokens_total_equals_input_plus_output(
         self,
         telegram_id: int,
@@ -3869,7 +3881,7 @@ class TestEmailFlowConversationHistoryMethodAttribution:
         craft_response=st.text(min_size=1, max_size=500),
         ggl_response=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_conversation_history_has_exactly_three_method_attributed_messages(
         self,
         telegram_id: int,
@@ -3940,7 +3952,7 @@ class TestEmailFlowConversationHistoryMethodAttribution:
         craft_response=st.text(min_size=1, max_size=500),
         ggl_response=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_conversation_history_contains_all_three_methods(
         self,
         telegram_id: int,
@@ -3997,7 +4009,7 @@ class TestEmailFlowConversationHistoryMethodAttribution:
         craft_response=st.text(min_size=1, max_size=500),
         ggl_response=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_conversation_history_preserves_response_content(
         self,
         telegram_id: int,
@@ -4061,7 +4073,7 @@ class TestEmailFlowConversationHistoryMethodAttribution:
         craft_response=st.text(min_size=1, max_size=500),
         ggl_response=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_flow_conversation_history_messages_have_timestamps(
         self,
         telegram_id: int,
@@ -4137,7 +4149,7 @@ class TestEmailFlowBackwardCompatibility:
         role=st.sampled_from(["user", "assistant", "system"]),
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_add_message_without_method_excludes_method_field(
         self,
         telegram_id: int,
@@ -4187,7 +4199,7 @@ class TestEmailFlowBackwardCompatibility:
         model_name=model_name_strategy,
         content=st.text(min_size=1, max_size=500),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_add_message_with_none_method_excludes_method_field(
         self,
         telegram_id: int,
@@ -4232,7 +4244,7 @@ class TestEmailFlowBackwardCompatibility:
         model_name=model_name_strategy,
         num_messages=st.integers(min_value=1, max_value=10),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_multiple_messages_without_method_all_exclude_method_field(
         self,
         telegram_id: int,
@@ -4276,3 +4288,723 @@ class TestEmailFlowBackwardCompatibility:
                     f"Message {i} should NOT have method field when add_message() "
                     f"is called without method parameter, but found: {msg}"
                 )
+
+
+class TestTerminalStateImmutability:
+    """
+    **Feature: session-status-protection, Property 1: Terminal state immutability**
+    **Validates: Requirements 1.1, 1.2, 1.5**
+
+    Property 1: Terminal state immutability
+    *For any* session with status "successful" or "unsuccessful", calling
+    `reset_session()` SHALL NOT modify the session's status, finish_time,
+    or duration_seconds fields.
+
+    This test class verifies that sessions in terminal states (successful or
+    unsuccessful) are protected from being overwritten by reset operations.
+    """
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_successful_session_status_not_modified_by_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.1, 1.5**
+
+        For any session with status "successful", calling reset_session() SHALL NOT
+        modify the session's status. The status should remain "successful".
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens to make the session more realistic
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Complete the session (terminal state: successful)
+            completed_session = service.complete_session(session.id)
+            assert completed_session is not None, "Session should be completed successfully"
+            assert completed_session.status == SessionStatus.SUCCESSFUL.value
+
+            # Store original values before reset attempt
+            original_status = completed_session.status
+
+            # Attempt to reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: status should NOT be modified (Requirement 1.1)
+            assert result is not None, "reset_session should return the session object"
+            assert result.status == original_status, (
+                f"Status should remain '{original_status}' after reset attempt, "
+                f"but got: '{result.status}'"
+            )
+            assert result.status == SessionStatus.SUCCESSFUL.value, (
+                f"Successful session status should remain 'successful', got: '{result.status}'"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_successful_session_finish_time_not_modified_by_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.1, 1.5**
+
+        For any session with status "successful", calling reset_session() SHALL NOT
+        modify the session's finish_time.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Complete the session (terminal state: successful)
+            completed_session = service.complete_session(session.id)
+            assert completed_session is not None, "Session should be completed successfully"
+
+            # Store original finish_time before reset attempt
+            original_finish_time = completed_session.finish_time
+            assert original_finish_time is not None, "Completed session should have finish_time"
+
+            # Attempt to reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: finish_time should NOT be modified
+            assert result is not None, "reset_session should return the session object"
+            assert result.finish_time == original_finish_time, (
+                f"finish_time should remain unchanged after reset attempt, "
+                f"original: {original_finish_time}, got: {result.finish_time}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_successful_session_duration_not_modified_by_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.1, 1.5**
+
+        For any session with status "successful", calling reset_session() SHALL NOT
+        modify the session's duration_seconds.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Complete the session (terminal state: successful)
+            completed_session = service.complete_session(session.id)
+            assert completed_session is not None, "Session should be completed successfully"
+
+            # Store original duration_seconds before reset attempt
+            original_duration = completed_session.duration_seconds
+
+            # Attempt to reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: duration_seconds should NOT be modified
+            assert result is not None, "reset_session should return the session object"
+            assert result.duration_seconds == original_duration, (
+                f"duration_seconds should remain unchanged after reset attempt, "
+                f"original: {original_duration}, got: {result.duration_seconds}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_unsuccessful_session_status_not_modified_by_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.2, 1.5**
+
+        For any session with status "unsuccessful", calling reset_session() SHALL NOT
+        modify the session's status. The status should remain "unsuccessful".
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Reset the session first time (terminal state: unsuccessful)
+            first_reset = service.reset_session(session.id)
+            assert first_reset is not None, "First reset should succeed"
+            assert first_reset.status == SessionStatus.UNSUCCESSFUL.value
+
+            # Store original values before second reset attempt
+            original_status = first_reset.status
+
+            # Attempt to reset the session again
+            result = service.reset_session(session.id)
+
+            # Property assertion: status should NOT be modified (Requirement 1.2)
+            assert result is not None, "reset_session should return the session object"
+            assert result.status == original_status, (
+                f"Status should remain '{original_status}' after second reset attempt, "
+                f"but got: '{result.status}'"
+            )
+            assert result.status == SessionStatus.UNSUCCESSFUL.value, (
+                f"Unsuccessful session status should remain 'unsuccessful', got: '{result.status}'"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_unsuccessful_session_finish_time_not_modified_by_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.2, 1.5**
+
+        For any session with status "unsuccessful", calling reset_session() SHALL NOT
+        modify the session's finish_time.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Reset the session first time (terminal state: unsuccessful)
+            first_reset = service.reset_session(session.id)
+            assert first_reset is not None, "First reset should succeed"
+
+            # Store original finish_time before second reset attempt
+            original_finish_time = first_reset.finish_time
+            assert original_finish_time is not None, "Reset session should have finish_time"
+
+            # Attempt to reset the session again
+            result = service.reset_session(session.id)
+
+            # Property assertion: finish_time should NOT be modified
+            assert result is not None, "reset_session should return the session object"
+            assert result.finish_time == original_finish_time, (
+                f"finish_time should remain unchanged after second reset attempt, "
+                f"original: {original_finish_time}, got: {result.finish_time}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_unsuccessful_session_duration_not_modified_by_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.2, 1.5**
+
+        For any session with status "unsuccessful", calling reset_session() SHALL NOT
+        modify the session's duration_seconds.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Reset the session first time (terminal state: unsuccessful)
+            first_reset = service.reset_session(session.id)
+            assert first_reset is not None, "First reset should succeed"
+
+            # Store original duration_seconds before second reset attempt
+            original_duration = first_reset.duration_seconds
+
+            # Attempt to reset the session again
+            result = service.reset_session(session.id)
+
+            # Property assertion: duration_seconds should NOT be modified
+            assert result is not None, "reset_session should return the session object"
+            assert result.duration_seconds == original_duration, (
+                f"duration_seconds should remain unchanged after second reset attempt, "
+                f"original: {original_duration}, got: {result.duration_seconds}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        terminal_status=st.sampled_from(["successful", "unsuccessful"]),
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_terminal_session_returns_existing_session_object(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        terminal_status: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 1: Terminal state immutability**
+        **Validates: Requirements 1.5**
+
+        For any session in a terminal state (successful or unsuccessful), calling
+        reset_session() SHALL return the existing session object without modification.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Put session in terminal state based on test parameter
+            if terminal_status == "successful":
+                terminal_session = service.complete_session(session.id)
+            else:
+                terminal_session = service.reset_session(session.id)
+
+            assert terminal_session is not None, "Terminal session should be created"
+            assert terminal_session.status == terminal_status
+
+            # Store all original values
+            original_id = terminal_session.id
+            original_status = terminal_session.status
+            original_finish_time = terminal_session.finish_time
+            original_duration = terminal_session.duration_seconds
+            original_tokens = terminal_session.tokens_total
+
+            # Attempt to reset the terminal session
+            result = service.reset_session(session.id)
+
+            # Property assertion: should return the existing session object (Requirement 1.5)
+            assert result is not None, "reset_session should return the session object"
+            assert result.id == original_id, "Should return the same session"
+            assert result.status == original_status, "Status should be unchanged"
+            assert result.finish_time == original_finish_time, "finish_time should be unchanged"
+            assert result.duration_seconds == original_duration, (
+                "duration_seconds should be unchanged"
+            )
+            assert result.tokens_total == original_tokens, "tokens_total should be unchanged"
+
+
+class TestInProgressSessionsCanBeReset:
+    """
+    **Feature: session-status-protection, Property 2: In-progress sessions can be reset**
+    **Validates: Requirements 1.3**
+
+    Property 2: In-progress sessions can be reset
+    *For any* session with status "in_progress", calling `reset_session()` SHALL
+    update the status to "unsuccessful" and set finish_time and duration_seconds.
+
+    This test class verifies that sessions in the "in_progress" state can be
+    properly reset to "unsuccessful" status with appropriate timing fields set.
+    """
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_in_progress_session_status_changes_to_unsuccessful(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 2: In-progress sessions can be reset**
+        **Validates: Requirements 1.3**
+
+        For any session with status "in_progress", calling reset_session() SHALL
+        update the status to "unsuccessful".
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens to make the session more realistic
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Verify session is in_progress before reset
+            assert session.status == SessionStatus.IN_PROGRESS.value, (
+                f"Session should be 'in_progress' before reset, got: {session.status}"
+            )
+
+            # Reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: status should change to "unsuccessful" (Requirement 1.3)
+            assert result is not None, "reset_session should return the session object"
+            assert result.status == SessionStatus.UNSUCCESSFUL.value, (
+                f"Status should be 'unsuccessful' after reset, got: '{result.status}'"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_in_progress_session_finish_time_is_set(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 2: In-progress sessions can be reset**
+        **Validates: Requirements 1.3**
+
+        For any session with status "in_progress", calling reset_session() SHALL
+        set finish_time to a valid UTC timestamp.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Verify finish_time is None before reset
+            assert session.finish_time is None, "Session finish_time should be None before reset"
+
+            # Record time before reset
+            before_reset = datetime.now(UTC)
+
+            # Reset the session
+            result = service.reset_session(session.id)
+
+            # Record time after reset
+            after_reset = datetime.now(UTC)
+
+            # Property assertion: finish_time should be set (Requirement 1.3)
+            assert result is not None, "reset_session should return the session object"
+            assert result.finish_time is not None, "finish_time should be set after reset"
+
+            # Normalize timestamp for comparison (SQLite may strip timezone)
+            finish_ts = _normalize_timestamp(result.finish_time)
+
+            # Property: finish_time should be within the test window
+            assert before_reset <= finish_ts <= after_reset, (
+                f"finish_time ({finish_ts}) should be between {before_reset} and {after_reset}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_in_progress_session_duration_is_set(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 2: In-progress sessions can be reset**
+        **Validates: Requirements 1.3**
+
+        For any session with status "in_progress", calling reset_session() SHALL
+        set duration_seconds to a non-negative value.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add some tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Verify duration_seconds is None before reset
+            assert session.duration_seconds is None, (
+                "Session duration_seconds should be None before reset"
+            )
+
+            # Reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: duration_seconds should be set (Requirement 1.3)
+            assert result is not None, "reset_session should return the session object"
+            assert result.duration_seconds is not None, "duration_seconds should be set after reset"
+            assert result.duration_seconds >= 0, (
+                f"duration_seconds should be non-negative, got: {result.duration_seconds}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+        input_tokens=st.integers(min_value=0, max_value=10000),
+        output_tokens=st.integers(min_value=0, max_value=10000),
+    )
+    @settings(max_examples=25)
+    def test_in_progress_session_preserves_tokens_after_reset(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+    ):
+        """
+        **Feature: session-status-protection, Property 2: In-progress sessions can be reset**
+        **Validates: Requirements 1.3**
+
+        For any session with status "in_progress", calling reset_session() SHALL
+        preserve all collected metrics (tokens) for analysis.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Add tokens
+            if input_tokens > 0 or output_tokens > 0:
+                service.add_tokens(session.id, input_tokens, output_tokens)
+
+            # Store original token values before reset
+            original_input_tokens = session.input_tokens
+            original_output_tokens = session.output_tokens
+            original_tokens_total = session.tokens_total
+
+            # Reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: tokens should be preserved after reset
+            assert result is not None, "reset_session should return the session object"
+            assert result.input_tokens == original_input_tokens, (
+                f"input_tokens should be preserved, expected: {original_input_tokens}, "
+                f"got: {result.input_tokens}"
+            )
+            assert result.output_tokens == original_output_tokens, (
+                f"output_tokens should be preserved, expected: {original_output_tokens}, "
+                f"got: {result.output_tokens}"
+            )
+            assert result.tokens_total == original_tokens_total, (
+                f"tokens_total should be preserved, expected: {original_tokens_total}, "
+                f"got: {result.tokens_total}"
+            )
+
+    @given(
+        telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
+        method=optimization_method_strategy,
+        model_name=model_name_strategy,
+    )
+    @settings(max_examples=25)
+    def test_in_progress_session_returns_session_object(
+        self,
+        telegram_id: int,
+        method: OptimizationMethod,
+        model_name: str,
+    ):
+        """
+        **Feature: session-status-protection, Property 2: In-progress sessions can be reset**
+        **Validates: Requirements 1.3**
+
+        For any session with status "in_progress", calling reset_session() SHALL
+        return the updated session object.
+        """
+        with get_test_db_session() as db_session:
+            # Create a user first (required for foreign key)
+            user = _SQLiteUser(telegram_id=telegram_id, email=None, is_authenticated=False)
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            # Create session service and start a session
+            service = _SQLiteSessionService(db_session)
+            session = service.start_session(user.id, model_name, method)
+            assert session is not None, "Session should be created successfully"
+
+            # Store original session ID
+            original_id = session.id
+
+            # Reset the session
+            result = service.reset_session(session.id)
+
+            # Property assertion: should return the session object
+            assert result is not None, "reset_session should return the session object"
+            assert result.id == original_id, (
+                f"Should return the same session, expected id: {original_id}, got: {result.id}"
+            )

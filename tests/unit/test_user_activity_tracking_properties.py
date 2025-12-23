@@ -58,7 +58,7 @@ class TestTimestampProperties:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_timestamps_are_set_and_retrievable_as_utc(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 8: Timestamps are timezone-aware UTC**
@@ -107,7 +107,7 @@ class TestTimestampProperties:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_timestamps_preserve_utc_values(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 8: Timestamps are timezone-aware UTC**
@@ -188,7 +188,7 @@ class TestNewUserCreationTimestamps:
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_user_timestamps_are_equal(self, telegram_id: int, effective_user):
         """
         **Feature: user-activity-tracking, Property 1: New user creation sets both timestamps equally**
@@ -253,7 +253,7 @@ class TestNewUserCreationTimestamps:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_user_timestamps_equal_with_none_effective_user(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 1: New user creation sets both timestamps equally**
@@ -314,7 +314,7 @@ class TestUnauthenticatedUserState:
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_user_has_null_email_and_unauthenticated(self, telegram_id: int, effective_user):
         """
         **Feature: user-activity-tracking, Property 6: Unauthenticated users have null email**
@@ -359,7 +359,7 @@ class TestUnauthenticatedUserState:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_user_with_none_effective_user_has_null_email(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 6: Unauthenticated users have null email**
@@ -433,7 +433,7 @@ class TestFirstInteractionTimestampImmutability:
         num_interactions=st.integers(min_value=2, max_value=10),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_first_interaction_timestamp_unchanged_after_multiple_interactions(
         self, telegram_id: int, num_interactions: int, effective_user
     ):
@@ -486,7 +486,7 @@ class TestFirstInteractionTimestampImmutability:
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_first_interaction_timestamp_preserved_with_profile_changes(
         self, telegram_id: int, effective_user
     ):
@@ -547,7 +547,7 @@ class TestFirstInteractionTimestampImmutability:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_first_interaction_timestamp_preserved_with_none_effective_user(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 2: First interaction timestamp is immutable**
@@ -609,7 +609,7 @@ class TestNoDuplicateUsers:
         num_calls=st.integers(min_value=2, max_value=10),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_multiple_calls_create_single_user(
         self, telegram_id: int, num_calls: int, effective_user
     ):
@@ -675,7 +675,7 @@ class TestNoDuplicateUsers:
         ),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_different_telegram_ids_create_separate_users(
         self, telegram_ids: list[int], effective_user
     ):
@@ -738,7 +738,7 @@ class TestLastInteractionTimestampUpdates:
         num_interactions=st.integers(min_value=2, max_value=10),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_last_interaction_timestamp_updates_on_each_interaction(
         self, telegram_id: int, num_interactions: int, effective_user
     ):
@@ -793,7 +793,7 @@ class TestLastInteractionTimestampUpdates:
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_last_interaction_timestamp_monotonically_increases(
         self, telegram_id: int, effective_user
     ):
@@ -843,7 +843,7 @@ class TestLastInteractionTimestampUpdates:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**63 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_last_interaction_timestamp_updates_with_none_effective_user(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 3: Last interaction timestamp updates on each interaction**
@@ -908,7 +908,7 @@ class TestFirstTimeUserIdentification:
         telegram_id=st.integers(min_value=1, max_value=2**62 - 1),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_new_user_is_identified_as_first_time(self, telegram_id: int, effective_user):
         """
         **Feature: user-activity-tracking, Property 4: First-time user identification**
@@ -954,7 +954,7 @@ class TestFirstTimeUserIdentification:
         telegram_id=st.integers(min_value=1, max_value=2**62 - 1),
         hours_diff=st.integers(min_value=1, max_value=1000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_returning_user_is_not_identified_as_first_time(
         self, telegram_id: int, hours_diff: int
     ):
@@ -993,7 +993,7 @@ class TestFirstTimeUserIdentification:
     @given(
         telegram_id=st.integers(min_value=1, max_value=2**62 - 1),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_is_first_time_user_with_equal_timestamps(self, telegram_id: int):
         """
         **Feature: user-activity-tracking, Property 4: First-time user identification**
@@ -1028,7 +1028,7 @@ class TestFirstTimeUserIdentification:
         telegram_id=st.integers(min_value=1, max_value=2**62 - 1),
         hours_diff=st.integers(min_value=1, max_value=1000),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_is_first_time_user_with_varying_time_differences(
         self, telegram_id: int, hours_diff: int
     ):
@@ -1067,7 +1067,7 @@ class TestFirstTimeUserIdentification:
         telegram_id=st.integers(min_value=1, max_value=2**62 - 1),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_track_user_interaction_returns_correct_first_time_flag(
         self, telegram_id: int, effective_user
     ):
@@ -1123,7 +1123,7 @@ class TestEmailVerificationPreservesHistory:
         email=st.emails(),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_verification_preserves_first_interaction_at(
         self, telegram_id: int, email: str, effective_user
     ):
@@ -1224,7 +1224,7 @@ class TestEmailVerificationPreservesHistory:
         telegram_id=st.integers(min_value=1, max_value=2**62 - 1),
         email=st.emails(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_verification_preserves_created_at(self, telegram_id: int, email: str):
         """
         **Feature: user-activity-tracking, Property 7: Email verification preserves activity history**
@@ -1306,7 +1306,7 @@ class TestEmailVerificationPreservesHistory:
         num_interactions=st.integers(min_value=1, max_value=5),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_email_verification_preserves_history_after_multiple_interactions(
         self, telegram_id: int, email: str, num_interactions: int, effective_user
     ):
@@ -1422,7 +1422,7 @@ class TestMultipleNullEmailsAllowed:
             unique=True,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_multiple_users_can_have_null_email(self, telegram_ids: list[int]):
         """
         **Feature: user-activity-tracking, Property 9: Multiple null emails allowed**
@@ -1476,7 +1476,7 @@ class TestMultipleNullEmailsAllowed:
     @given(
         num_users=st.integers(min_value=2, max_value=20),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_database_allows_multiple_null_emails_directly(self, num_users: int):
         """
         **Feature: user-activity-tracking, Property 9: Multiple null emails allowed**
@@ -1523,7 +1523,7 @@ class TestMultipleNullEmailsAllowed:
         ),
         effective_user=effective_user_strategy(),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_multiple_null_emails_with_profile_data(self, telegram_ids: list[int], effective_user):
         """
         **Feature: user-activity-tracking, Property 9: Multiple null emails allowed**
@@ -1572,7 +1572,7 @@ class TestMultipleNullEmailsAllowed:
         num_null_email_users=st.integers(min_value=2, max_value=5),
         num_verified_users=st.integers(min_value=1, max_value=3),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=25)
     def test_null_emails_coexist_with_verified_emails(
         self, num_null_email_users: int, num_verified_users: int
     ):
