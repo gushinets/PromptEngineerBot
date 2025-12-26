@@ -5,7 +5,7 @@ This module contains all the static messages and templates used by the Telegram 
 for consistent messaging and easier maintenance.
 """
 
-from telegram import ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 
 # ===== Language Settings =====
@@ -36,7 +36,20 @@ BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Gene
 BTN_EMAIL_DELIVERY = _("📧 Отправить 3 промпта на email", "📧 Send 3 prompts to email")
 BTN_POST_OPTIMIZATION_EMAIL = _("📧 Отправить промпт на e-mail", "📧 Send prompt to e-mail")
 
+# Support button
+BTN_SUPPORT = _("🆘 Техподдержка", "🆘 Support")
+
+# Support URL
+SUPPORT_BOT_URL = "https://t.me/prompthelpdesk_bot?start"
+
+# Inline keyboard with support button
+SUPPORT_KEYBOARD = InlineKeyboardMarkup([[InlineKeyboardButton(BTN_SUPPORT, url=SUPPORT_BOT_URL)]])
+
 # ===== Welcome and Help Messages =====
+# DEPRECATED: Use WELCOME_MESSAGE_1 and WELCOME_MESSAGE_2 instead.
+# This constant is kept for backward compatibility and will be removed in a future version.
+# The welcome flow now sends two separate messages: WELCOME_MESSAGE_1 (introduction)
+# followed by WELCOME_MESSAGE_2 (instructions) with a support button.
 WELCOME_MESSAGE = _(
     "🤖 Добро пожаловать в Prompt Engineering Bot!\n"
     "💡 Я превращаю ваши идеи в точные запросы для нейросетей — без лишних усилий.\n\n"
@@ -62,6 +75,47 @@ WELCOME_MESSAGE = _(
     "3️⃣ Choose an optimization method\n"
     "4️⃣ Get a ready query — clear for AI models 🚀\n\n"
     "✍️ Describe your task — I'll create a prompt that works right away.",
+)
+
+# New split welcome messages
+WELCOME_MESSAGE_1 = _(
+    "🤖 Привет. Я PromptEngineer.\n\n"
+    "Я превращаю вашу задачу в готовый промпт для нейросети —\n"
+    "такой, который можно сразу использовать, без правок и догадок.\n\n"
+    "Не нужно знать, как «правильно» писать запросы.\n"
+    "Просто опишите, что вам нужно сделать.\n\n"
+    "✍️ Опишите свою задачу — я сделаю из неё промпт, который сработает сразу.",
+    "🤖 Hi. I'm PromptEngineer.\n\n"
+    "I transform your task into a ready-to-use prompt for AI —\n"
+    "one you can use immediately, without edits or guesswork.\n\n"
+    'You don\'t need to know how to write prompts "correctly."\n'
+    "Just describe what you need to do.\n\n"
+    "✍️ Describe your task — I'll create a prompt that works right away.",
+)
+
+WELCOME_MESSAGE_2 = _(
+    "ℹ️ Как работать с PromptEngineer\n\n"
+    "1️⃣ Опишите задачу своими словами\n"
+    "Не нужно думать о формулировках — пишите как есть.\n\n"
+    "2️⃣ Выберите подходящий вариант оптимизации:\n"
+    "⚡Быстро — короткий и рабочий запрос без лишних деталей\n"
+    "🛠 По шагам — аккуратно разложенный и структурированный запрос\n"
+    "🎯 Под результат — запрос под конкретный формат или итог\n\n"
+    "3️⃣ Получите готовый промпт\n"
+    "Его можно сразу использовать в нейросети без доработок.\n\n"
+    "Если у вас возникнут вопросы по работе сервиса, "
+    "воспользуйтесь кнопкой «Техподдержка» — мы поможем разобраться.",
+    "ℹ️ How to work with PromptEngineer\n\n"
+    "1️⃣ Describe your task in your own words\n"
+    "No need to think about wording — just write as is.\n\n"
+    "2️⃣ Choose the right optimization option:\n"
+    "⚡Quick — a short, working prompt without extra details\n"
+    "🛠 Step-by-step — a neatly organized and structured prompt\n"
+    "🎯 Result-focused — a prompt for a specific format or outcome\n\n"
+    "3️⃣ Get your ready prompt\n"
+    "You can use it immediately in AI without any modifications.\n\n"
+    "If you have questions about the service, "
+    "use the «Support» button — we'll help you figure it out.",
 )
 
 # ===== Error Messages =====

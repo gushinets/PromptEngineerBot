@@ -61,8 +61,10 @@ from telegram_bot.utils.messages import (
     RESET_CONFIRMATION,
     SELECT_METHOD_KEYBOARD,
     SELECT_METHOD_MESSAGE,
+    SUPPORT_KEYBOARD,
     SYSTEM_FOLLOWUP_PROMPT_INDICATOR,
-    WELCOME_MESSAGE,
+    WELCOME_MESSAGE_1,
+    WELCOME_MESSAGE_2,
     get_processing_message,
     parse_followup_response,
     parse_llm_response,
@@ -218,12 +220,20 @@ class BotHandler:
         # Token logging should only happen when optimized prompts are generated
         self.reset_user_state(user_id)
 
-        # Send welcome message
+        # Send welcome message 1 (introduction)
         await self._safe_reply(
             update,
-            WELCOME_MESSAGE,
+            WELCOME_MESSAGE_1,
             parse_mode="Markdown",
             reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True),
+        )
+
+        # Send welcome message 2 (instructions) with support button
+        await self._safe_reply(
+            update,
+            WELCOME_MESSAGE_2,
+            parse_mode="Markdown",
+            reply_markup=SUPPORT_KEYBOARD,
         )
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

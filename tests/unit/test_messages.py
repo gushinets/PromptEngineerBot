@@ -1,17 +1,24 @@
 """Tests for the messages module."""
 
+from telegram import InlineKeyboardMarkup
+
 from telegram_bot.utils.messages import (
     BTN_CRAFT,
     BTN_GENERATE_PROMPT,
     BTN_GGL,
     BTN_LYRA,
     BTN_NO,
+    BTN_SUPPORT,
     BTN_YES,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
     LANGUAGE,
+    SUPPORT_BOT_URL,
+    SUPPORT_KEYBOARD,
     WELCOME_MESSAGE,
+    WELCOME_MESSAGE_1,
+    WELCOME_MESSAGE_2,
     _,
     _extract_tag_block,
     format_improved_prompt_response,
@@ -388,10 +395,136 @@ class TestConstants:
         assert "GGL" in BTN_GGL
 
     def test_welcome_message_exists(self):
-        """Test that welcome message is defined and not empty."""
+        """Test that welcome messages are defined and not empty."""
+        # Test WELCOME_MESSAGE_1 (introduction message)
+        assert WELCOME_MESSAGE_1 is not None
+        assert len(WELCOME_MESSAGE_1) > 0
+        assert "🤖" in WELCOME_MESSAGE_1
+
+        # Test WELCOME_MESSAGE_2 (instructions message)
+        assert WELCOME_MESSAGE_2 is not None
+        assert len(WELCOME_MESSAGE_2) > 0
+        assert "ℹ️" in WELCOME_MESSAGE_2
+
+        # Test deprecated WELCOME_MESSAGE still exists for backward compatibility
         assert WELCOME_MESSAGE is not None
         assert len(WELCOME_MESSAGE) > 0
         assert "🤖" in WELCOME_MESSAGE
+
+    def test_welcome_message_1_content(self):
+        """Test WELCOME_MESSAGE_1 contains required key phrases.
+
+        Validates: Requirements 2.1, 2.2, 2.3, 2.4
+        """
+        # Requirement 2.1: Contains greeting with bot name
+        # Check for Russian or English greeting
+        assert "PromptEngineer" in WELCOME_MESSAGE_1
+
+        # Requirement 2.2: Explains bot transforms tasks into ready-to-use prompts
+        # Russian: "превращаю вашу задачу в готовый промпт"
+        # English: "transform your task into a ready-to-use prompt"
+        has_transform_ru = "превращаю" in WELCOME_MESSAGE_1 and "промпт" in WELCOME_MESSAGE_1
+        has_transform_en = "transform" in WELCOME_MESSAGE_1 and "prompt" in WELCOME_MESSAGE_1
+        assert has_transform_ru or has_transform_en
+
+        # Requirement 2.3: Reassures users don't need to know how to write prompts correctly
+        # Russian: "Не нужно знать, как «правильно» писать запросы"
+        # English: "don't need to know how to write prompts"
+        has_reassurance_ru = "Не нужно знать" in WELCOME_MESSAGE_1
+        has_reassurance_en = "don't need to know" in WELCOME_MESSAGE_1
+        assert has_reassurance_ru or has_reassurance_en
+
+        # Requirement 2.4: Call-to-action to describe task
+        # Russian: "Опишите свою задачу"
+        # English: "Describe your task"
+        has_cta_ru = "Опишите" in WELCOME_MESSAGE_1 and "задачу" in WELCOME_MESSAGE_1
+        has_cta_en = "Describe" in WELCOME_MESSAGE_1 and "task" in WELCOME_MESSAGE_1
+        assert has_cta_ru or has_cta_en
+
+        # Verify the ✍️ emoji is present for the call-to-action
+        assert "✍️" in WELCOME_MESSAGE_1
+
+    def test_welcome_message_2_content(self):
+        """Test WELCOME_MESSAGE_2 contains required step markers and optimization options.
+
+        Validates: Requirements 3.1, 3.2, 3.3, 3.4
+        """
+        # Requirement 3.1: Contains header with ℹ️ emoji
+        assert "ℹ️" in WELCOME_MESSAGE_2
+
+        # Requirement 3.2: Contains three step markers
+        assert "1️⃣" in WELCOME_MESSAGE_2
+        assert "2️⃣" in WELCOME_MESSAGE_2
+        assert "3️⃣" in WELCOME_MESSAGE_2
+
+        # Requirement 3.3: Contains three optimization options with emojis
+        # Russian: ⚡Быстро, 🛠 По шагам, 🎯 Под результат
+        # English: ⚡Quick, 🛠 Step-by-step, 🎯 Result-focused
+        assert "⚡" in WELCOME_MESSAGE_2  # Quick/Быстро option
+        assert "🛠" in WELCOME_MESSAGE_2  # Step-by-step/По шагам option
+        assert "🎯" in WELCOME_MESSAGE_2  # Result-focused/Под результат option
+
+        # Verify optimization option text (Russian or English)
+        has_quick_ru = "Быстро" in WELCOME_MESSAGE_2
+        has_quick_en = "Quick" in WELCOME_MESSAGE_2
+        assert has_quick_ru or has_quick_en
+
+        has_steps_ru = "По шагам" in WELCOME_MESSAGE_2
+        has_steps_en = "Step-by-step" in WELCOME_MESSAGE_2
+        assert has_steps_ru or has_steps_en
+
+        has_result_ru = "Под результат" in WELCOME_MESSAGE_2
+        has_result_en = "Result-focused" in WELCOME_MESSAGE_2
+        assert has_result_ru or has_result_en
+
+        # Requirement 3.4: Mentions support button
+        # Russian: "Техподдержка"
+        # English: "Support"
+        has_support_ru = "Техподдержка" in WELCOME_MESSAGE_2
+        has_support_en = "Support" in WELCOME_MESSAGE_2
+        assert has_support_ru or has_support_en
+
+    def test_btn_support_label(self):
+        """Test BTN_SUPPORT contains expected text.
+
+        Validates: Requirements 4.2
+        """
+        # BTN_SUPPORT should not be empty
+        assert BTN_SUPPORT is not None
+        assert len(BTN_SUPPORT) > 0
+
+        # Should contain the support emoji
+        assert "🆘" in BTN_SUPPORT
+
+        # Should contain localized text based on language setting
+        # Russian: "Техподдержка"
+        # English: "Support"
+        if LANGUAGE == "ru":
+            assert "Техподдержка" in BTN_SUPPORT
+        else:
+            assert "Support" in BTN_SUPPORT
+
+    def test_support_keyboard_configuration(self):
+        """Test SUPPORT_KEYBOARD is properly configured.
+
+        Validates: Requirements 4.1, 4.3, 4.4
+        """
+        # Requirement 4.4: Should be an InlineKeyboardMarkup
+        assert isinstance(SUPPORT_KEYBOARD, InlineKeyboardMarkup)
+
+        # Should have one row with one button
+        assert len(SUPPORT_KEYBOARD.inline_keyboard) == 1
+        assert len(SUPPORT_KEYBOARD.inline_keyboard[0]) == 1
+
+        # Get the support button
+        support_button = SUPPORT_KEYBOARD.inline_keyboard[0][0]
+
+        # Requirement 4.3: Button should have correct URL
+        assert support_button.url == SUPPORT_BOT_URL
+        assert support_button.url == "https://t.me/prompthelpdesk_bot?start"
+
+        # Button should have the correct label (BTN_SUPPORT)
+        assert support_button.text == BTN_SUPPORT
 
 
 class TestFollowUpFeatureMessages:

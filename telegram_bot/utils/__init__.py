@@ -21,8 +21,14 @@ from telegram_bot.utils.health_checks import (
 )
 from telegram_bot.utils.logging_utils import setup_application_logging
 from telegram_bot.utils.messages import (
+    BTN_SUPPORT,
     SELECT_METHOD_MESSAGE,
+    SUPPORT_KEYBOARD,
+    # WELCOME_MESSAGE is deprecated but kept for backward compatibility
+    # until bot_handler.py and tests are updated (tasks 3, 5, 6)
     WELCOME_MESSAGE,
+    WELCOME_MESSAGE_1,
+    WELCOME_MESSAGE_2,
     get_processing_message,
 )
 from telegram_bot.utils.metrics import (
@@ -33,8 +39,13 @@ from telegram_bot.utils.prompt_loader import PromptLoader
 
 
 __all__ = [
+    "BTN_SUPPORT",
     "SELECT_METHOD_MESSAGE",
+    "SUPPORT_KEYBOARD",
+    # WELCOME_MESSAGE is deprecated - remove after tasks 3, 5, 6 are complete
     "WELCOME_MESSAGE",
+    "WELCOME_MESSAGE_1",
+    "WELCOME_MESSAGE_2",
     "BotConfig",
     "EmailTemplates",
     "PromptLoader",

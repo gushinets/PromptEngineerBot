@@ -605,10 +605,19 @@ class TestPostOptimizationRegressionPrevention:
             ERROR_GENERIC,
             OTP_VERIFICATION_SUCCESS,
             WELCOME_MESSAGE,
+            WELCOME_MESSAGE_1,
+            WELCOME_MESSAGE_2,
         )
 
         # Verify key messages still exist and contain expected content
+        # WELCOME_MESSAGE is deprecated but kept for backward compatibility
         assert isinstance(WELCOME_MESSAGE, str) and len(WELCOME_MESSAGE) > 0
+        # New split welcome messages
+        assert isinstance(WELCOME_MESSAGE_1, str) and len(WELCOME_MESSAGE_1) > 0
+        assert isinstance(WELCOME_MESSAGE_2, str) and len(WELCOME_MESSAGE_2) > 0
+        # Verify identifying emojis are present
+        assert "🤖" in WELCOME_MESSAGE_1
+        assert "ℹ️" in WELCOME_MESSAGE_2
         assert isinstance(ERROR_GENERIC, str) and len(ERROR_GENERIC) > 0
         assert isinstance(EMAIL_INPUT_MESSAGE, str) and len(EMAIL_INPUT_MESSAGE) > 0
         assert isinstance(OTP_VERIFICATION_SUCCESS, str) and len(OTP_VERIFICATION_SUCCESS) > 0
