@@ -172,8 +172,11 @@ class TestBotHandlerEmailIntegration:
         user_id = mock_update.effective_user.id
         mock_update.message.text = BTN_EMAIL_DELIVERY
 
-        # Set up state for method selection
+        # Reset state first and set up state for method selection
+        bot_handler.reset_user_state(user_id)
         bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
         bot_handler.conversation_manager.set_user_prompt(user_id, "Test prompt")
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
 
@@ -212,8 +215,10 @@ class TestBotHandlerEmailIntegration:
         otp = "123456"
         mock_update.message.text = otp
 
-        # Set up OTP input waiting state
+        # Reset state first and set up OTP input waiting state
+        bot_handler.reset_user_state(user_id)
         bot_handler.state_manager.set_waiting_for_otp_input(user_id, True)
+        bot_handler.state_manager.set_waiting_for_email_input(user_id, False)
         bot_handler.email_flow_orchestrator.reset_mock()
 
         await bot_handler.handle_message(mock_update, mock_context)
@@ -438,6 +443,10 @@ class TestBotHandlerMessageRouting:
         user1_id = 12345
         user2_id = 67890
 
+        # Reset both users first
+        bot_handler.reset_user_state(user1_id)
+        bot_handler.reset_user_state(user2_id)
+
         # Set different states for different users
         bot_handler.state_manager.set_waiting_for_email_input(user1_id, True)
         bot_handler.state_manager.set_waiting_for_otp_input(user2_id, True)
@@ -456,9 +465,14 @@ class TestBotHandlerMessageRouting:
         """Test handling of invalid state transitions."""
         user_id = mock_update.effective_user.id
 
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
         # Try to send OTP when not in email input state
         mock_update.message.text = "123456"
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)  # Wrong state
+        bot_handler.state_manager.set_waiting_for_otp_input(user_id, False)
+        bot_handler.state_manager.set_waiting_for_email_input(user_id, False)
 
         await bot_handler.handle_message(mock_update, mock_context)
 
@@ -474,8 +488,11 @@ class TestBotHandlerErrorRecovery:
         user_id = mock_update.effective_user.id
         mock_update.message.text = BTN_EMAIL_DELIVERY
 
-        # Set up state
+        # Reset state first and set up state
+        bot_handler.reset_user_state(user_id)
         bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
         bot_handler.conversation_manager.set_user_prompt(user_id, "Test prompt")
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
 
@@ -484,10 +501,24 @@ class TestBotHandlerErrorRecovery:
         mock_email_flow.start_email_flow = AsyncMock(side_effect=Exception("Email flow error"))
         bot_handler.email_flow_orchestrator = mock_email_flow
 
-        await bot_handler.handle_message(mock_update, mock_context)
+        # Mock health monitor
+        with patch("telegram_bot.utils.health_checks.get_health_monitor") as mock_get_health:
+            mock_health_monitor = MagicMock()
+            mock_health_monitor.is_service_healthy.return_value = True
+            mock_get_health.return_value = mock_health_monitor
+
+            await bot_handler.handle_message(mock_update, mock_context)
 
         # Verify error was handled gracefully (bot handler should send error message)
         mock_update.message.reply_text.assert_called()
+
+        # Reset state for next test
+        bot_handler.reset_user_state(user_id)
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
+        bot_handler.conversation_manager.set_user_prompt(user_id, "Test prompt")
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
 
         # Verify user can continue with regular optimization
         mock_update.message.text = BTN_CRAFT

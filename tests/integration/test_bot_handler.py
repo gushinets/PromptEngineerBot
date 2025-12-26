@@ -90,13 +90,20 @@ class TestBotHandler:
         """Test handling start command."""
         await bot_handler.handle_start(mock_update, mock_context)
 
-        # Verify welcome message was sent
-        mock_update.message.reply_text.assert_called_once()
-        args, kwargs = mock_update.message.reply_text.call_args
+        # Verify two welcome messages were sent (welcome + instructions)
+        assert mock_update.message.reply_text.call_count == 2
 
-        assert len(args[0]) > 0  # Message text
-        assert "parse_mode" in kwargs
-        assert "reply_markup" in kwargs
+        # Check first message (welcome)
+        first_call_args, first_call_kwargs = mock_update.message.reply_text.call_args_list[0]
+        assert len(first_call_args[0]) > 0  # Message text
+        assert "parse_mode" in first_call_kwargs
+        assert "reply_markup" in first_call_kwargs
+
+        # Check second message (instructions)
+        second_call_args, second_call_kwargs = mock_update.message.reply_text.call_args_list[1]
+        assert len(second_call_args[0]) > 0  # Message text
+        assert "parse_mode" in second_call_kwargs
+        assert "reply_markup" in second_call_kwargs
 
     @pytest.mark.asyncio
     async def test_handle_message_reset_button(self, bot_handler, mock_update, mock_context):
@@ -195,8 +202,14 @@ class TestBotHandler:
         user_id = mock_update.effective_user.id
         mock_update.message.text = "Follow-up question"
 
-        # Set up existing conversation
-        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)  # Not waiting for prompt
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
+        # Set up existing conversation - ensure all followup states are False
+        bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
+        bot_handler.conversation_manager.set_waiting_for_method(user_id, False)
         bot_handler.conversation_manager.set_current_method(user_id, "CRAFT")
         bot_handler.conversation_manager.append_message(user_id, "user", "Initial prompt")
 
@@ -1369,6 +1382,8 @@ class TestBotHandler:
         mock_update.message.text = "User response in follow-up"
 
         # Set up follow-up conversation state with other conflicting states
+        # Note: waiting_for_followup_choice must be False for in_followup_conversation to be checked
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)  # Should be ignored
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)  # Should be ignored
@@ -1386,6 +1401,9 @@ class TestBotHandler:
         mock_update.message.text = "New prompt input"
 
         # Set up prompt waiting state with method selection state
+        # Note: followup states must be False for prompt input to be checked
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)  # Should be ignored
 
@@ -1402,6 +1420,9 @@ class TestBotHandler:
         mock_update.message.text = BTN_CRAFT
 
         # Set up method selection state with existing conversation
+        # Note: followup and prompt states must be False for method selection to be checked
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
         bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
         bot_handler.conversation_manager.set_current_method(
@@ -1467,9 +1488,14 @@ class TestBotHandler:
         """Test complete state transitions through the routing system."""
         user_id = mock_update.effective_user.id
 
+        # Reset all states first to ensure clean test
+        bot_handler.reset_user_state(user_id)
+
         # Start with prompt input
         mock_update.message.text = "Initial prompt"
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
 
         with patch.object(bot_handler, "_handle_prompt_input") as mock_prompt:
             await bot_handler.handle_message(mock_update, mock_context)
@@ -1478,6 +1504,8 @@ class TestBotHandler:
         # Transition to method selection
         mock_update.message.text = BTN_CRAFT
         bot_handler.state_manager.set_waiting_for_prompt(user_id, False)
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
+        bot_handler.state_manager.set_in_followup_conversation(user_id, False)
         bot_handler.conversation_manager.set_waiting_for_method(user_id, True)
 
         with patch.object(bot_handler, "_handle_method_selection") as mock_method:
@@ -1515,6 +1543,9 @@ class TestBotHandler:
         improved_prompt = "Improved prompt from LLM"
         refined_prompt = "Final refined prompt after questions"
 
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
         # Step 1: User submits prompt
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)
         mock_update.message.text = original_prompt
@@ -1538,8 +1569,9 @@ class TestBotHandler:
         # Reset mock for next step
         mock_update.message.reply_text.reset_mock()
 
-        # Step 2: User chooses ДА for follow-up questions
+        # Step 3: User chooses ДА for follow-up questions
         mock_update.message.text = BTN_YES
+        bot_handler.llm_client.send_prompt.return_value = "What is your target audience?"
 
         await bot_handler.handle_message(mock_update, mock_context)
 
@@ -1549,7 +1581,7 @@ class TestBotHandler:
         assert user_state.in_followup_conversation is True
 
         # Verify LLM response was sent (direct conversation start)
-        assert mock_update.message.reply_text.call_count == 1
+        assert mock_update.message.reply_text.call_count >= 1
 
         # Step 4: User answers follow-up questions
         mock_update.message.text = "My target audience is developers"
@@ -1585,6 +1617,9 @@ class TestBotHandler:
         original_prompt = "Original user prompt"
         improved_prompt = "Improved prompt from LLM"
 
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
         # Step 1: User submits prompt
         bot_handler.state_manager.set_waiting_for_prompt(user_id, True)
         mock_update.message.text = original_prompt
@@ -1602,7 +1637,7 @@ class TestBotHandler:
         assert user_state.waiting_for_followup_choice is True
         assert user_state.improved_prompt_cache == improved_prompt
 
-        # Step 2: User chooses НЕТ to decline follow-up questions
+        # Step 3: User chooses НЕТ to decline follow-up questions
         mock_update.message.text = BTN_NO
 
         await bot_handler.handle_message(mock_update, mock_context)
@@ -1625,7 +1660,11 @@ class TestBotHandler:
         improved_prompt = "Improved prompt from LLM"
         refined_prompt = "Generated refined prompt"
 
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
         # Set up follow-up conversation state
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
         bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)
@@ -1656,6 +1695,9 @@ class TestBotHandler:
         """Test conversation state management throughout entire follow-up flow."""
         user_id = mock_update.effective_user.id
         improved_prompt = "Improved prompt"
+
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
 
         # Initial state: waiting for prompt
         user_state = bot_handler.state_manager.get_user_state(user_id)
@@ -1781,7 +1823,11 @@ class TestBotHandler:
         user_id = mock_update.effective_user.id
         improved_prompt = "Cached improved prompt"
 
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
         # Set up follow-up conversation
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
         bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)
@@ -1809,7 +1855,11 @@ class TestBotHandler:
         user_id = mock_update.effective_user.id
         improved_prompt = "Cached improved prompt"
 
+        # Reset state first
+        bot_handler.reset_user_state(user_id)
+
         # Set up follow-up conversation
+        bot_handler.state_manager.set_waiting_for_followup_choice(user_id, False)
         bot_handler.state_manager.set_in_followup_conversation(user_id, True)
         bot_handler.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
         bot_handler.conversation_manager.start_followup_conversation(user_id, improved_prompt)

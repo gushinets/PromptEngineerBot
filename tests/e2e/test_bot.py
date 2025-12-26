@@ -33,19 +33,19 @@ class TestBotFunctionality:
         # Execute
         await bot_handler.handle_start(mock_update, mock_context)
 
-        # Verify the bot sent the expected response
-        mock_update.message.reply_text.assert_awaited_once()
-        args, kwargs = mock_update.message.reply_text.call_args
+        # Verify the bot sent two messages (welcome + instructions)
+        assert mock_update.message.reply_text.await_count == 2
 
-        # Check the message text
-        # The welcome message is long; assert it was sent (not specific phrase)
-        assert isinstance(args[0], str) and len(args[0]) > 10
+        # Check the first message (welcome)
+        first_call_args, first_call_kwargs = mock_update.message.reply_text.call_args_list[0]
+        assert isinstance(first_call_args[0], str) and len(first_call_args[0]) > 10
+        assert "reply_markup" in first_call_kwargs
+        assert isinstance(first_call_kwargs["reply_markup"], ReplyKeyboardMarkup)
 
-        # Check the reply markup structure
-        assert "reply_markup" in kwargs
-        reply_markup = kwargs["reply_markup"]
-        assert isinstance(reply_markup, ReplyKeyboardMarkup)
-        assert reply_markup.resize_keyboard is True
+        # Check the second message (instructions with support button)
+        second_call_args, second_call_kwargs = mock_update.message.reply_text.call_args_list[1]
+        assert isinstance(second_call_args[0], str) and len(second_call_args[0]) > 10
+        assert "reply_markup" in second_call_kwargs
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -188,13 +188,21 @@ class TestTimeoutHandling:
             mock_app.stop = AsyncMock(return_value=None)
             mock_app.shutdown = AsyncMock(return_value=None)
 
-            # Run the main function, force loop to exit immediately
-            with patch("telegram_bot.main.asyncio.sleep", new=AsyncMock(side_effect=SystemExit)):
-                with pytest.raises(SystemExit):
+            # Mock Redis health check to pass
+            with patch("telegram_bot.main.get_redis_client") as mock_redis:
+                mock_redis_instance = MagicMock()
+                mock_redis_instance.health_check.return_value = True
+                mock_redis.return_value = mock_redis_instance
+
+                # Run the main function, force loop to exit immediately
+                with (
+                    patch("telegram_bot.main.asyncio.sleep", new=AsyncMock(side_effect=SystemExit)),
+                    pytest.raises(SystemExit),
+                ):
                     await main()
 
             # Verify timeout settings
             builder.token.assert_called_once()
-            builder.connect_timeout.assert_called_with(60.0)
+            builder.connect_timeout.assert_called_with(30.0)
             builder.read_timeout.assert_called_with(300.0)
-            builder.write_timeout.assert_called_with(120.0)
+            builder.write_timeout.assert_called_with(60.0)

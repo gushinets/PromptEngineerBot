@@ -157,18 +157,6 @@ def test_metrics_system():
     cleanup_metrics_collector()
     print("✓ Metrics collector cleaned up")
 
-    return True
-
 
 if __name__ == "__main__":
-    try:
-        success = test_metrics_system()
-        sys.exit(0 if success else 1)
-    except Exception as e:
-        print(f"Test failed with error: {e}")
-        import traceback
-
-        traceback.print_exc()
-        # Clean up even on failure
-        cleanup_metrics_collector()
-        sys.exit(1)
+    test_metrics_system()

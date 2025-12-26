@@ -6,6 +6,8 @@ Standalone test for audit service functionality.
 import os
 import sys
 
+import pytest
+
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -42,8 +44,7 @@ def test_audit_service():
         if event:
             print(f"✓ Event stored: {event.event_type}, success: {event.success}")
         else:
-            print("✗ Event not found in database")
-            return False
+            pytest.fail("Event not found in database")
 
     # Test different event types
     audit_service.log_otp_verified(telegram_id, email)
@@ -63,16 +64,7 @@ def test_audit_service():
     print(f"✓ Purged {purged} old events")
 
     print("All tests passed!")
-    return True
 
 
 if __name__ == "__main__":
-    try:
-        success = test_audit_service()
-        sys.exit(0 if success else 1)
-    except Exception as e:
-        print(f"Test failed with error: {e}")
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
+    test_audit_service()
