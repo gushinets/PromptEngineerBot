@@ -86,9 +86,9 @@ class TestBotFunctionality:
 
         # 3. Select method
         mapping = {
-            "CRAFT": "🛠 CRAFT",
-            "LYRA basic": "⚡ LYRA",
-            "GGL Guide": "🔍 GGL",
+            "CRAFT": "🛠 По шагам",
+            "LYRA basic": "⚡ Быстро",
+            "GGL Guide": "🎯 Под результат",
         }
         mock_update.message.text = mapping[method]
         await bot_handler.handle_message(mock_update, mock_context)
@@ -143,7 +143,7 @@ class TestTimeoutHandling:
         await bot_handler.handle_message(mock_update, mock_context)
 
         # Trigger the LLM call with timeout
-        mock_update.message.text = "🛠 CRAFT"
+        mock_update.message.text = "🛠 По шагам"
         await bot_handler.handle_message(mock_update, mock_context)
 
         # Verify error handling - check that reply_text was called

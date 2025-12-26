@@ -26,7 +26,6 @@ from telegram_bot.utils.messages import (
     BTN_GENERATE_PROMPT,
     BTN_GGL,
     BTN_LYRA,
-    BTN_LYRA_DETAIL,
     BTN_NO,
     BTN_POST_OPTIMIZATION_EMAIL,
     BTN_RESET,
@@ -422,11 +421,6 @@ class BotHandler:
                 "LYRA Basic",
                 self.prompt_loader.lyra_prompt,
                 "BASIC using ChatGPT",
-            ),
-            BTN_LYRA_DETAIL: (
-                "LYRA Detail",
-                self.prompt_loader.lyra_prompt,
-                "DETAILED using ChatGPT",
             ),
             BTN_GGL: ("GGL", self.prompt_loader.ggl_prompt),
         }

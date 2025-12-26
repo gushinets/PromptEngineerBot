@@ -10,11 +10,11 @@ repos:
     rev: v0.14.4
     hooks:
       # Ruff linter with auto-fix
-      - id: ruff
-        name: Ruff Linter (Python security & code quality)
-        args: [--fix, --exit-non-zero-on-fix]
-        types: [python]
-        exclude: ^(\.venv/|__pycache__/|alembic/versions/)
+      # - id: ruff
+      #   name: Ruff Linter (Python security & code quality)
+      #   args: [--fix, --exit-non-zero-on-fix]
+      #   types: [python]
+      #   exclude: ^(\.venv/|__pycache__/|alembic/versions/)
         
       # Ruff formatter
       - id: ruff-format

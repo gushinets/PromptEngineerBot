@@ -136,11 +136,13 @@ class TestEmailServiceSingleResult:
 
         # Verify content is present
         assert original_prompt in html_body
-        assert method_name in html_body
+        # Method name is mapped to user-friendly display name (CRAFT -> 🛠 По шагам)
+        assert "🛠 По шагам" in html_body
         assert optimized_result in html_body
 
         assert original_prompt in plain_body
-        assert method_name in plain_body
+        # Method name is mapped to user-friendly display name (CRAFT -> 🛠 По шагам)
+        assert "🛠 По шагам" in plain_body
         assert optimized_result in plain_body
 
         # Verify HTML structure

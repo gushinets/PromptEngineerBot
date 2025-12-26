@@ -24,7 +24,7 @@
 
 This document provides comprehensive end-to-end testing documentation for the Telegram bot that optimizes user prompts using AI-powered methodologies (CRAFT, LYRA, GGL). The bot supports:
 
-- **4 Optimization Methods**: CRAFT, LYRA Basic, LYRA Detail, GGL
+- **3 Optimization Methods**: По шагам (CRAFT), Быстро (LYRA), Под результат (GGL)
 - **Follow-up Questions**: Interactive refinement of prompts
 - **Email Delivery**: Authentication and multi-method optimization via email
 - **Robust Error Handling**: Graceful degradation and state recovery
@@ -101,10 +101,9 @@ This document provides comprehensive end-to-end testing documentation for the Te
 ### Button Constants
 
 **Method Selection:**
-- `BTN_CRAFT` = "🛠 CRAFT"
-- `BTN_LYRA` = "⚡ LYRA"
-- `BTN_LYRA_DETAIL` = "🧩 LYRA detail"
-- `BTN_GGL` = "🔍 GGL"
+- `BTN_CRAFT` = "🛠 По шагам"
+- `BTN_LYRA` = "⚡ Быстро"
+- `BTN_GGL` = "🎯 Под результат"
 - `BTN_EMAIL_DELIVERY` = "📧 Отправить 3 промпта на email"
 
 **Follow-up:**
@@ -152,7 +151,7 @@ This document provides comprehensive end-to-end testing documentation for the Te
 | Step | User Action | System Response | State After | Verification Points |
 |------|------------|-----------------|-------------|---------------------|
 | 1 | Send `/start` command | WELCOME_MESSAGE with instructions | `waiting_for_prompt=True` | ✓ Welcome message displays<br>✓ No keyboard buttons shown<br>✓ Message in Markdown format |
-| 2 | Send text: "Write a blog post about AI" | SELECT_METHOD_MESSAGE with method buttons | `waiting_for_prompt=False`<br>`waiting_for_method=True`<br>User prompt stored | ✓ Method selection message<br>✓ 5 buttons: CRAFT, LYRA, LYRA detail, GGL, Email<br>✓ Reset button shown<br>✓ Conversation transcript initialized |
+| 2 | Send text: "Write a blog post about AI" | SELECT_METHOD_MESSAGE with method buttons | `waiting_for_prompt=False`<br>`waiting_for_method=True`<br>User prompt stored | ✓ Method selection message<br>✓ 4 buttons: По шагам, Быстро, Под результат, Email<br>✓ Reset button shown<br>✓ Conversation transcript initialized |
 | 3 | Click "🛠 CRAFT" button | Processing message: "🔄 Обрабатываю ваш промпт с помощью метода *CRAFT*..." | `waiting_for_method=False`<br>`current_method=CRAFT` | ✓ Processing message sent<br>✓ Method logged<br>✓ System prompt added to transcript |
 | 4 | (Bot processing) | LLM returns optimized prompt | Transcript updated with LLM response | ✓ LLM API called with CRAFT system prompt<br>✓ Token usage tracked<br>✓ Response parsed correctly |
 | 5 | (Bot sends result) | Optimized prompt message (no tags) | `improved_prompt_cache` set<br>`cached_method_name=CRAFT` | ✓ Clean prompt without XML tags<br>✓ Markdown formatted<br>✓ Reset button shown<br>✓ Prompt cached |
@@ -203,36 +202,7 @@ This document provides comprehensive end-to-end testing documentation for the Te
 
 ---
 
-### Path 1C: LYRA Detail Method Optimization
-
-**Description**: User optimizes prompt using LYRA Detail method
-
-**Preconditions:**
-- User has started bot
-- State: `waiting_for_prompt = True`
-
-**Steps and Expected Outcomes:**
-
-| Step | User Action | System Response | State After | Verification Points |
-|------|------------|-----------------|-------------|---------------------|
-| 1-2 | Same as Path 1A | Same as Path 1A | Same as Path 1A | Same verification as Path 1A |
-| 3 | Click "🧩 LYRA detail" button | Processing message: "🔄 Обрабатываю ваш промпт с помощью метода *LYRA DETAIL*..." | `waiting_for_method=False`<br>`current_method=LYRA Detail` | ✓ Processing message sent<br>✓ Additional context: "DETAILED using ChatGPT" added |
-| 4-6 | Same as Path 1A | Same as Path 1A with LYRA Detail-optimized prompt | Same as Path 1A | ✓ LYRA system prompt used<br>✓ Cached method name: "LYRA Detail" |
-
-**Success Criteria:**
-- ✅ More detailed than LYRA Basic version
-- ✅ Comprehensive coverage of requirements
-- ✅ Method logged as "LYRA Detail"
-
-**LLM Quality Checks:**
-- More detailed than LYRA Basic
-- Comprehensive requirements
-- Structured but detailed
-- Balance between CRAFT structure and LYRA efficiency
-
----
-
-### Path 1D: GGL Method Optimization
+### Path 1C: GGL Method Optimization (Под результат)
 
 **Description**: User optimizes prompt using GGL (goal-focused) method
 
@@ -245,7 +215,7 @@ This document provides comprehensive end-to-end testing documentation for the Te
 | Step | User Action | System Response | State After | Verification Points |
 |------|------------|-----------------|-------------|---------------------|
 | 1-2 | Same as Path 1A | Same as Path 1A | Same as Path 1A | Same verification as Path 1A |
-| 3 | Click "🔍 GGL" button | Processing message: "🔄 Обрабатываю ваш промпт с помощью метода *GGL*..." | `waiting_for_method=False`<br>`current_method=GGL` | ✓ Processing message sent<br>✓ GGL system prompt used |
+| 3 | Click "🎯 Под результат" button | Processing message: "🔄 Обрабатываю ваш промпт с помощью метода *GGL*..." | `waiting_for_method=False`<br>`current_method=GGL` | ✓ Processing message sent<br>✓ GGL system prompt used |
 | 4-6 | Same as Path 1A | Same as Path 1A with GGL-optimized prompt | Same as Path 1A | ✓ Cached method name: "GGL" |
 
 **Success Criteria:**
@@ -582,7 +552,7 @@ ORIGINAL PROMPT:
 
 ---
 
-🔍 GGL OPTIMIZED PROMPT:
+🎯 GGL OPTIMIZED PROMPT:
 [GGL optimization result]
 
 ---
@@ -1150,10 +1120,9 @@ For each optimization result:
   - [ ] Actionable and clear
 
 - [ ] **Method-Specific Traits**
-  - [ ] CRAFT: Structured sections, comprehensive
-  - [ ] LYRA: Concise, focused, efficient
-  - [ ] LYRA Detail: Detailed but organized
-  - [ ] GGL: Goal-oriented, outcome-focused
+  - [ ] По шагам (CRAFT): Structured sections, comprehensive
+  - [ ] Быстро (LYRA): Concise, focused, efficient
+  - [ ] Под результат (GGL): Goal-oriented, outcome-focused
 
 - [ ] **Edge Case Handling**
   - [ ] Very short prompts: Adds appropriate detail

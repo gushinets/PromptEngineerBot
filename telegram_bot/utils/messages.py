@@ -21,10 +21,9 @@ def _(text_ru, text_en):
 # ===== UI Elements =====
 # Localized, emoji-enhanced button labels (single source of truth)
 BTN_RESET = _("🔄 Сбросить диалог", "🔄 Reset Conversation")
-BTN_CRAFT = _("🛠 CRAFT", "🛠 CRAFT")
-BTN_LYRA = _("⚡ LYRA", "⚡ LYRA")
-BTN_LYRA_DETAIL = _("🧩 LYRA detail", "🧩 LYRA detail")
-BTN_GGL = _("🔍 GGL", "🔍 GGL")
+BTN_LYRA = _("⚡ Быстро", "⚡ Quick")
+BTN_CRAFT = _("🛠 По шагам", "🛠 Step-by-step")
+BTN_GGL = _("🎯 Под результат", "🎯 Result-focused")
 BTN_HELP = _("❓ Помощь", "❓ Help")
 
 # Follow-up feature buttons
@@ -54,9 +53,9 @@ WELCOME_MESSAGE = _(
     "🤖 Добро пожаловать в Prompt Engineering Bot!\n"
     "💡 Я превращаю ваши идеи в точные запросы для нейросетей — без лишних усилий.\n\n"
     "🎯 Методы оптимизации:\n"
-    "⚡️ LYRA — быстрый результат\n"
-    "🛠 CRAFT — структурированный подход\n"
-    "🔍 GGL — фокус на цели\n\n"
+    "⚡ Быстро — быстрый результат\n"
+    "🛠 По шагам — структурированный подход\n"
+    "🎯 Под результат — фокус на цели\n\n"
     "📌 Как это работает:\n"
     "1️⃣ Напишите свою задачу простыми словами\n"
     "2️⃣ Я подберу оптимальную структуру\n"
@@ -66,9 +65,9 @@ WELCOME_MESSAGE = _(
     "🤖 Welcome to Prompt Engineering Bot!\n"
     "💡 I transform your ideas into precise queries for AI models — effortlessly.\n\n"
     "🎯 Optimization methods:\n"
-    "⚡️ LYRA — quick results\n"
-    "🛠 CRAFT — structured approach\n"
-    "🔍 GGL — goal-focused\n\n"
+    "⚡ Quick — quick results\n"
+    "🛠 Step-by-step — structured approach\n"
+    "🎯 Result-focused — goal-focused\n\n"
     "📌 How it works:\n"
     "1️⃣ Describe your task in simple words\n"
     "2️⃣ I'll find the optimal structure\n"
@@ -98,7 +97,7 @@ WELCOME_MESSAGE_2 = _(
     "1️⃣ Опишите задачу своими словами\n"
     "Не нужно думать о формулировках — пишите как есть.\n\n"
     "2️⃣ Выберите подходящий вариант оптимизации:\n"
-    "⚡Быстро — короткий и рабочий запрос без лишних деталей\n"
+    "⚡ Быстро — короткий и рабочий запрос без лишних деталей\n"
     "🛠 По шагам — аккуратно разложенный и структурированный запрос\n"
     "🎯 Под результат — запрос под конкретный формат или итог\n\n"
     "3️⃣ Получите готовый промпт\n"
@@ -109,7 +108,7 @@ WELCOME_MESSAGE_2 = _(
     "1️⃣ Describe your task in your own words\n"
     "No need to think about wording — just write as is.\n\n"
     "2️⃣ Choose the right optimization option:\n"
-    "⚡Quick — a short, working prompt without extra details\n"
+    "⚡ Quick — a short, working prompt without extra details\n"
     "🛠 Step-by-step — a neatly organized and structured prompt\n"
     "🎯 Result-focused — a prompt for a specific format or outcome\n\n"
     "3️⃣ Get your ready prompt\n"
@@ -425,17 +424,19 @@ INFO_ALL_METHODS_OPTIMIZATION = _(
 SELECT_METHOD_MESSAGE = _(
     "📝 **Ваш запрос получен!**\n\n"
     "Теперь выберите один метод оптимизации:\n\n"
-    "⚡️ LYRA — мгновенный результат\n"
-    "🛠 CRAFT — структурированный подход\n"
-    "🔍 GGL — фокус на цели, минимум вопросов\n\n"
-    'Или нажмите кнопку "Отправить на e-mail" и получите запрос, оптимизированный всеми тремя методами сразу, на вашу почту.\n\n'
+    "⚡ Быстро — мгновенный результат\n"
+    "🛠 По шагам — структурированный подход\n"
+    "🎯 Под результат — фокус на цели, минимум вопросов\n\n"
+    'Или нажмите кнопку "Отправить на e-mail" и получите запрос, '
+    "оптимизированный всеми тремя методами сразу, на вашу почту.\n\n"
     "👉 *Нажмите на кнопку ниже, чтобы начать*:",
     "📝 **Your request has been received!**\n\n"
     "Now choose one optimization method:\n\n"
-    "⚡️ LYRA — instant results\n"
-    "🛠 CRAFT — structured approach\n"
-    "🔍 GGL — goal-focused, minimal questions\n\n"
-    'Or click the "Send to e-mail" button and receive your request optimized with all three methods at once in your email.\n\n'
+    "⚡ Quick — instant results\n"
+    "🛠 Step-by-step — structured approach\n"
+    "🎯 Result-focused — goal-focused, minimal questions\n\n"
+    'Or click the "Send to e-mail" button and receive your request '
+    "optimized with all three methods at once in your email.\n\n"
     "👉 *Click the button below to start*:",
 )
 
@@ -454,12 +455,9 @@ def get_processing_message(method: str) -> str:
     Returns:
         str: A formatted processing message in the user's language
     """
-    # Clean method name for display (remove underscores, capitalize)
-    display_method = method.replace("_", " ").upper()
-
     return _(
-        f"🔄 Обрабатываю ваш промпт с помощью метода *{display_method}*...\n\nЭто может занять несколько секунд.",
-        f"🔄 Processing your prompt using the *{display_method}* method...\n\nThis may take a few seconds.",
+        "🔄 Обрабатываю ваш промпт...\n\nЭто может занять несколько секунд.",
+        "🔄 Processing your prompt...\n\nThis may take a few seconds.",
     )
 
 

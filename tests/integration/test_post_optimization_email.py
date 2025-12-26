@@ -349,13 +349,15 @@ class TestSingleResultEmailTemplates:
 
         # Test HTML body
         assert original_prompt in html_body
-        assert method_name in html_body
+        # Method name should be mapped to user-friendly display name
+        assert "🛠 По шагам" in html_body  # CRAFT -> По шагам
         assert optimized_result in html_body
         assert "<!DOCTYPE html>" in html_body
 
         # Test plain body
         assert original_prompt in plain_body
-        assert method_name in plain_body
+        # Method name should be mapped to user-friendly display name
+        assert "🛠 По шагам" in plain_body  # CRAFT -> По шагам
         assert optimized_result in plain_body
 
     def test_single_result_email_template_english(self):
@@ -376,6 +378,9 @@ class TestSingleResultEmailTemplates:
         # Test content is present in both formats
         assert original_prompt in html_body
         assert original_prompt in plain_body
+        # Method name should be mapped to user-friendly display name
+        assert "⚡ Quick" in html_body  # LYRA -> Quick
+        assert "⚡ Quick" in plain_body  # LYRA -> Quick
 
     def test_single_result_email_html_escaping(self):
         """Test that HTML content is properly escaped in single result emails."""
@@ -396,6 +401,8 @@ class TestSingleResultEmailTemplates:
         assert "&amp;" in html_body
         assert "&lt;" in html_body
         assert "&gt;" in html_body
+        # Method name should be mapped to user-friendly display name
+        assert "🎯 Result-focused" in html_body  # GGL -> Result-focused
 
 
 class TestPostOptimizationEmailIntegration:
@@ -1128,7 +1135,8 @@ class TestPostOptimizationEmailTemplateIntegration:
 
         assert "оптимизированный промпт готов" in subject_ru.lower()
         assert original_prompt in html_ru
-        assert method_name in html_ru
+        # Method name is mapped to user-friendly display name (CRAFT -> 🛠 По шагам)
+        assert "🛠 По шагам" in html_ru
         assert optimized_result in html_ru
 
         # Test English template
@@ -1138,7 +1146,8 @@ class TestPostOptimizationEmailTemplateIntegration:
 
         assert "optimized prompt is ready" in subject_en.lower()
         assert original_prompt in html_en
-        assert method_name in html_en
+        # Method name is mapped to user-friendly display name (CRAFT -> 🛠 Step-by-step)
+        assert "🛠 Step-by-step" in html_en
         assert optimized_result in html_en
 
     def test_template_security_validation(self):

@@ -391,7 +391,8 @@ class TestPostOptimizationEmailTemplateValidation:
         assert "оптимизированный промпт готов" in subject.lower()
 
         # Verify HTML body contains all required elements
-        required_elements = [original_prompt, method_name, optimized_result]
+        # Note: method_name is mapped to user-friendly display name (CRAFT -> 🛠 По шагам)
+        required_elements = [original_prompt, "🛠 По шагам", optimized_result]
         for element in required_elements:
             assert element in html_body, f"Missing element in HTML: {element}"
 
@@ -524,8 +525,8 @@ class TestPostOptimizationEmailTemplateValidation:
 class TestPostOptimizationRegressionPrevention:
     """Test to prevent regressions in existing functionality."""
 
-    def test_existing_button_definitions_unchanged(self):
-        """Test that existing button definitions are not modified."""
+    def test_existing_button_definitions_not_modified(self):
+        """Test that existing button definitions have the expected user-friendly names."""
         from telegram_bot.utils.messages import (
             BTN_CRAFT,
             BTN_EMAIL_DELIVERY,
@@ -535,9 +536,19 @@ class TestPostOptimizationRegressionPrevention:
 
         # Verify existing buttons still exist and have expected content
         assert "3 промпта" in BTN_EMAIL_DELIVERY or "3 prompts" in BTN_EMAIL_DELIVERY
-        assert "CRAFT" in BTN_CRAFT
-        assert "LYRA" in BTN_LYRA
-        assert "GGL" in BTN_GGL
+
+        # Verify new user-friendly button names (Requirements 1.1-1.6)
+        # BTN_LYRA should show "Быстро" (RU) or "Quick" (EN) with ⚡ emoji
+        assert "Быстро" in BTN_LYRA or "Quick" in BTN_LYRA
+        assert "⚡" in BTN_LYRA
+
+        # BTN_CRAFT should show "По шагам" (RU) or "Step-by-step" (EN) with 🛠 emoji
+        assert "По шагам" in BTN_CRAFT or "Step-by-step" in BTN_CRAFT
+        assert "🛠" in BTN_CRAFT
+
+        # BTN_GGL should show "Под результат" (RU) or "Result-focused" (EN) with 🎯 emoji
+        assert "Под результат" in BTN_GGL or "Result-focused" in BTN_GGL
+        assert "🎯" in BTN_GGL
 
     def test_existing_keyboard_layouts_unchanged(self):
         """Test that existing keyboard layouts are not modified."""

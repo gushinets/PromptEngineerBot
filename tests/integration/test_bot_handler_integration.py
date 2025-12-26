@@ -342,9 +342,9 @@ class TestBotHandlerHealthCheckIntegration:
             async def mock_start_email_flow(update, context, user_id):
                 # Simulate SMTP failure and fallback to chat delivery
                 await update.message.reply_text("Processing optimization...")
-                await update.message.reply_text("🛠 CRAFT optimized prompt")
-                await update.message.reply_text("⚡ LYRA optimized prompt")
-                await update.message.reply_text("🔍 GGL optimized prompt")
+                await update.message.reply_text("🛠 По шагам optimized prompt")
+                await update.message.reply_text("⚡ Быстро optimized prompt")
+                await update.message.reply_text("🎯 Под результат optimized prompt")
                 return True
 
             bot_handler.email_flow_orchestrator.start_email_flow = mock_start_email_flow

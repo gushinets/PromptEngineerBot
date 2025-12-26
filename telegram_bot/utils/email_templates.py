@@ -14,6 +14,36 @@ def _(text_ru: str, text_en: str, language: str = "EN") -> str:
     return text_ru if language.upper() == "RU" else text_en
 
 
+def _get_display_method_name(method_name: str, language: str) -> str:
+    """Map internal method names to user-friendly display names.
+
+    Args:
+        method_name: Internal method name (e.g., 'lyra', 'craft', 'ggl')
+        language: Language code ("EN" or "RU")
+
+    Returns:
+        User-friendly display name with emoji
+    """
+    method_display_names_ru = {
+        "lyra": "⚡ Быстро",
+        "lyra basic": "⚡ Быстро",
+        "craft": "🛠 По шагам",
+        "ggl": "🎯 Под результат",
+        "ggl guide": "🎯 Под результат",
+    }
+    method_display_names_en = {
+        "lyra": "⚡ Quick",
+        "lyra basic": "⚡ Quick",
+        "craft": "🛠 Step-by-step",
+        "ggl": "🎯 Result-focused",
+        "ggl guide": "🎯 Result-focused",
+    }
+    normalized = method_name.lower().strip()
+    if language.upper() == "RU":
+        return method_display_names_ru.get(normalized, method_name)
+    return method_display_names_en.get(normalized, method_name)
+
+
 class EmailTemplates:
     """
     Email template manager with multilingual support.
@@ -337,18 +367,20 @@ class EmailTemplates:
         )
 
         craft_label = _(
-            "🛠 CRAFT - Структурированный подход:",
-            "🛠 CRAFT - Structured Approach:",
+            "🛠 По шагам - Структурированный подход:",
+            "🛠 Step-by-step - Structured Approach:",
             self.language,
         )
 
         lyra_label = _(
-            "⚡ LYRA - Быстрая оптимизация:",
-            "⚡ LYRA - Quick Optimization:",
+            "⚡ Быстро - Быстрая оптимизация:",
+            "⚡ Quick - Quick Optimization:",
             self.language,
         )
 
-        ggl_label = _("🔍 GGL - Фокус на цели:", "🔍 GGL - Goal-Focused:", self.language)
+        ggl_label = _(
+            "🎯 Под результат - Фокус на цели:", "🎯 Result-focused - Goal-Focused:", self.language
+        )
 
         usage_note = _(
             "Выберите тот промпт, который лучше всего подходит для ваших задач, и используйте его в любом ИИ-помощнике:",
@@ -558,18 +590,20 @@ class EmailTemplates:
         )
 
         craft_label = _(
-            "🛠 CRAFT - СТРУКТУРИРОВАННЫЙ ПОДХОД:",
-            "🛠 CRAFT - STRUCTURED APPROACH:",
+            "🛠 ПО ШАГАМ - СТРУКТУРИРОВАННЫЙ ПОДХОД:",
+            "🛠 STEP-BY-STEP - STRUCTURED APPROACH:",
             self.language,
         )
 
         lyra_label = _(
-            "⚡ LYRA - БЫСТРАЯ ОПТИМИЗАЦИЯ:",
-            "⚡ LYRA - QUICK OPTIMIZATION:",
+            "⚡ БЫСТРО - БЫСТРАЯ ОПТИМИЗАЦИЯ:",
+            "⚡ QUICK - QUICK OPTIMIZATION:",
             self.language,
         )
 
-        ggl_label = _("🔍 GGL - ФОКУС НА ЦЕЛИ:", "🔍 GGL - GOAL-FOCUSED:", self.language)
+        ggl_label = _(
+            "🎯 ПОД РЕЗУЛЬТАТ - ФОКУС НА ЦЕЛИ:", "🎯 RESULT-FOCUSED - GOAL-FOCUSED:", self.language
+        )
 
         usage_note = _(
             "Выберите тот промпт, который лучше всего подходит для ваших задач, и используйте его в любом ИИ-помощнике:",
@@ -690,6 +724,9 @@ class EmailTemplates:
         Returns:
             HTML formatted email body
         """
+        # Map internal method name to user-friendly display name
+        display_name = _get_display_method_name(method_name, self.language)
+
         title = _("Ваш оптимизированный промпт", "Your Optimized Prompt", self.language)
 
         greeting = _(
@@ -699,16 +736,16 @@ class EmailTemplates:
         )
 
         intro = _(
-            f"Мы оптимизировали ваш запрос с помощью метода {method_name}:",
-            f"We optimized your request using the {method_name} method:",
+            f"Мы оптимизировали ваш запрос с помощью метода {display_name}:",
+            f"We optimized your request using the {display_name} method:",
             self.language,
         )
 
         original_label = _("Ваш исходный промпт:", "Your Original Prompt:", self.language)
 
         optimized_label = _(
-            f"Оптимизированный промпт ({method_name}):",
-            f"Optimized Prompt ({method_name}):",
+            f"Оптимизированный промпт ({display_name}):",
+            f"Optimized Prompt ({display_name}):",
             self.language,
         )
 
@@ -862,6 +899,9 @@ class EmailTemplates:
         Returns:
             Plain text formatted email body
         """
+        # Map internal method name to user-friendly display name
+        display_name = _get_display_method_name(method_name, self.language)
+
         title = _("Ваш оптимизированный промпт", "Your Optimized Prompt", self.language)
 
         greeting = _(
@@ -871,16 +911,16 @@ class EmailTemplates:
         )
 
         intro = _(
-            f"Мы оптимизировали ваш запрос с помощью метода {method_name}:",
-            f"We optimized your request using the {method_name} method:",
+            f"Мы оптимизировали ваш запрос с помощью метода {display_name}:",
+            f"We optimized your request using the {display_name} method:",
             self.language,
         )
 
         original_label = _("ВАШ ИСХОДНЫЙ ПРОМПТ:", "YOUR ORIGINAL PROMPT:", self.language)
 
         optimized_label = _(
-            f"ОПТИМИЗИРОВАННЫЙ ПРОМПТ ({method_name}):",
-            f"OPTIMIZED PROMPT ({method_name}):",
+            f"ОПТИМИЗИРОВАННЫЙ ПРОМПТ ({display_name}):",
+            f"OPTIMIZED PROMPT ({display_name}):",
             self.language,
         )
 

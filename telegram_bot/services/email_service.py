@@ -687,18 +687,22 @@ class EmailService:
             Formatted text with only the three optimized prompts
         """
         craft_label = _(
-            "🛠 CRAFT - Структурированный подход:",
-            "🛠 CRAFT - Structured Approach:",
+            "🛠 По шагам - Структурированный подход:",
+            "🛠 Step-by-step - Structured Approach:",
             self.config.language,
         )
 
         lyra_label = _(
-            "⚡ LYRA - Быстрая оптимизация:",
-            "⚡ LYRA - Quick Optimization:",
+            "⚡ Быстро - Быстрая оптимизация:",
+            "⚡ Quick - Quick Optimization:",
             self.config.language,
         )
 
-        ggl_label = _("🔍 GGL - Фокус на цели:", "🔍 GGL - Goal-Focused:", self.config.language)
+        ggl_label = _(
+            "🎯 Под результат - Фокус на цели:",
+            "🎯 Result-focused - Goal-Focused:",
+            self.config.language,
+        )
 
         fallback_note = _(
             "📧 Не удалось отправить на email. Вот ваши оптимизированные промпты:",

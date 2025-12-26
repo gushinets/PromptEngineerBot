@@ -32,32 +32,36 @@ class TestGetProcessingMessage:
     """Test cases for get_processing_message function."""
 
     def test_get_processing_message_craft(self):
-        """Test processing message for CRAFT method."""
+        """Test processing message for CRAFT method returns generic message."""
         result = get_processing_message("craft")
 
-        assert "CRAFT" in result
+        # Processing message no longer includes method name
         assert "🔄" in result
         assert "Обрабатываю" in result or "Processing" in result
 
     def test_get_processing_message_lyra_basic(self):
-        """Test processing message for LYRA basic method."""
-        result = get_processing_message("lyra_basic")
+        """Test processing message for LYRA basic method returns generic message."""
+        result = get_processing_message("lyra basic")
 
-        assert "LYRA BASIC" in result
+        # Processing message no longer includes method name
         assert "🔄" in result
+        assert "Обрабатываю" in result or "Processing" in result
 
     def test_get_processing_message_ggl(self):
-        """Test processing message for GGL method."""
+        """Test processing message for GGL method returns generic message."""
         result = get_processing_message("ggl")
 
-        assert "GGL" in result
+        # Processing message no longer includes method name
         assert "🔄" in result
+        assert "Обрабатываю" in result or "Processing" in result
 
-    def test_get_processing_message_case_handling(self):
-        """Test processing message handles case conversion."""
-        result = get_processing_message("test_method")
+    def test_get_processing_message_unknown_method(self):
+        """Test processing message handles unknown methods with generic message."""
+        result = get_processing_message("unknown_method")
 
-        assert "TEST METHOD" in result
+        # Processing message no longer includes method name
+        assert "🔄" in result
+        assert "Обрабатываю" in result or "Processing" in result
 
 
 class TestExtractTagBlock:
@@ -381,18 +385,39 @@ class TestConstants:
     """Test cases for message constants."""
 
     def test_button_constants_exist(self):
-        """Test that button constants are defined."""
+        """Test that button constants are defined with new user-friendly names.
+
+        Validates: Requirements 6.1, 6.2
+        """
         assert BTN_CRAFT is not None
         assert BTN_LYRA is not None
         assert BTN_GGL is not None
 
-        # Should contain emoji and text
-        assert "🛠" in BTN_CRAFT
-        assert "CRAFT" in BTN_CRAFT
+        # Should contain standardized emojis and new user-friendly text
+        # BTN_LYRA: "⚡ Быстро" (RU) / "⚡ Quick" (EN)
         assert "⚡" in BTN_LYRA
-        assert "LYRA" in BTN_LYRA
-        assert "🔍" in BTN_GGL
-        assert "GGL" in BTN_GGL
+        has_lyra_ru = "Быстро" in BTN_LYRA
+        has_lyra_en = "Quick" in BTN_LYRA
+        assert has_lyra_ru or has_lyra_en
+
+        # BTN_CRAFT: "🛠 По шагам" (RU) / "🛠 Step-by-step" (EN)
+        assert "🛠" in BTN_CRAFT
+        has_craft_ru = "По шагам" in BTN_CRAFT
+        has_craft_en = "Step-by-step" in BTN_CRAFT
+        assert has_craft_ru or has_craft_en
+
+        # BTN_GGL: "🎯 Под результат" (RU) / "🎯 Result-focused" (EN)
+        assert "🎯" in BTN_GGL
+        has_ggl_ru = "Под результат" in BTN_GGL
+        has_ggl_en = "Result-focused" in BTN_GGL
+        assert has_ggl_ru or has_ggl_en
+
+        # Verify old names are NOT in button text (they should only be internal identifiers)
+        assert "LYRA" not in BTN_LYRA
+        assert "CRAFT" not in BTN_CRAFT
+        assert "GGL" not in BTN_GGL
+        # Verify legacy emoji is not used
+        assert "🔍" not in BTN_GGL
 
     def test_welcome_message_exists(self):
         """Test that welcome messages are defined and not empty."""

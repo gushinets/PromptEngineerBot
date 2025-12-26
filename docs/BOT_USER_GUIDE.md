@@ -50,10 +50,9 @@ The bot offers **four distinct optimization methods**, each with its own approac
 
 | Method | Icon | Description | Best For |
 |--------|------|-------------|----------|
-| **CRAFT** | 🛠 | Structured approach using Context, Role, Action, Format, and Target Audience framework | Complex tasks requiring detailed structure; professional or technical prompts |
-| **LYRA** | ⚡ | Quick, concise optimization focused on efficiency | Simple tasks; when you need fast results |
-| **LYRA Detail** | 🧩 | Detailed version of LYRA with comprehensive coverage | When you need LYRA's efficiency with more thoroughness |
-| **GGL** | 🔍 | Goal-focused methodology based on Google's prompt engineering guidelines | Outcome-driven tasks; when clear objectives matter most |
+| **По шагам (CRAFT)** | 🛠 | Structured approach using Context, Role, Action, Format, and Target Audience framework | Complex tasks requiring detailed structure; professional or technical prompts |
+| **Быстро (LYRA)** | ⚡ | Quick, concise optimization focused on efficiency | Simple tasks; when you need fast results |
+| **Под результат (GGL)** | 🎯 | Goal-focused methodology based on Google's prompt engineering guidelines | Outcome-driven tasks; when clear objectives matter most |
 
 ### 2.2 Follow-up Question System
 
@@ -95,10 +94,9 @@ After completing any optimization, you can send your final result to email:
 | Button (RU) | Button (EN) | Function |
 |-------------|-------------|----------|
 | 📧 Отправить 3 промпта на email | 📧 Send 3 prompts to email | Optimize with all methods and send to email |
-| 🛠 CRAFT | 🛠 CRAFT | Optimize using CRAFT method |
-| ⚡ LYRA | ⚡ LYRA | Optimize using LYRA Basic method |
-| 🧩 LYRA detail | 🧩 LYRA detail | Optimize using LYRA Detail method |
-| 🔍 GGL | 🔍 GGL | Optimize using GGL method |
+| 🛠 По шагам | 🛠 Step-by-step | Optimize using CRAFT method |
+| ⚡ Быстро | ⚡ Quick | Optimize using LYRA method |
+| 🎯 Под результат | 🎯 Result-focused | Optimize using GGL method |
 
 #### Follow-up Buttons
 | Button (RU) | Button (EN) | Function |
@@ -141,7 +139,7 @@ After completing any optimization, you can send your final result to email:
 **Steps:**
 1. Send `/start` to begin
 2. Type your task description
-3. Select 🔍 GGL method
+3. Select 🎯 Под результат method
 4. Receive initial optimized prompt
 5. Click ✅YES to accept follow-up questions
 6. Answer 2-4 clarifying questions from the bot:
@@ -322,10 +320,9 @@ A: Usage depends on how the bot is deployed. Contact the bot operator for pricin
 
 **Q: Which method should I choose?**  
 A: 
-- **CRAFT** for complex, professional tasks needing structure
-- **LYRA** for quick, simple optimizations
-- **LYRA Detail** when you want LYRA's style but more comprehensive
-- **GGL** for goal-oriented, outcome-focused prompts
+- **По шагам (CRAFT)** for complex, professional tasks needing structure
+- **Быстро (LYRA)** for quick, simple optimizations
+- **Под результат (GGL)** for goal-oriented, outcome-focused prompts
 - **Email delivery** when you want to compare all three
 
 **Q: Can I optimize code-related prompts?**  
@@ -409,10 +406,9 @@ If you encounter issues not covered in this guide:
 ```
 
 ### Method Quick Guide
-- 🛠 **CRAFT** = Structured & comprehensive
-- ⚡ **LYRA** = Quick & efficient  
-- 🧩 **LYRA detail** = Efficient but thorough
-- 🔍 **GGL** = Goal-focused
+- 🛠 **По шагам (CRAFT)** = Structured & comprehensive
+- ⚡ **Быстро (LYRA)** = Quick & efficient  
+- 🎯 **Под результат (GGL)** = Goal-focused
 - 📧 **Email** = Get all three methods
 
 ### Key Buttons
