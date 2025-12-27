@@ -44,6 +44,27 @@ SUPPORT_BOT_URL = "https://t.me/prompthelpdesk_bot?start"
 # Inline keyboard with support button
 SUPPORT_KEYBOARD = InlineKeyboardMarkup([[InlineKeyboardButton(BTN_SUPPORT, url=SUPPORT_BOT_URL)]])
 
+# ===== Data Processing Consent =====
+# Consent message text
+EMAIL_OTP_CONSENT_MESSAGE = _(
+    "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
+    "By entering the verification code, you consent to the processing of personal data",
+)
+
+# Agreement button text
+BTN_DATA_AGREEMENT = _(
+    "📄 Согласие на обработку персональных данных",
+    "📄 Personal Data Processing Agreement",
+)
+
+# Agreement URL constant
+DATA_AGREEMENT_URL = "https://disk.yandex.ru/i/zGiuY7mtIfOA-Q"
+
+# Inline keyboard with agreement button
+DATA_AGREEMENT_KEYBOARD = InlineKeyboardMarkup(
+    [[InlineKeyboardButton(BTN_DATA_AGREEMENT, url=DATA_AGREEMENT_URL)]]
+)
+
 # ===== Welcome and Help Messages =====
 # DEPRECATED: Use WELCOME_MESSAGE_1 and WELCOME_MESSAGE_2 instead.
 # This constant is kept for backward compatibility and will be removed in a future version.
@@ -279,8 +300,12 @@ ERROR_EMAIL_INVALID = _(
 )
 
 EMAIL_OTP_SENT = _(
-    "📧 Код подтверждения отправлен на {email}.\n\n🔢 Введите 6-значный код из письма:",
-    "📧 Verification code sent to {email}.\n\n🔢 Please enter the 6-digit code from the email:",
+    "📧 Код подтверждения отправлен на {email}.\n\n"
+    "🔢 Введите 6-значный код из письма:\n\n"
+    "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
+    "📧 Verification code sent to {email}.\n\n"
+    "🔢 Please enter the 6-digit code from the email:\n\n"
+    "By entering the verification code, you consent to the processing of personal data",
 )
 
 ERROR_EMAIL_RATE_LIMITED = _(

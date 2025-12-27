@@ -30,6 +30,7 @@ from telegram_bot.utils.messages import (
     BTN_NO,
     BTN_RESET,
     BTN_YES,
+    DATA_AGREEMENT_KEYBOARD,
     EMAIL_ALREADY_AUTHENTICATED,
     EMAIL_INPUT_MESSAGE,
     EMAIL_OPTIMIZATION_SUCCESS,
@@ -408,7 +409,7 @@ class EmailFlowOrchestrator:
             await self._safe_reply(
                 update,
                 EMAIL_OTP_SENT.format(email=mask_email(text.strip())),
-                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
+                reply_markup=DATA_AGREEMENT_KEYBOARD,
             )
 
             logger.info(

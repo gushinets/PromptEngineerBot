@@ -169,6 +169,21 @@ class EmailTemplates:
             self.language,
         )
 
+        # Consent section text
+        consent_message = _(
+            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
+            "By entering the verification code, you consent to the processing of personal data",
+            self.language,
+        )
+
+        consent_button_text = _(
+            "📄 Согласие на обработку персональных данных",
+            "📄 Personal Data Processing Agreement",
+            self.language,
+        )
+
+        agreement_url = "https://disk.yandex.ru/i/zGiuY7mtIfOA-Q"
+
         return f"""
 <!DOCTYPE html>
 <html lang="{self.language.lower()}">
@@ -195,6 +210,23 @@ class EmailTemplates:
         .header {{
             text-align: center;
             margin-bottom: 30px;
+        }}
+        .consent-section {{
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }}
+        .agreement-button {{
+            display: inline-block;
+            background-color: #1976d2;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
         }}
         .otp-code {{
             background-color: #f8f9fa;
@@ -232,6 +264,11 @@ class EmailTemplates:
     <div class="container">
         <div class="header">
             <h1>🤖 {title}</h1>
+        </div>
+        
+        <div class="consent-section">
+            <p><strong>⚖️ {consent_message}</strong></p>
+            <a href="{agreement_url}" class="agreement-button">{consent_button_text}</a>
         </div>
         
         <p>{greeting}</p>
@@ -273,6 +310,21 @@ class EmailTemplates:
             self.language,
         )
 
+        # Consent section text
+        consent_message = _(
+            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
+            "By entering the verification code, you consent to the processing of personal data",
+            self.language,
+        )
+
+        consent_link_text = _(
+            "📄 Согласие на обработку персональных данных",
+            "📄 Personal Data Processing Agreement",
+            self.language,
+        )
+
+        agreement_url = "https://disk.yandex.ru/i/zGiuY7mtIfOA-Q"
+
         greeting = _("Здравствуйте!", "Hello!", self.language)
 
         message = _(
@@ -301,6 +353,9 @@ class EmailTemplates:
 
         return f"""
 {title}
+
+⚖️ {consent_message}
+{consent_link_text}: {agreement_url}
 
 {greeting}
 

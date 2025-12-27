@@ -10,6 +10,8 @@ from telegram_bot.utils.messages import (
     BTN_NO,
     BTN_SUPPORT,
     BTN_YES,
+    EMAIL_OTP_CONSENT_MESSAGE,
+    EMAIL_OTP_SENT,
     FOLLOWUP_CHOICE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
@@ -772,3 +774,114 @@ class TestFollowupResponseErrorHandling:
 
         assert parsed == ""  # Should be stripped
         assert is_refined is False
+
+
+class TestEmailOtpSentConsentMessage:
+    """Test cases for EMAIL_OTP_SENT message with consent text.
+
+    Validates: Requirements 1.1, 1.2, 1.3
+    """
+
+    def test_email_otp_sent_contains_consent_text(self):
+        """Test that EMAIL_OTP_SENT message contains consent text.
+
+        Validates: Requirements 1.1
+        """
+        # EMAIL_OTP_SENT should contain the consent message
+        assert EMAIL_OTP_SENT is not None
+        assert len(EMAIL_OTP_SENT) > 0
+
+        # Check for consent text based on current language
+        if LANGUAGE == "ru":
+            assert (
+                "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+                in EMAIL_OTP_SENT
+            )
+        else:
+            assert (
+                "By entering the verification code, you consent to the processing of personal data"
+                in EMAIL_OTP_SENT
+            )
+
+    def test_email_otp_sent_russian_consent_text(self):
+        """Test that Russian EMAIL_OTP_SENT message contains Russian consent text.
+
+        Validates: Requirements 1.2
+        """
+        # The Russian consent text should be present in the Russian version
+        russian_consent = (
+            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+        )
+
+        # Since EMAIL_OTP_SENT uses the _() helper, we need to check the actual value
+        # based on the current LANGUAGE setting
+        if LANGUAGE == "ru":
+            assert russian_consent in EMAIL_OTP_SENT
+        else:
+            # When language is English, Russian text should not be present
+            assert russian_consent not in EMAIL_OTP_SENT
+
+    def test_email_otp_sent_english_consent_text(self):
+        """Test that English EMAIL_OTP_SENT message contains English consent text.
+
+        Validates: Requirements 1.3
+        """
+        # The English consent text should be present in the English version
+        english_consent = (
+            "By entering the verification code, you consent to the processing of personal data"
+        )
+
+        # Since EMAIL_OTP_SENT uses the _() helper, we need to check the actual value
+        # based on the current LANGUAGE setting
+        if LANGUAGE == "en":
+            assert english_consent in EMAIL_OTP_SENT
+        else:
+            # When language is Russian, English text should not be present
+            assert english_consent not in EMAIL_OTP_SENT
+
+    def test_email_otp_sent_has_email_placeholder(self):
+        """Test that EMAIL_OTP_SENT message has email placeholder for formatting."""
+        # The message should contain {email} placeholder
+        assert "{email}" in EMAIL_OTP_SENT
+
+    def test_email_otp_sent_has_otp_instructions(self):
+        """Test that EMAIL_OTP_SENT message contains OTP entry instructions."""
+        # Should contain emoji and instruction text
+        assert "📧" in EMAIL_OTP_SENT
+        assert "🔢" in EMAIL_OTP_SENT
+
+        # Check for instruction text based on language
+        if LANGUAGE == "ru":
+            assert "Код подтверждения отправлен" in EMAIL_OTP_SENT
+            assert "Введите 6-значный код" in EMAIL_OTP_SENT
+        else:
+            assert "Verification code sent" in EMAIL_OTP_SENT
+            assert "enter the 6-digit code" in EMAIL_OTP_SENT
+
+    def test_email_otp_consent_message_constant_exists(self):
+        """Test that EMAIL_OTP_CONSENT_MESSAGE constant is defined.
+
+        Validates: Requirements 1.2, 1.3
+        """
+        assert EMAIL_OTP_CONSENT_MESSAGE is not None
+        assert len(EMAIL_OTP_CONSENT_MESSAGE) > 0
+
+        # Check content based on language
+        if LANGUAGE == "ru":
+            assert (
+                EMAIL_OTP_CONSENT_MESSAGE
+                == "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+            )
+        else:
+            assert (
+                EMAIL_OTP_CONSENT_MESSAGE
+                == "By entering the verification code, you consent to the processing of personal data"
+            )
+
+    def test_email_otp_sent_consent_matches_constant(self):
+        """Test that consent text in EMAIL_OTP_SENT matches EMAIL_OTP_CONSENT_MESSAGE.
+
+        Validates: Requirements 1.1, 1.2, 1.3
+        """
+        # The consent message in EMAIL_OTP_SENT should match the constant
+        assert EMAIL_OTP_CONSENT_MESSAGE in EMAIL_OTP_SENT

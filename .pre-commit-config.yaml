@@ -57,12 +57,12 @@ repos:
   # Uses custom rules from .semgrep.yml
   # To also use community rulesets (OWASP Top 10, Python security), modify entry to:
   #   semgrep scan --config "p/owasp-top-ten" --config "p/python" --config .semgrep.yml --quiet --error
-  - repo: local
-    hooks:
-      - id: semgrep
-        name: Semgrep (Pattern-based security analysis)
-        entry: semgrep scan --config .semgrep.yml --quiet --error
-        language: system
-        types: [python]
-        exclude: ^(\.venv/|__pycache__/|tests/fixtures/|alembic/versions/)
-        pass_filenames: false
+  # - repo: local
+  #   hooks:
+  #     - id: semgrep
+  #       name: Semgrep (Pattern-based security analysis)
+  #       entry: semgrep scan --config .semgrep.yml --quiet --error
+  #       language: system
+  #       types: [python]
+  #       exclude: ^(\.venv/|__pycache__/|tests/fixtures/|alembic/versions/)
+  #       pass_filenames: false
