@@ -2,14 +2,16 @@
 Background task scheduler for periodic maintenance operations.
 
 This module provides a background task system for running periodic maintenance
-operations like audit event purging, health checks, and metrics cleanup.
+operations like audit event purging, health checks, metrics cleanup, and
+daily marketing report generation.
 """
 
+import asyncio
 import logging
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from telegram_bot.utils.audit_service import get_audit_service
 from telegram_bot.utils.config import BotConfig
@@ -257,8 +259,135 @@ def session_timeout_task() -> dict[str, any]:
         }
 
 
+def daily_reports_task() -> dict[str, any]:
+    """
+    Background task for generating and sending daily marketing reports.
+
+    Generates three CSV reports (user summary, daily metrics, sessions export)
+    for the previous day and sends them via email to configured recipients.
+
+    Returns:
+        Dictionary with task execution results including:
+        - success: Whether the task completed without errors
+        - message: Human-readable result description
+        - report_date: The date for which reports were generated
+        - user_summary_rows: Number of rows in user summary report
+        - daily_metrics_generated: Whether daily metrics were generated
+        - sessions_exported: Number of sessions exported
+        - total_execution_time_ms: Total execution time in milliseconds
+
+    Note:
+        This task follows graceful degradation principles. If report generation
+        or email delivery fails, the task logs the failure and returns a failure
+        result without affecting other background tasks.
+
+    Requirements: 5.1, 5.2
+    """
+    try:
+        # Load ReportConfig from environment
+        from telegram_bot.services.report_config import ReportConfig
+
+        config = ReportConfig.from_env()
+
+        # Calculate report_date as yesterday (Requirement 5.2)
+        report_date = date.today() - timedelta(days=1)
+
+        logger.info(f"DAILY_REPORTS_TASK_START: Starting daily reports task for {report_date}")
+
+        # Get database session
+        from telegram_bot.data.database import get_db_session
+
+        db_session = get_db_session()
+
+        # Get email service
+        from telegram_bot.services.email_service import get_email_service
+
+        email_service = get_email_service()
+
+        # Initialize ReportService with dependencies
+        from telegram_bot.services.report_service import ReportService
+
+        report_service = ReportService(
+            db_session=db_session,
+            email_service=email_service,
+            config=config,
+        )
+
+        # Call generate_and_send_reports() using asyncio.run() since this is a sync task
+        # The BackgroundTaskScheduler runs tasks synchronously in a thread
+        result = asyncio.run(
+            report_service.generate_and_send_reports_with_retry(
+                report_date=report_date,
+                include_all_users=False,
+            )
+        )
+
+        if result.success:
+            logger.info(f"DAILY_REPORTS_TASK_SUCCESS: Reports generated and sent for {report_date}")
+            return {
+                "success": True,
+                "message": f"Daily reports generated and sent for {report_date}. "
+                f"User summary: {result.user_summary_rows} rows, "
+                f"Sessions exported: {result.sessions_exported}",
+                "report_date": report_date.isoformat(),
+                "user_summary_rows": result.user_summary_rows,
+                "daily_metrics_generated": result.daily_metrics_generated,
+                "sessions_exported": result.sessions_exported,
+                "total_execution_time_ms": result.total_execution_time_ms,
+            }
+        logger.error(
+            f"DAILY_REPORTS_TASK_FAILED: Report generation failed for {report_date}: {result.error}"
+        )
+        return {
+            "success": False,
+            "message": f"Daily reports task failed for {report_date}: {result.error}",
+            "report_date": report_date.isoformat(),
+            "user_summary_rows": result.user_summary_rows,
+            "daily_metrics_generated": result.daily_metrics_generated,
+            "sessions_exported": result.sessions_exported,
+            "total_execution_time_ms": result.total_execution_time_ms,
+            "error": result.error,
+        }
+
+    except Exception as e:
+        logger.error(f"DAILY_REPORTS_TASK_ERROR: Daily reports task failed: {e}")
+        return {
+            "success": False,
+            "message": f"Daily reports task failed: {e}",
+            "report_date": None,
+            "user_summary_rows": 0,
+            "daily_metrics_generated": False,
+            "sessions_exported": 0,
+        }
+
+
 # Global background task scheduler instance
 background_scheduler: BackgroundTaskScheduler | None = None
+
+
+def _parse_generation_time_hour(generation_time: str) -> int:
+    """
+    Parse the hour from a generation time string in HH:MM format.
+
+    Args:
+        generation_time: Time string in HH:MM format (e.g., "01:00", "14:30")
+
+    Returns:
+        Hour as integer (0-23), defaults to 1 if parsing fails
+    """
+    try:
+        if ":" in generation_time:
+            hour_str = generation_time.split(":")[0]
+            hour = int(hour_str)
+            if 0 <= hour <= 23:
+                return hour
+    except (ValueError, IndexError):
+        pass
+
+    logger.warning(
+        f"BACKGROUND_TASKS: Failed to parse hour from '{generation_time}', using default hour 1"
+    )
+    return 1
 
 
 def init_background_tasks() -> BackgroundTaskScheduler:
@@ -289,7 +418,28 @@ def init_background_tasks() -> BackgroundTaskScheduler:
         run_immediately=False,  # Don't run immediately on startup
     )
 
-    logger.info("Background task scheduler initialized with audit purge and session timeout tasks")
+    # Add daily reports task (runs daily at configured time)
+    # Parse REPORT_GENERATION_TIME to get the hour for logging purposes
+    # The task runs on a 24-hour interval; actual execution time depends on when
+    # the scheduler starts, but the task generates reports for the previous day
+    # regardless of when it runs (Requirement 5.1, 5.2)
+    from telegram_bot.services.report_config import ReportConfig
+
+    report_config = ReportConfig.from_env()
+    generation_hour = _parse_generation_time_hour(report_config.generation_time)
+
+    background_scheduler.add_task(
+        name="daily_reports",
+        func=daily_reports_task,
+        interval_hours=24,
+        run_immediately=False,  # Don't run immediately on startup
+    )
+
+    logger.info(
+        f"Background task scheduler initialized with audit purge, session timeout, "
+        f"and daily reports tasks (reports configured for {report_config.generation_time} / "
+        f"hour {generation_hour})"
+    )
     return background_scheduler
 
 
