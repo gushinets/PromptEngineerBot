@@ -1,450 +1,687 @@
 # Deployment Guide
 
-This guide covers deploying the Prompt Engineering Bot with email authentication features.
+This guide covers deploying the Prompt Engineering Bot to a VPS running Ubuntu 22+. It documents the 3-file Docker Compose structure, environment configuration, automated backups, and operational procedures.
 
-## Prerequisites
+## Table of Contents
 
-- Docker and Docker Compose installed
-- Telegram bot token from @BotFather
-- SMTP credentials (e.g., SMTP-Pulse account)
-- LLM API key (OpenAI or OpenRouter)
+- [Architecture Overview](#architecture-overview)
+- [Docker Compose Structure](#docker-compose-structure)
+- [Environment Variables Reference](#environment-variables-reference)
+- [VPS Setup Instructions](#vps-setup-instructions)
+- [Deployment Workflow](#deployment-workflow)
+- [Backup and Restore](#backup-and-restore)
+- [Healthchecks and Monitoring](#healthchecks-and-monitoring)
+- [Webhook Mode](#webhook-mode)
+- [Troubleshooting](#troubleshooting)
 
-## Quick Start
+---
 
-1. **Clone and configure**:
-   ```bash
-   git clone <repository>
-   cd prompt-engineering-bot
-   cp .env.example .env
-   ```
+## Architecture Overview
 
-2. **Edit `.env` file** with your credentials:
-   ```bash
-   # Required settings
-   TELEGRAM_TOKEN=your_telegram_token
-   OPENROUTER_API_KEY=your_openrouter_key  # or OPENAI_API_KEY
-   SMTP_USERNAME=your_smtp_username
-   SMTP_PASSWORD=your_smtp_password
-   SMTP_FROM_EMAIL=noreply@yourdomain.com
-   ```
+The deployment uses a 3-file Docker Compose pattern for clear separation between base configuration, development overrides, and production hardening:
 
-3. **Start services**:
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Run database migrations** (recommended via Postgres in Compose):
-   ```bash
-   # Ensure image includes alembic files
-   docker compose -f docker-compose.yml build --no-cache prompt-improver-bot
-
-   # Run migrations against the Postgres service
-   docker compose -f docker-compose.yml run --rm \
-     -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
-     prompt-improver-bot alembic upgrade head
-   ```
-
-## Configuration Options
-
-### Email Feature Toggle
-
-To disable email features entirely:
-```bash
-EMAIL_ENABLED=false
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         VPS (Ubuntu 22+)                        │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                    Docker Engine                         │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │   │
+│  │  │    Bot      │  │   Redis     │  │  Postgres   │     │   │
+│  │  │  Container  │  │  Container  │  │  Container  │     │   │
+│  │  └──────┬──────┘  └─────────────┘  └──────┬──────┘     │   │
+│  │         │                                  │            │   │
+│  │         ▼                                  ▼            │   │
+│  │  ┌─────────────┐                   ┌─────────────┐     │   │
+│  │  │  logs/      │                   │ postgres_   │     │   │
+│  │  │  bot.log    │                   │ data volume │     │   │
+│  │  └─────────────┘                   └─────────────┘     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │   .env      │  │  backups/   │  │  logrotate  │            │
+│  │   (secrets) │  │  (pg_dump)  │  │  (cron)     │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Database Options
+---
 
-**Development (SQLite)**:
+## Docker Compose Structure
+
+The configuration is split into three files:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Base configuration with shared service definitions |
+| `docker-compose.dev.yml` | Development overrides (exposed ports, debug logging) |
+| `docker-compose.prod.yml` | Production hardening (restart policies, log rotation, security) |
+
+### Usage Commands
+
+**Development** (exposes Redis 6379 and Postgres 5432 for local tools):
 ```bash
-DATABASE_URL=sqlite:///./bot.db
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-**Production (PostgreSQL)**:
+**Production** (no exposed ports, restart always, log rotation):
 ```bash
-DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-### SMTP Configuration
+### Base Configuration (docker-compose.yml)
 
-**SMTP-Pulse (recommended)**:
+The base file defines:
+- Bot service with environment variable substitution for `DATABASE_URL` and `REDIS_URL`
+- Redis with password authentication and memory limits
+- PostgreSQL with healthcheck
+- Volume mounts for `google_service_key.json` (read-only) and `logs/`
+- Service dependencies with `condition: service_healthy`
+
+### Development Overrides (docker-compose.dev.yml)
+
+- `restart: unless-stopped` for all services
+- Exposed ports: Redis 6379, Postgres 5432
+- `LOG_LEVEL=DEBUG` environment variable
+
+### Production Overrides (docker-compose.prod.yml)
+
+- `restart: always` for all services
+- JSON file logging with rotation (10MB max, 3 files)
+- Hardened Redis with dangerous commands renamed/disabled
+- Commented webhook port mapping (8080)
+
+---
+
+## Environment Variables Reference
+
+Create a `.env` file from the example:
 ```bash
-SMTP_HOST=smtp-pulse.com
-SMTP_PORT=587
-SMTP_USE_TLS=true
-SMTP_USE_SSL=false
+cp .env.example .env
 ```
 
-**Gmail SMTP**:
-```bash
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USE_TLS=true
-SMTP_USE_SSL=false
-```
+### Required Variables
 
-**Custom SMTP with SSL**:
-```bash
-SMTP_HOST=your-smtp-server.com
-SMTP_PORT=465
-SMTP_USE_TLS=false
-SMTP_USE_SSL=true
-```
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `TELEGRAM_TOKEN` | Bot token from @BotFather | `123456:ABC-DEF...` |
+| `POSTGRES_DB` | PostgreSQL database name | `botdb` |
+| `POSTGRES_USER` | PostgreSQL username | `botuser` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | `your_secure_password` |
+| `REDIS_PASSWORD` | Redis authentication password | `your_redis_password` |
+
+### LLM Backend (choose one)
+
+| Variable | Description |
+|----------|-------------|
+| `LLM_BACKEND` | Backend type: `OPENAI` or `OPENROUTER` |
+| `OPENAI_API_KEY` | OpenAI API key (if using OPENAI) |
+| `OPENROUTER_API_KEY` | OpenRouter API key (if using OPENROUTER) |
+| `MODEL_NAME` | Model to use (e.g., `openai/gpt-4`, `gpt-4o`) |
+
+### Email Configuration (optional)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EMAIL_ENABLED` | Enable email authentication | `true` |
+| `SMTP_HOST` | SMTP server hostname | `smtp-pulse.com` |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USERNAME` | SMTP authentication username | - |
+| `SMTP_PASSWORD` | SMTP authentication password | - |
+| `SMTP_USE_TLS` | Use TLS encryption | `true` |
+| `SMTP_USE_SSL` | Use SSL encryption | `false` |
+| `SMTP_FROM_EMAIL` | Sender email address | - |
 
 ### Rate Limiting
 
-Adjust rate limits based on your needs:
-```bash
-EMAIL_RATE_LIMIT_PER_HOUR=3    # Max OTP emails per email address per hour
-USER_RATE_LIMIT_PER_HOUR=5     # Max OTP emails per user per hour
-OTP_SPACING_SECONDS=60         # Minimum seconds between OTP sends
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EMAIL_RATE_LIMIT_PER_HOUR` | Max OTP emails per email/hour | `3` |
+| `USER_RATE_LIMIT_PER_HOUR` | Max OTP emails per user/hour | `5` |
+| `OTP_SPACING_SECONDS` | Minimum seconds between OTPs | `60` |
 
-## Database Migrations
+### Logging
 
-### Initial Setup (Container-based, Postgres)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_LEVEL` | Log level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
 
-```bash
-# Build image to include alembic config
-docker compose -f docker-compose.yml build --no-cache prompt-improver-bot
+### Google Sheets Logging (optional)
 
-# Apply migrations to Postgres service from the app container
-docker compose -f docker-compose.yml run --rm \
-  -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
-  prompt-improver-bot alembic upgrade head
-```
+| Variable | Description |
+|----------|-------------|
+| `GSHEETS_LOGGING_ENABLED` | Enable Google Sheets logging |
+| `GSHEETS_SPREADSHEET_ID` | Spreadsheet ID |
+| `GSHEETS_WORKSHEET` | Worksheet name |
 
-### Alternative: Host-based
+---
 
-```bash
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt
-$env:DATABASE_URL="postgresql://botuser:botpass@localhost:5432/botdb"
-.venv/Scripts/alembic upgrade head
-```
+## VPS Setup Instructions
 
-### User Profile Fields Migration
+### Prerequisites
 
-The bot includes enhanced user profiling with Telegram profile data:
+- Fresh Ubuntu 22.04+ VPS
+- Root or sudo access
+- SSH access configured
 
-**New Profile Fields Added:**
-- `first_name`: User's first name from Telegram
-- `last_name`: User's last name from Telegram  
-- `is_bot`: Boolean indicating bot accounts
-- `is_premium`: Telegram Premium subscription status
-- `language_code`: User's language preference (ISO 639-1)
+### Automated Setup
 
-**Performance Indexes:**
-- `ix_users_language_code`: Language-based user queries
-- `ix_users_is_premium`: Premium user filtering
-- `ix_users_bot_premium`: Composite index for user analytics
-
-**Migration Safety:**
-- All new fields are nullable or have defaults for backward compatibility
-- Existing user data is preserved during migration
-- Profile data is captured automatically during user interactions
-
-### Creating New Migrations
-
-When modifying database models:
-```bash
-# Generate migration inside running app container
-docker compose exec prompt-improver-bot python -m alembic revision --autogenerate -m "Description"
-
-# Apply migration
-docker compose -f docker-compose.yml run --rm \
-  -e DATABASE_URL=postgresql://botuser:botpass@postgres:5432/botdb \
-  prompt-improver-bot alembic upgrade head
-```
-
-### Migration Rollback
-
-To rollback to previous version:
-```bash
-# Rollback one version
-docker compose exec prompt-improver-bot python -m alembic downgrade -1
-
-# Rollback to specific revision
-docker compose exec prompt-improver-bot python -m alembic downgrade <revision_id>
-```
-
-## Monitoring and Health Checks
-
-### Health Check Endpoints
-
-The bot includes built-in health monitoring for:
-- Database connectivity
-- Redis connectivity  
-- SMTP server connectivity
-
-### Logs
-
-View bot logs:
-```bash
-docker compose logs -f prompt-improver-bot
-```
-
-View service logs:
-```bash
-docker compose logs -f redis postgres
-```
-
-### Metrics
-
-The bot collects metrics for:
-- OTP generation and verification rates
-- Email delivery success/failure rates
-- LLM and SMTP response times
-- Authentication success rates
-
-## Security Considerations
-
-### Environment Variables
-
-Never commit sensitive data to version control:
-- Keep `.env` file in `.gitignore`
-- Use secrets management in production
-- Rotate credentials regularly
-
-### Database Security
-
-- Use strong passwords for PostgreSQL
-- Enable SSL/TLS for database connections in production
-- Regularly backup database
-
-### SMTP Security
-
-- Use app-specific passwords for Gmail
-- Enable 2FA on SMTP provider accounts
-- Monitor email sending quotas
-
-### Redis Security
-
-- Use Redis AUTH in production
-- Configure Redis to bind to localhost only
-- Set memory limits to prevent DoS
-
-### Redis Write Health Check
-
-The bot verifies Redis write capability at startup. If `REDIS_URL` points to a read-only replica, startup will fail fast with a clear error. Ensure `REDIS_URL` targets a writable primary (e.g., primary endpoint on managed services). You can manually verify with:
-
-```
-redis-cli -u "$REDIS_URL" ROLE
-redis-cli -u "$REDIS_URL" SET __bot_rw_check__ 1 EX 5 NX
-```
-
-## Production Deployment
-
-### Docker Compose Production
-
-Create `docker-compose.prod.yml`:
-```yaml
-version: '3.8'
-
-services:
-  prompt-improver-bot:
-    build: .
-    restart: always
-    env_file:
-      - .env.prod
-    depends_on:
-      - redis
-      - postgres
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  redis:
-    image: redis:7-alpine
-    restart: always
-    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
-    volumes:
-      - redis_data:/data
-
-  postgres:
-    image: postgres:15-alpine
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-```
-
-### Environment-Specific Configuration
-
-Create separate environment files:
-- `.env.dev` - Development settings
-- `.env.staging` - Staging environment
-- `.env.prod` - Production settings
-
-### SSL/TLS Configuration
-
-For production, configure SSL certificates:
-```bash
-# Mount SSL certificates
-volumes:
-  - ./ssl:/app/ssl:ro
-
-# Update environment
-SSL_CERT_PATH=/app/ssl/cert.pem
-SSL_KEY_PATH=/app/ssl/key.pem
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Database connection failed**:
-```bash
-# Check PostgreSQL status
-docker compose ps postgres
-docker compose logs postgres
-
-# Test connection
-docker compose exec postgres psql -U botuser -d botdb -c "SELECT 1;"
-```
-
-**Redis connection failed**:
-```bash
-# Check Redis status
-docker compose ps redis
-docker compose logs redis
-
-# Test connection
-docker compose exec redis redis-cli ping
-```
-
-**SMTP authentication failed**:
-```bash
-# Test SMTP connection
-docker compose exec prompt-improver-bot python -c "
-from src.email_service import EmailService
-from src.config import BotConfig
-config = BotConfig.from_env()
-service = EmailService(config)
-print('SMTP test:', service._check_smtp_health())
-"
-```
-
-**Email delivery failed**:
-- Check SMTP credentials and quotas
-- Verify sender email domain reputation
-- Check spam filters and blacklists
-
-### Performance Issues
-
-**High memory usage**:
-- Reduce Redis memory limit
-- Adjust database connection pool size
-- Monitor background task frequency
-
-**Slow response times**:
-- Check LLM API response times
-- Monitor database query performance
-- Verify network connectivity
-
-### Log Analysis
-
-**Find authentication issues**:
-```bash
-docker compose logs prompt-improver-bot | grep "OTP_"
-```
-
-**Monitor email delivery**:
-```bash
-docker compose logs prompt-improver-bot | grep "EMAIL_"
-```
-
-**Check health status**:
-```bash
-docker compose logs prompt-improver-bot | grep "HEALTH_"
-```
-
-## Backup and Recovery
-
-### Database Backup
+The `scripts/server-setup.sh` script automates the entire VPS configuration:
 
 ```bash
-# Create backup
-docker compose exec postgres pg_dump -U botuser botdb > backup.sql
+# On your VPS as root
+curl -O https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/scripts/server-setup.sh
+chmod +x server-setup.sh
+./server-setup.sh
+```
 
-# Restore backup
-docker compose exec -T postgres psql -U botuser botdb < backup.sql
+The script performs:
+1. System package updates
+2. Docker and Docker Compose installation
+3. Creates `deploy` user with docker group membership
+4. Creates directories: `/home/deploy/prompt-bot`, `/home/deploy/backups`, `/home/deploy/prompt-bot/logs`
+5. Configures UFW firewall (SSH only)
+6. Enables Docker on boot
+7. Configures logrotate for bot.log (daily, 14 days retention, compressed)
+8. Sets up cron job for daily database backups at 2:00 AM
+
+### Manual Setup Steps
+
+If you prefer manual setup:
+
+**1. Install Docker:**
+```bash
+apt-get update && apt-get install -y ca-certificates curl gnupg
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable docker
+```
+
+**2. Create deploy user:**
+```bash
+useradd -m -s /bin/bash deploy
+usermod -aG docker deploy
+```
+
+**3. Create directories:**
+```bash
+mkdir -p /home/deploy/prompt-bot /home/deploy/backups /home/deploy/prompt-bot/logs
+chown -R deploy:deploy /home/deploy
+```
+
+**4. Configure firewall:**
+```bash
+apt-get install -y ufw
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow ssh
+ufw --force enable
+```
+
+### Post-Setup: Deploy Key Configuration
+
+After running the setup script:
+
+**1. Generate SSH key for deploy user:**
+```bash
+sudo -u deploy ssh-keygen -t ed25519 -C 'deploy@vps'
+```
+
+**2. Add public key to GitHub as deploy key:**
+```bash
+sudo -u deploy cat /home/deploy/.ssh/id_ed25519.pub
+```
+Copy the output and add it to your GitHub repository: Settings → Deploy keys → Add deploy key
+
+**3. Clone repository:**
+```bash
+sudo -u deploy git clone git@github.com:YOUR_USER/YOUR_REPO.git /home/deploy/prompt-bot
+```
+
+**4. Create .env file:**
+```bash
+sudo -u deploy cp /home/deploy/prompt-bot/.env.example /home/deploy/prompt-bot/.env
+sudo -u deploy nano /home/deploy/prompt-bot/.env
+```
+
+**5. Copy Google service key (if using Google Sheets logging):**
+```bash
+sudo -u deploy cp /path/to/google_service_key.json /home/deploy/prompt-bot/
+```
+
+---
+
+## Deployment Workflow
+
+### Initial Deployment
+
+```bash
+# As deploy user
+cd /home/deploy/prompt-bot
+./scripts/deploy.sh
+```
+
+### What the Deploy Script Does
+
+The `scripts/deploy.sh` script performs:
+1. Pulls latest code from git (`git pull origin main`)
+2. Builds Docker images (keeps previous image for rollback)
+3. Runs database migrations (`alembic upgrade head`)
+4. Restarts services (`docker compose up -d`)
+5. Verifies service health (retries up to 6 times)
+6. Reports success or failure with clear error messages
+
+### Manual Deployment Steps
+
+If you need to deploy manually:
+
+```bash
+cd /home/deploy/prompt-bot
+
+# Pull latest code
+git pull origin main
+
+# Build images
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+# Run migrations
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm prompt-improver-bot alembic upgrade head
+
+# Restart services
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Verify health
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+```
+
+### Rollback
+
+If deployment fails, the previous Docker image is preserved:
+
+```bash
+# Rollback to previous image
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Or rollback database migration
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm prompt-improver-bot alembic downgrade -1
+```
+
+---
+
+## Backup and Restore
+
+### Automated Backups
+
+The server setup configures daily automated backups:
+- **Schedule:** Daily at 2:00 AM (cron)
+- **Location:** `/home/deploy/backups/`
+- **Format:** `botdb_YYYYMMDD_HHMMSS.sql.gz`
+- **Retention:** 14 days (older backups auto-deleted)
+- **Log:** `/home/deploy/backups/backup.log`
+
+### Manual Backup
+
+```bash
+# Run backup script manually
+/home/deploy/prompt-bot/scripts/backup-db.sh
+
+# Or direct pg_dump
+docker exec prompt-bot-postgres pg_dump -U botuser botdb | gzip > backup_$(date +%Y%m%d).sql.gz
+```
+
+### Restore from Backup
+
+```bash
+# Stop the bot (keep database running)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop prompt-improver-bot
+
+# Restore database
+gunzip -c /home/deploy/backups/botdb_YYYYMMDD_HHMMSS.sql.gz | docker exec -i prompt-bot-postgres psql -U botuser botdb
+
+# Restart bot
+docker compose -f docker-compose.yml -f docker-compose.prod.yml start prompt-improver-bot
 ```
 
 ### Redis Backup
 
+Redis data is persisted via AOF (append-only file):
 ```bash
-# Redis automatically saves to /data/dump.rdb
-# Copy backup file
-docker cp prompt-bot-redis:/data/dump.rdb ./redis-backup.rdb
+# Copy Redis data
+docker cp prompt-bot-redis:/data/appendonly.aof ./redis-backup.aof
 ```
 
-### Full System Backup
+---
 
+## Healthchecks and Monitoring
+
+### Internal Healthcheck
+
+The bot container includes a healthcheck that verifies Telegram API connectivity:
+
+| Setting | Value |
+|---------|-------|
+| Interval | 60 seconds |
+| Timeout | 15 seconds |
+| Start period | 30 seconds |
+| Retries | 3 |
+
+The healthcheck script (`scripts/healthcheck.py`) calls the Telegram `getMe` API endpoint. If the API responds successfully, the container is marked healthy.
+
+**Check container health status:**
 ```bash
-# Stop services
-docker compose down
-
-# Backup volumes
-docker run --rm -v prompt-engineering-bot_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres-backup.tar.gz -C /data .
-docker run --rm -v prompt-engineering-bot_redis_data:/data -v $(pwd):/backup alpine tar czf /backup/redis-backup.tar.gz -C /data .
-
-# Restart services
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
 
-## Run Production-like Locally
+**View healthcheck logs:**
+```bash
+docker inspect prompt-improver-bot --format='{{json .State.Health}}' | jq
+```
 
-Use only the base compose file to mimic production:
+### Internal Healthcheck Limitations
 
-1. Ensure `.env` contains required values (`TELEGRAM_TOKEN`, LLM backend/API key, SMTP if `EMAIL_ENABLED=true`).
-2. Pre-create the log file on host to avoid directory bind issues:
-   ```bash
-   # PowerShell
-   if (Test-Path .\bot.log) { Remove-Item -Force .\bot.log }
-   New-Item -ItemType File .\bot.log | Out-Null
-   ```
-3. Start infrastructure:
-   ```bash
-   docker compose -f docker-compose.yml up -d postgres redis
-   ```
-4. Run migrations (see Quick Start step 4 for options). Host-based example:
-   ```bash
-   python -m venv .venv
-   .venv/Scripts/pip install -r requirements.txt
-   $env:DATABASE_URL = "postgresql://botuser:botpass@localhost:5432/botdb"
-   .venv/Scripts/alembic upgrade head
-   ```
-5. Start the app:
-   ```bash
-   docker compose -f docker-compose.yml up -d prompt-improver-bot
-   ```
-6. Verify:
-   ```bash
-   docker compose -f docker-compose.yml ps
-   docker compose -f docker-compose.yml logs -f prompt-improver-bot
-   ```
+The Docker healthcheck only monitors the container from inside the Docker host. It cannot detect:
+- VPS network outages
+- Docker daemon failures
+- Complete server crashes
+- Firewall blocking outbound traffic
 
-### Prod-like Local Troubleshooting
+**If the entire server goes down, the internal healthcheck cannot alert you.**
 
-- Alembic error `No 'script_location' key found`: Ensure the image includes `alembic.ini` and the `alembic/` folder (already added in Dockerfile). Avoid bind-mounting the repo during migrations as it can shadow these files.
-- Using dev override with SQLite: Override `DATABASE_URL` to Postgres when running migrations (see commands above).
-- Stale image (outdated sources):
-  ```bash
-  docker compose -f docker-compose.yml up -d --build --force-recreate
-  # or, to force a clean rebuild
-  docker compose -f docker-compose.yml build --no-cache --pull prompt-improver-bot
-  docker compose -f docker-compose.yml up -d --force-recreate prompt-improver-bot
-  ```
+### External Monitoring with UptimeRobot
 
-## Support
+For comprehensive monitoring, set up external monitoring using UptimeRobot (free tier available):
 
-For issues and questions:
-1. Check logs for error messages
-2. Verify configuration settings
-3. Test individual components (database, Redis, SMTP)
-4. Review security settings and credentials
-5. Monitor resource usage and performance metrics
+**1. Create UptimeRobot account:**
+- Go to [https://uptimerobot.com](https://uptimerobot.com)
+- Sign up for a free account
+
+**2. Add a new monitor:**
+- Click "Add New Monitor"
+- Monitor Type: **Ping** (or HTTP if you enable webhook mode)
+- Friendly Name: `Prompt Bot VPS`
+- IP or Host: Your VPS IP address
+- Monitoring Interval: 5 minutes
+
+**3. Configure alerts:**
+- Add your email for notifications
+- Optionally add Telegram notifications via UptimeRobot's Telegram integration
+
+**4. For HTTP monitoring (webhook mode only):**
+- Monitor Type: **HTTP(s)**
+- URL: `http://YOUR_VPS_IP:8080/health` (requires webhook mode enabled)
+- Monitoring Interval: 5 minutes
+
+**Recommended monitoring strategy:**
+- Use Ping monitor for basic server availability
+- Use HTTP monitor if webhook mode is enabled
+- Set up multiple alert contacts (email + Telegram)
+
+---
+
+## Webhook Mode
+
+The bot runs in polling mode by default. To switch to webhook mode for better performance:
+
+### Step 1: Uncomment Dockerfile EXPOSE
+
+In `Dockerfile`, uncomment the EXPOSE directive:
+```dockerfile
+# Change this:
+# EXPOSE 8080
+
+# To this:
+EXPOSE 8080
+```
+
+### Step 2: Uncomment Port Mapping
+
+In `docker-compose.prod.yml`, uncomment the ports section:
+```yaml
+services:
+  prompt-improver-bot:
+    # Change this:
+    # ports:
+    #   - "8080:8080"
+    
+    # To this:
+    ports:
+      - "8080:8080"
+```
+
+### Step 3: Configure Reverse Proxy
+
+Set up nginx or Caddy as a reverse proxy with SSL:
+
+**Nginx example:**
+```nginx
+server {
+    listen 443 ssl;
+    server_name bot.yourdomain.com;
+    
+    ssl_certificate /etc/letsencrypt/live/bot.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/bot.yourdomain.com/privkey.pem;
+    
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### Step 4: Update Firewall
+
+```bash
+# Allow HTTPS traffic
+ufw allow 443/tcp
+```
+
+### Step 5: Set Webhook URL
+
+Configure your bot to use webhook mode by setting the webhook URL with Telegram:
+```bash
+curl "https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook?url=https://bot.yourdomain.com/webhook"
+```
+
+### Step 6: Rebuild and Deploy
+
+```bash
+./scripts/deploy.sh
+```
+
+---
+
+## Troubleshooting
+
+### Container Won't Start
+
+**Check logs:**
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs prompt-improver-bot
+```
+
+**Common causes:**
+- Missing `.env` file or required variables
+- Invalid `TELEGRAM_TOKEN`
+- Database not ready (check `depends_on` health conditions)
+
+### Database Connection Failed
+
+```bash
+# Check PostgreSQL status
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps postgres
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs postgres
+
+# Test connection
+docker exec -it prompt-bot-postgres psql -U botuser -d botdb -c "SELECT 1;"
+```
+
+### Redis Connection Failed
+
+```bash
+# Check Redis status
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps redis
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs redis
+
+# Test connection
+docker exec -it prompt-bot-redis redis-cli -a "${REDIS_PASSWORD}" ping
+```
+
+### Healthcheck Failing
+
+```bash
+# Check healthcheck status
+docker inspect prompt-improver-bot --format='{{json .State.Health}}'
+
+# Run healthcheck manually
+docker exec prompt-improver-bot python /app/scripts/healthcheck.py
+echo $?  # 0 = healthy, 1 = unhealthy
+
+# Common causes:
+# - Invalid TELEGRAM_TOKEN
+# - Network connectivity issues
+# - Telegram API rate limiting
+```
+
+### Migration Failed
+
+```bash
+# Check migration status
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm prompt-improver-bot alembic current
+
+# View migration history
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm prompt-improver-bot alembic history
+
+# Rollback one migration
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm prompt-improver-bot alembic downgrade -1
+```
+
+### Backup Failed
+
+```bash
+# Check backup log
+cat /home/deploy/backups/backup.log
+
+# Common causes:
+# - PostgreSQL container not running
+# - Disk full
+# - Permission issues
+
+# Test backup manually
+/home/deploy/prompt-bot/scripts/backup-db.sh
+```
+
+### High Memory Usage
+
+```bash
+# Check container resource usage
+docker stats
+
+# Redis memory is limited to 256MB by default
+# Adjust in docker-compose.yml if needed:
+# --maxmemory 512mb
+```
+
+### Logs Filling Disk
+
+Production compose configures log rotation:
+- Max size: 10MB per file
+- Max files: 3
+
+Bot logs are rotated by logrotate:
+- Daily rotation
+- 14 days retention
+- Compressed
+
+**Manual log cleanup:**
+```bash
+# Truncate bot log
+truncate -s 0 /home/deploy/prompt-bot/logs/bot.log
+
+# Clean Docker logs
+docker system prune --volumes
+```
+
+### Service Status Commands
+
+```bash
+# View all services
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+# View logs (follow mode)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+
+# View specific service logs
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f prompt-improver-bot
+
+# Restart specific service
+docker compose -f docker-compose.yml -f docker-compose.prod.yml restart prompt-improver-bot
+
+# Stop all services
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+
+# Stop and remove volumes (WARNING: deletes data)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down -v
+```
+
+---
+
+## Security Considerations
+
+### Secrets Management
+
+- Never commit `.env` or `google_service_key.json` to version control
+- Both files are in `.gitignore`
+- Use strong, unique passwords for PostgreSQL and Redis
+- Rotate credentials periodically
+
+### Network Security
+
+- UFW firewall allows only SSH by default
+- Redis and PostgreSQL ports are not exposed in production
+- Use SSH keys instead of passwords for server access
+
+### Redis Hardening (Production)
+
+The production compose file disables dangerous Redis commands:
+- `SLAVEOF`, `REPLICAOF` - Prevents replication attacks
+- `CONFIG` - Prevents runtime configuration changes
+- `FLUSHALL` - Prevents data deletion
+
+### Database Security
+
+- PostgreSQL uses password authentication
+- Connection is internal to Docker network only
+- Regular backups with 14-day retention
+
+---
+
+## Quick Reference
+
+### Common Commands
+
+| Action | Command |
+|--------|---------|
+| Start (dev) | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up` |
+| Start (prod) | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
+| Stop | `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` |
+| Logs | `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f` |
+| Deploy | `./scripts/deploy.sh` |
+| Backup | `./scripts/backup-db.sh` |
+| Health | `docker compose -f docker-compose.yml -f docker-compose.prod.yml ps` |
+
+### File Locations (Production)
+
+| Item | Path |
+|------|------|
+| Application | `/home/deploy/prompt-bot/` |
+| Environment | `/home/deploy/prompt-bot/.env` |
+| Logs | `/home/deploy/prompt-bot/logs/bot.log` |
+| Backups | `/home/deploy/backups/` |
+| Backup log | `/home/deploy/backups/backup.log` |

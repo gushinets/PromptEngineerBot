@@ -17,13 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app
 
-# Copy application files
-COPY .env* ./
-COPY google_service_key.json* ./
+# Copy application files (secrets are mounted at runtime, not copied into image)
 COPY alembic.ini .
 COPY alembic ./alembic
 COPY telegram_bot ./telegram_bot
 COPY run_bot.py .
+COPY scripts/healthcheck.py ./scripts/
 
 # Change ownership to app user
 RUN chown -R app:app /app
@@ -31,11 +30,13 @@ RUN chown -R app:app /app
 # Switch to non-root user
 USER app
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import os; exit(0 if os.getenv('TELEGRAM_TOKEN') else 1)"
+# Healthcheck using Telegram API ping
+# Requirements: 4.4, 4.5, 4.6
+HEALTHCHECK --interval=60s --timeout=15s --start-period=30s --retries=3 \
+    CMD python /app/scripts/healthcheck.py
 
-# Expose port (if needed, e.g. for webhook)
+# Webhook port (uncomment when switching to webhook mode)
+# Requirement: 9.1
 # EXPOSE 8080
 
 # Run the bot using the new entry point

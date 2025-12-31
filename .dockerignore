@@ -43,8 +43,9 @@ tests/
 README.md
 docs/
 
-# Scripts
+# Scripts (except healthcheck.py which is needed in the image)
 scripts/
+!scripts/healthcheck.py
 
 # Development files
 .env.example

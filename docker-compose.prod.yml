@@ -1,0 +1,31 @@
+# Docker Compose production overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  prompt-improver-bot:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Webhook port (uncomment when switching to webhook mode)
+    # ports:
+    #   - "8080:8080"
+
+  redis:
+    restart: always
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass ${REDIS_PASSWORD}
+      --protected-mode yes
+      --maxmemory 256mb 
+      --maxmemory-policy allkeys-lru
+      --rename-command SLAVEOF ""
+      --rename-command REPLICAOF ""
+      --rename-command CONFIG ""
+      --rename-command FLUSHALL ""
+
+  postgres:
+    restart: always
