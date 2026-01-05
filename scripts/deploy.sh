@@ -78,24 +78,46 @@ if ! docker compose "${COMPOSE_FILES[@]}" build; then
 fi
 log_info "Docker images built successfully"
 
-# Step 3: Run database migrations (Requirement 8.3)
+# Step 3: Clean up orphaned resources
+log_info "Cleaning up orphaned Docker resources..."
+# Stop and remove any orphaned containers from previous deployments
+docker compose "${COMPOSE_FILES[@]}" down --remove-orphans 2>/dev/null || true
+# Remove orphaned networks that might conflict (ignore errors if not found)
+docker network rm prompt-bot-network 2>/dev/null || true
+log_info "Cleanup complete"
+
+# Step 4: Start database services (Requirement 8.3)
+log_info "Starting database services..."
+if ! docker compose "${COMPOSE_FILES[@]}" up -d --remove-orphans postgres redis; then
+    log_error "Failed to start database services"
+    log_error "Check for orphaned containers: docker ps -a"
+    log_error "Remove conflicts with: docker rm -f <container_name>"
+    exit 1
+fi
+
+# Wait for database to be ready
+log_info "Waiting for database to be ready..."
+sleep 5
+
+# Step 5: Run database migrations (Requirement 8.3)
 log_info "Running database migrations..."
-if ! docker compose "${COMPOSE_FILES[@]}" run --rm prompt-improver-bot alembic upgrade head; then
+if ! docker compose "${COMPOSE_FILES[@]}" run --rm --no-deps prompt-improver-bot alembic upgrade head; then
     log_error "Failed to run database migrations"
     log_error "Check alembic configuration and migration files"
+    log_error "View migration logs: docker compose ${COMPOSE_FILES[*]} logs"
     exit 1
 fi
 log_info "Database migrations completed successfully"
 
-# Step 4: Restart services (Requirement 8.4)
-log_info "Restarting services..."
-if ! docker compose "${COMPOSE_FILES[@]}" up -d; then
-    log_error "Failed to restart services"
+# Step 6: Start all services (Requirement 8.4)
+log_info "Starting all services..."
+if ! docker compose "${COMPOSE_FILES[@]}" up -d --remove-orphans; then
+    log_error "Failed to start services"
     exit 1
 fi
-log_info "Services restarted successfully"
+log_info "Services started successfully"
 
-# Step 5: Verify service health (Requirement 8.5)
+# Step 7: Verify service health (Requirement 8.5)
 log_info "Waiting for services to start..."
 sleep 5
 
