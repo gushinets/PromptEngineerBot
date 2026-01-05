@@ -15,10 +15,12 @@
 set -e
 
 # Configuration
-APP_USER="deploy"
-APP_DIR="/home/$APP_USER/prompt-bot"
-BACKUP_DIR="/home/$APP_USER/backups"
-LOG_DIR="/home/$APP_USER/prompt-bot/logs"
+# Use the user who invoked sudo (or current user if not using sudo)
+APP_USER="${SUDO_USER:-$(whoami)}"
+APP_HOME=$(getent passwd "$APP_USER" | cut -d: -f6)
+APP_DIR="$APP_HOME/prompt-bot"
+BACKUP_DIR="$APP_HOME/backups"
+LOG_DIR="$APP_HOME/prompt-bot/logs"
 
 echo "=== Prompt Bot VPS Setup ==="
 echo ""
@@ -68,21 +70,16 @@ echo "[3/8] Enabling Docker on boot..."
 systemctl enable docker
 systemctl start docker
 
-# Create deploy user with docker group membership (Requirement 7.2)
-echo "[4/8] Creating deploy user..."
-if ! id "$APP_USER" &>/dev/null; then
-    useradd -m -s /bin/bash "$APP_USER"
-    echo "Created user: $APP_USER"
-else
-    echo "User $APP_USER already exists"
-fi
+# Add current user to docker group (Requirement 7.2)
+echo "[4/8] Configuring user for Docker access..."
 usermod -aG docker "$APP_USER"
 echo "Added $APP_USER to docker group"
+echo "NOTE: User may need to log out and back in for docker group to take effect"
 
 # Create directories (Requirement 7.3)
 echo "[5/8] Creating directories..."
 mkdir -p "$APP_DIR" "$BACKUP_DIR" "$LOG_DIR"
-chown -R "$APP_USER:$APP_USER" "/home/$APP_USER"
+chown -R "$APP_USER:$APP_USER" "$APP_DIR" "$BACKUP_DIR"
 echo "Created directories:"
 echo "  - $APP_DIR"
 echo "  - $BACKUP_DIR"
@@ -100,8 +97,8 @@ echo "Firewall configured: SSH allowed, all other incoming blocked"
 
 # Configure logrotate for bot logs (Requirements 6.2, 6.3, 6.4, 6.5)
 echo "[7/8] Configuring logrotate..."
-cat > /etc/logrotate.d/prompt-bot << 'EOF'
-/home/deploy/prompt-bot/logs/bot.log {
+cat > /etc/logrotate.d/prompt-bot << EOF
+$LOG_DIR/bot.log {
     daily
     rotate 14
     compress
@@ -109,14 +106,14 @@ cat > /etc/logrotate.d/prompt-bot << 'EOF'
     missingok
     notifempty
     copytruncate
-    create 644 deploy deploy
+    create 644 $APP_USER $APP_USER
 }
 EOF
 echo "Logrotate configured: daily rotation, 14 days retention, compressed"
 
 # Setup backup cron job (Requirement 5.5, 7.7)
 echo "[8/8] Setting up backup cron..."
-CRON_CMD="0 2 * * * /home/deploy/prompt-bot/scripts/backup-db.sh"
+CRON_CMD="0 2 * * * $APP_DIR/scripts/backup-db.sh"
 # Remove existing backup-db.sh entry if present, then add new one
 (crontab -u "$APP_USER" -l 2>/dev/null | grep -v "backup-db.sh"; echo "$CRON_CMD") | crontab -u "$APP_USER" -
 echo "Cron job configured: daily backup at 2:00 AM"
@@ -126,27 +123,27 @@ echo "=== Setup Complete ==="
 echo ""
 echo "Next steps for SSH deploy key setup (Requirement 7.8):"
 echo ""
-echo "1. Generate SSH key for deploy user:"
-echo "   sudo -u $APP_USER ssh-keygen -t ed25519 -C 'deploy@vps'"
+echo "1. Generate SSH key for $APP_USER:"
+echo "   ssh-keygen -t ed25519 -C '$APP_USER@vps'"
 echo ""
 echo "2. Add the public key to your GitHub repo as a deploy key:"
-echo "   sudo -u $APP_USER cat /home/$APP_USER/.ssh/id_ed25519.pub"
+echo "   cat $APP_HOME/.ssh/id_ed25519.pub"
 echo ""
 echo "3. Clone your repository:"
-echo "   sudo -u $APP_USER git clone git@github.com:YOUR_USER/YOUR_REPO.git $APP_DIR"
+echo "   git clone git@github.com:YOUR_USER/YOUR_REPO.git $APP_DIR"
 echo ""
 echo "4. Create .env file with your secrets:"
-echo "   sudo -u $APP_USER cp $APP_DIR/.env.example $APP_DIR/.env"
-echo "   sudo -u $APP_USER nano $APP_DIR/.env"
+echo "   cp $APP_DIR/.env.example $APP_DIR/.env"
+echo "   nano $APP_DIR/.env"
 echo ""
 echo "5. Copy google_service_key.json to the app directory:"
-echo "   sudo -u $APP_USER cp /path/to/google_service_key.json $APP_DIR/"
+echo "   cp /path/to/google_service_key.json $APP_DIR/"
 echo ""
-echo "6. Run the deploy script:"
-echo "   sudo -u $APP_USER $APP_DIR/scripts/deploy.sh"
+echo "6. Log out and back in (for docker group), then run the deploy script:"
+echo "   $APP_DIR/scripts/deploy.sh"
 echo ""
 echo "=== Server Information ==="
-echo "Deploy user: $APP_USER"
+echo "App user: $APP_USER"
 echo "App directory: $APP_DIR"
 echo "Backup directory: $BACKUP_DIR"
 echo "Log directory: $LOG_DIR"

@@ -14,7 +14,7 @@
 set -e
 
 # Configuration
-APP_DIR="${APP_DIR:-/home/deploy/prompt-bot}"
+APP_DIR="${APP_DIR:-$HOME/prompt-bot}"
 # shellcheck disable=SC2034
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.prod.yml)
 HEALTH_CHECK_RETRIES=6
