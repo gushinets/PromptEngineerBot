@@ -51,9 +51,7 @@ class TestHtmlEmailConsentSection:
         templates = EmailTemplates("EN")
         html_body = templates.get_otp_html_body("123456")
 
-        expected_consent_text = (
-            "By entering the verification code, you consent to the processing of personal data"
-        )
+        expected_consent_text = "By entering the verification code in the bot, you consent to the processing of personal data"
         assert expected_consent_text in html_body
 
     def test_consent_message_text_matches_russian_language_setting(self):
@@ -65,7 +63,7 @@ class TestHtmlEmailConsentSection:
         html_body = templates.get_otp_html_body("123456")
 
         expected_consent_text = (
-            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+            "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных"
         )
         assert expected_consent_text in html_body
 
@@ -156,7 +154,7 @@ class TestHtmlEmailConsentSection:
         html_body = templates.get_otp_html_body("123456")
 
         russian_consent_text = (
-            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+            "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных"
         )
         assert russian_consent_text not in html_body
 
@@ -168,7 +166,5 @@ class TestHtmlEmailConsentSection:
         templates = EmailTemplates("RU")
         html_body = templates.get_otp_html_body("123456")
 
-        english_consent_text = (
-            "By entering the verification code, you consent to the processing of personal data"
-        )
+        english_consent_text = "By entering the verification code in the bot, you consent to the processing of personal data"
         assert english_consent_text not in html_body

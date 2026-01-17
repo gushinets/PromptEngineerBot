@@ -16,3 +16,10 @@ services:
     restart: unless-stopped
     ports:
       - "5432:5432"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP server
+      - "8025:8025"   # Web UI

@@ -102,11 +102,12 @@ class EmailService:
         if not self.config.smtp_host:
             raise ValueError("SMTP_HOST is required")
 
-        if not self.config.smtp_username:
-            raise ValueError("SMTP_USERNAME is required")
-
-        if not self.config.smtp_password:
-            raise ValueError("SMTP_PASSWORD is required")
+        # Username/password not required for local dev (e.g., Mailpit)
+        # Only validate if one is provided without the other
+        has_username = bool(self.config.smtp_username)
+        has_password = bool(self.config.smtp_password)
+        if has_username != has_password:
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must both be set or both be empty")
 
         if not self.config.smtp_from_email:
             raise ValueError("SMTP_FROM_EMAIL is required")
@@ -236,9 +237,12 @@ class EmailService:
                     smtp.starttls(context=context)
                     logger.debug("SMTP_TLS: TLS encryption enabled")
 
-            # Authenticate
-            smtp.login(self.config.smtp_username, self.config.smtp_password)
-            logger.debug("SMTP_AUTH: Authentication successful")
+            # Authenticate (skip if no credentials - e.g., Mailpit)
+            if self.config.smtp_username and self.config.smtp_password:
+                smtp.login(self.config.smtp_username, self.config.smtp_password)
+                logger.debug("SMTP_AUTH: Authentication successful")
+            else:
+                logger.debug("SMTP_AUTH: Skipped (no credentials configured)")
 
             return smtp
 

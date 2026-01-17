@@ -25,9 +25,7 @@ class TestPlainTextEmailConsentSection:
         plain_body = templates.get_otp_plain_body("123456")
 
         # Check that consent message exists in plain text
-        expected_consent_text = (
-            "By entering the verification code, you consent to the processing of personal data"
-        )
+        expected_consent_text = "By entering the verification code in the bot, you consent to the processing of personal data"
         assert expected_consent_text in plain_body
 
     def test_consent_section_appears_before_greeting_in_plain_text(self):
@@ -40,7 +38,7 @@ class TestPlainTextEmailConsentSection:
 
         # Find positions of consent message and greeting
         consent_pos = plain_body.find(
-            "By entering the verification code, you consent to the processing of personal data"
+            "By entering the verification code in the bot, you consent to the processing of personal data"
         )
         greeting_pos = plain_body.find("Hello!")
 
@@ -56,9 +54,7 @@ class TestPlainTextEmailConsentSection:
         templates = EmailTemplates("EN")
         plain_body = templates.get_otp_plain_body("123456")
 
-        expected_consent_text = (
-            "By entering the verification code, you consent to the processing of personal data"
-        )
+        expected_consent_text = "By entering the verification code in the bot, you consent to the processing of personal data"
         assert expected_consent_text in plain_body
 
     def test_consent_message_text_matches_russian_language_setting(self):
@@ -70,7 +66,7 @@ class TestPlainTextEmailConsentSection:
         plain_body = templates.get_otp_plain_body("123456")
 
         expected_consent_text = (
-            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+            "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных"
         )
         assert expected_consent_text in plain_body
 
@@ -138,7 +134,7 @@ class TestPlainTextEmailConsentSection:
         plain_body = templates.get_otp_plain_body("123456")
 
         russian_consent_text = (
-            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
+            "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных"
         )
         assert russian_consent_text not in plain_body
 
@@ -150,7 +146,5 @@ class TestPlainTextEmailConsentSection:
         templates = EmailTemplates("RU")
         plain_body = templates.get_otp_plain_body("123456")
 
-        english_consent_text = (
-            "By entering the verification code, you consent to the processing of personal data"
-        )
+        english_consent_text = "By entering the verification code in the bot, you consent to the processing of personal data"
         assert english_consent_text not in plain_body

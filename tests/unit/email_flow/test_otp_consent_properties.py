@@ -348,8 +348,8 @@ class TestEmailConsentSectionContainsRequiredElements:
 
         # Define expected consent text based on language
         consent_texts = {
-            "RU": "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
-            "EN": "By entering the verification code, you consent to the processing of personal data",
+            "RU": "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных",
+            "EN": "By entering the verification code in the bot, you consent to the processing of personal data",
         }
 
         expected_consent = consent_texts[language]
@@ -448,8 +448,8 @@ class TestEmailConsentSectionContainsRequiredElements:
 
         # Define expected consent text based on language
         consent_texts = {
-            "RU": "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
-            "EN": "By entering the verification code, you consent to the processing of personal data",
+            "RU": "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных",
+            "EN": "By entering the verification code in the bot, you consent to the processing of personal data",
         }
 
         expected_consent = consent_texts[language]
@@ -588,8 +588,8 @@ class TestEmailConsentSectionContainsRequiredElements:
 
         # Define consent text and greeting based on language
         consent_texts = {
-            "RU": "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
-            "EN": "By entering the verification code, you consent to the processing of personal data",
+            "RU": "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных",
+            "EN": "By entering the verification code in the bot, you consent to the processing of personal data",
         }
         greetings = {
             "RU": "Здравствуйте!",
@@ -630,6 +630,9 @@ class TestLanguageConsistency:
     Property 4: Language Consistency
     *For any* language setting, the consent message text in Telegram and email SHALL use
     the same language, and the button/link text SHALL use the same language.
+
+    Note: Email templates use slightly different consent text ("в бота"/"in the bot")
+    than Telegram messages, but both must be in the same language.
     """
 
     @given(otp=st.text(alphabet="0123456789", min_size=6, max_size=6))
@@ -640,7 +643,7 @@ class TestLanguageConsistency:
         **Validates: Requirements 1.2, 2.2, 3.7**
 
         For Russian language setting, the consent message text in Telegram messages
-        and email templates SHALL be identical.
+        and email templates SHALL both be in Russian.
         """
         from telegram_bot.utils.email_templates import EmailTemplates
 
@@ -662,28 +665,32 @@ class TestLanguageConsistency:
             html_body = templates.get_otp_html_body(otp)
             plain_body = templates.get_otp_plain_body(otp)
 
-            # Expected Russian consent text
-            expected_ru_consent = (
+            # Expected Russian consent text for Telegram
+            expected_telegram_ru_consent = (
                 "Вводя код подтверждения, вы даёте согласие на обработку персональных данных"
             )
 
+            # Expected Russian consent text for Email (includes "в бота")
+            expected_email_ru_consent = (
+                "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных"
+            )
+
             # Property assertion: Telegram consent must match expected Russian text
-            assert telegram_consent == expected_ru_consent, (
+            assert telegram_consent == expected_telegram_ru_consent, (
                 f"Telegram consent message must be in Russian.\n"
-                f"Expected: '{expected_ru_consent}'\n"
+                f"Expected: '{expected_telegram_ru_consent}'\n"
                 f"Got: '{telegram_consent}'"
             )
 
-            # Property assertion: HTML email must contain the same Russian consent text
-            assert expected_ru_consent in html_body, (
-                f"HTML email consent must match Telegram consent (Russian).\n"
-                f"Expected: '{expected_ru_consent}'"
+            # Property assertion: HTML email must contain Russian consent text
+            assert expected_email_ru_consent in html_body, (
+                f"HTML email consent must be in Russian.\nExpected: '{expected_email_ru_consent}'"
             )
 
-            # Property assertion: Plain text email must contain the same Russian consent
-            assert expected_ru_consent in plain_body, (
-                f"Plain text email consent must match Telegram consent (Russian).\n"
-                f"Expected: '{expected_ru_consent}'"
+            # Property assertion: Plain text email must contain Russian consent
+            assert expected_email_ru_consent in plain_body, (
+                f"Plain text email consent must be in Russian.\n"
+                f"Expected: '{expected_email_ru_consent}'"
             )
 
         finally:
@@ -698,7 +705,7 @@ class TestLanguageConsistency:
         **Validates: Requirements 1.3, 2.3, 3.7**
 
         For English language setting, the consent message text in Telegram messages
-        and email templates SHALL be identical.
+        and email templates SHALL both be in English.
         """
         from telegram_bot.utils.email_templates import EmailTemplates
 
@@ -720,28 +727,30 @@ class TestLanguageConsistency:
             html_body = templates.get_otp_html_body(otp)
             plain_body = templates.get_otp_plain_body(otp)
 
-            # Expected English consent text
-            expected_en_consent = (
+            # Expected English consent text for Telegram
+            expected_telegram_en_consent = (
                 "By entering the verification code, you consent to the processing of personal data"
             )
 
+            # Expected English consent text for Email (includes "in the bot")
+            expected_email_en_consent = "By entering the verification code in the bot, you consent to the processing of personal data"
+
             # Property assertion: Telegram consent must match expected English text
-            assert telegram_consent == expected_en_consent, (
+            assert telegram_consent == expected_telegram_en_consent, (
                 f"Telegram consent message must be in English.\n"
-                f"Expected: '{expected_en_consent}'\n"
+                f"Expected: '{expected_telegram_en_consent}'\n"
                 f"Got: '{telegram_consent}'"
             )
 
-            # Property assertion: HTML email must contain the same English consent text
-            assert expected_en_consent in html_body, (
-                f"HTML email consent must match Telegram consent (English).\n"
-                f"Expected: '{expected_en_consent}'"
+            # Property assertion: HTML email must contain English consent text
+            assert expected_email_en_consent in html_body, (
+                f"HTML email consent must be in English.\nExpected: '{expected_email_en_consent}'"
             )
 
-            # Property assertion: Plain text email must contain the same English consent
-            assert expected_en_consent in plain_body, (
-                f"Plain text email consent must match Telegram consent (English).\n"
-                f"Expected: '{expected_en_consent}'"
+            # Property assertion: Plain text email must contain English consent
+            assert expected_email_en_consent in plain_body, (
+                f"Plain text email consent must be in English.\n"
+                f"Expected: '{expected_email_en_consent}'"
             )
 
         finally:
@@ -872,6 +881,9 @@ class TestLanguageConsistency:
 
         For any language setting, the consent message and button text in Telegram
         messages and email templates SHALL use the same language consistently.
+
+        Note: Email templates use slightly different consent text ("в бота"/"in the bot")
+        than Telegram messages, but both must be in the same language.
         """
         from telegram_bot.utils.email_templates import EmailTemplates
 
@@ -885,12 +897,20 @@ class TestLanguageConsistency:
             # Map language codes for email templates (email uses uppercase)
             email_language = language.upper()
 
-            # Define expected texts based on language
-            expected_consent = {
+            # Define expected texts based on language for Telegram
+            expected_telegram_consent = {
                 "ru": "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
                 "en": "By entering the verification code, you consent to the "
                 "processing of personal data",
             }
+
+            # Define expected texts based on language for Email (includes "в бота"/"in the bot")
+            expected_email_consent = {
+                "ru": "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных",
+                "en": "By entering the verification code in the bot, you consent to the "
+                "processing of personal data",
+            }
+
             expected_button = {
                 "ru": "📄 Согласие на обработку персональных данных",
                 "en": "📄 Personal Data Processing Agreement",
@@ -912,9 +932,9 @@ class TestLanguageConsistency:
             plain_body = templates.get_otp_plain_body(otp)
 
             # Property assertion: Telegram consent matches expected language
-            assert telegram_consent == expected_consent[language], (
+            assert telegram_consent == expected_telegram_consent[language], (
                 f"Telegram consent must be in {language}.\n"
-                f"Expected: '{expected_consent[language]}'\n"
+                f"Expected: '{expected_telegram_consent[language]}'\n"
                 f"Got: '{telegram_consent}'"
             )
 
@@ -925,10 +945,10 @@ class TestLanguageConsistency:
                 f"Got: '{telegram_button}'"
             )
 
-            # Property assertion: HTML email consent matches Telegram consent
-            assert expected_consent[language] in html_body, (
-                f"HTML email consent must match Telegram ({language}).\n"
-                f"Expected: '{expected_consent[language]}'"
+            # Property assertion: HTML email consent is in correct language
+            assert expected_email_consent[language] in html_body, (
+                f"HTML email consent must be in {language}.\n"
+                f"Expected: '{expected_email_consent[language]}'"
             )
 
             # Property assertion: HTML email button matches Telegram button
@@ -937,10 +957,10 @@ class TestLanguageConsistency:
                 f"Expected: '{expected_button[language]}'"
             )
 
-            # Property assertion: Plain text email consent matches Telegram consent
-            assert expected_consent[language] in plain_body, (
-                f"Plain text email consent must match Telegram ({language}).\n"
-                f"Expected: '{expected_consent[language]}'"
+            # Property assertion: Plain text email consent is in correct language
+            assert expected_email_consent[language] in plain_body, (
+                f"Plain text email consent must be in {language}.\n"
+                f"Expected: '{expected_email_consent[language]}'"
             )
 
             # Property assertion: Plain text email button matches Telegram button

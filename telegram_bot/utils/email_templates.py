@@ -171,8 +171,8 @@ class EmailTemplates:
 
         # Consent section text
         consent_message = _(
-            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
-            "By entering the verification code, you consent to the processing of personal data",
+            "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных",
+            "By entering the verification code in the bot, you consent to the processing of personal data",
             self.language,
         )
 
@@ -221,12 +221,13 @@ class EmailTemplates:
         }}
         .agreement-button {{
             display: inline-block;
-            background-color: #1976d2;
-            color: white;
+            background-color: #ffc107;
+            color: #000000;
             padding: 10px 20px;
             text-decoration: none;
             border-radius: 5px;
             margin-top: 10px;
+            font-weight: bold;
         }}
         .otp-code {{
             background-color: #f8f9fa;
@@ -268,7 +269,7 @@ class EmailTemplates:
         
         <div class="consent-section">
             <p><strong>⚖️ {consent_message}</strong></p>
-            <a href="{agreement_url}" class="agreement-button">{consent_button_text}</a>
+            <a href="{agreement_url}" class="agreement-button" style="background-color: #ffc107; color: #000000; font-weight: bold;">{consent_button_text}</a>
         </div>
         
         <p>{greeting}</p>
@@ -312,8 +313,8 @@ class EmailTemplates:
 
         # Consent section text
         consent_message = _(
-            "Вводя код подтверждения, вы даёте согласие на обработку персональных данных",
-            "By entering the verification code, you consent to the processing of personal data",
+            "Вводя код подтверждения в бота, вы даёте согласие на обработку персональных данных",
+            "By entering the verification code in the bot, you consent to the processing of personal data",
             self.language,
         )
 
