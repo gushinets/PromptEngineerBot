@@ -1314,14 +1314,16 @@ class TestBotHandler:
 
         await bot_handler._process_with_llm(mock_update, user_id, method_name)
 
-        # Verify two messages were sent: improved prompt and follow-up offer
+        # Verify two messages were sent: improved prompt and follow-up offer with inline buttons
+        # Requirements 8.1, 8.6: Use inline buttons for follow-up choice
+        # Note: Reset keyboard is attached to the processing message sent earlier in the flow
         assert mock_update.message.reply_text.call_count == 2
 
         # Verify first message contains the improved prompt
         first_call_args = mock_update.message.reply_text.call_args_list[0][0]
         assert "Improved prompt here" in first_call_args[0]
 
-        # Verify second message is the follow-up offer
+        # Verify second message is the follow-up offer with inline keyboard
         second_call_args = mock_update.message.reply_text.call_args_list[1][0]
         assert (
             "готов к использованию" in second_call_args[0]

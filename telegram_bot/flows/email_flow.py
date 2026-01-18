@@ -8,7 +8,7 @@ authentication, follow-up questions, and optimization for email delivery.
 import logging
 import time
 
-from telegram import ReplyKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from telegram_bot.auth.auth_service import get_auth_service
@@ -30,6 +30,8 @@ from telegram_bot.utils.messages import (
     BTN_NO,
     BTN_RESET,
     BTN_YES,
+    CALLBACK_FOLLOWUP_NO,
+    CALLBACK_FOLLOWUP_YES,
     DATA_AGREEMENT_KEYBOARD,
     EMAIL_ALREADY_AUTHENTICATED,
     EMAIL_INPUT_MESSAGE,
@@ -57,7 +59,7 @@ from telegram_bot.utils.messages import (
     ERROR_PROMPT_OPTIMIZATION_FAILED,
     ERROR_REDIS_UNAVAILABLE,
     ERROR_SMTP_UNAVAILABLE,
-    FOLLOWUP_CHOICE_KEYBOARD,
+    FOLLOWUP_CHOICE_INLINE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
     INFO_ALL_METHODS_OPTIMIZATION,
@@ -680,6 +682,14 @@ class EmailFlowOrchestrator:
                 )
                 return False
 
+            # Send processing message with Reset keyboard attached
+            # This keyboard will persist and be available during follow-up choice phase
+            await self._safe_reply(
+                update,
+                INFO_EMAIL_OPTIMIZATION_PROCESSING,
+                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
+            )
+
             # First, run initial optimization to get improved prompt
             improved_prompt = await self._get_improved_prompt(original_prompt, user_id)
             if not improved_prompt:
@@ -690,12 +700,15 @@ class EmailFlowOrchestrator:
             # Cache the improved prompt for follow-up conversation context
             self.state_manager.set_improved_prompt_cache(user_id, improved_prompt)
 
-            # Offer follow-up questions to user
+            # Send the follow-up offer message with inline buttons (Requirements 8.1, 8.7)
+            # The inline buttons are attached directly to the offer message
+            # Note: Reset keyboard was already attached to the processing message
+            # and will persist, so no need to send a separate message for it
             await self._safe_reply(
                 update,
                 FOLLOWUP_OFFER_MESSAGE,
                 parse_mode="Markdown",
-                reply_markup=FOLLOWUP_CHOICE_KEYBOARD,
+                reply_markup=FOLLOWUP_CHOICE_INLINE_KEYBOARD,
             )
 
             # Set state to waiting for follow-up choice
@@ -785,6 +798,221 @@ class EmailFlowOrchestrator:
         except Exception as e:
             logger.error(
                 f"Error handling follow-up choice for user {mask_telegram_id(user_id)}: {e}",
+                exc_info=True,
+            )
+            return False
+
+    async def handle_followup_callback(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> bool:
+        """
+        Handle inline button callbacks for follow-up choice in email flow.
+
+        This method processes callback queries from inline buttons (YES/NO)
+        attached to the follow-up offer message.
+
+        Args:
+            update: Telegram update object containing the callback query
+            context: Telegram context object
+
+        Returns:
+            True if handled successfully, False otherwise
+
+        Requirements: 8.4, 8.7
+        """
+        query = update.callback_query
+        user_id = query.from_user.id
+        callback_data = query.data
+
+        # Answer the callback query immediately to remove loading indicator
+        await query.answer()
+
+        logger.info(
+            f"email_flow_followup_callback_received | user_id={mask_telegram_id(user_id)} | "
+            f"callback_data={callback_data}"
+        )
+
+        # Verify user is in the correct state for follow-up choice
+        user_state = self.state_manager.get_user_state(user_id)
+        if not user_state.waiting_for_followup_choice:
+            logger.warning(
+                f"email_flow_followup_callback_invalid_state | user_id={mask_telegram_id(user_id)} | "
+                f"waiting_for_followup_choice={user_state.waiting_for_followup_choice}"
+            )
+            # User is not in follow-up choice state, ignore the callback
+            return False
+
+        try:
+            if callback_data == CALLBACK_FOLLOWUP_YES:
+                # Disable buttons by editing message (Requirements 8.5)
+                await self._disable_followup_buttons(query, selected="yes")
+                # Process YES choice
+                logger.info(
+                    f"email_flow_followup_callback_yes | user_id={mask_telegram_id(user_id)}"
+                )
+                return await self._process_followup_yes(update, context, user_id)
+
+            if callback_data == CALLBACK_FOLLOWUP_NO:
+                # Disable buttons by editing message (Requirements 8.5)
+                await self._disable_followup_buttons(query, selected="no")
+                # Process NO choice
+                logger.info(
+                    f"email_flow_followup_callback_no | user_id={mask_telegram_id(user_id)}"
+                )
+                return await self._process_followup_no(update, context, user_id)
+
+            return False
+
+        except Exception as e:
+            logger.error(
+                f"Error handling email flow follow-up callback for user {mask_telegram_id(user_id)}: {e}",
+                exc_info=True,
+            )
+            return False
+
+    async def _disable_followup_buttons(self, query, selected: str):
+        """
+        Edit message to show disabled buttons after user selection.
+
+        This method edits the inline keyboard to show which button was selected
+        and disables both buttons to prevent further clicks.
+
+        Args:
+            query: The callback query object from Telegram
+            selected: Which button was selected ("yes" or "no")
+
+        Requirements: 8.5
+        """
+        # Create disabled version of buttons (using ✓ to indicate selection)
+        if selected == "yes":
+            disabled_keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("✓ " + BTN_YES, callback_data="disabled"),
+                        InlineKeyboardButton(BTN_NO, callback_data="disabled"),
+                    ]
+                ]
+            )
+        else:
+            disabled_keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(BTN_YES, callback_data="disabled"),
+                        InlineKeyboardButton("✓ " + BTN_NO, callback_data="disabled"),
+                    ]
+                ]
+            )
+
+        try:
+            await query.edit_message_reply_markup(reply_markup=disabled_keyboard)
+            logger.info(f"email_flow_followup_buttons_disabled | selected={selected}")
+        except Exception as e:
+            # Log but don't fail if button editing fails (e.g., message too old)
+            logger.warning(f"email_flow_followup_buttons_disable_failed | error={e}")
+
+    async def _process_followup_yes(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        user_id: int,
+    ) -> bool:
+        """
+        Process YES choice for follow-up questions in email flow.
+
+        This method contains the core logic for accepting follow-up questions.
+        It is called by handle_followup_callback (inline buttons).
+
+        Args:
+            update: Telegram update object
+            context: Telegram context
+            user_id: User's Telegram ID
+
+        Returns:
+            True if processed successfully, False otherwise
+        """
+        try:
+            # Get cached improved prompt
+            improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
+            if not improved_prompt:
+                # Fallback if cache is missing - should not happen in normal flow
+                logger.warning(
+                    f"email_flow_followup_accepted_no_cache | user_id={mask_telegram_id(user_id)}"
+                )
+                email_flow_data = self.state_manager.get_email_flow_data(user_id)
+                improved_prompt = email_flow_data.get("original_prompt", "")
+
+            # Reset follow-up choice state
+            self.state_manager.set_waiting_for_followup_choice(user_id, False)
+
+            # Start follow-up conversation immediately (simplified flow)
+            self.conversation_manager.start_followup_conversation(user_id, improved_prompt)
+
+            # Reset token counters to start new accumulation session for follow-up only
+            self.conversation_manager.reset_token_totals(user_id)
+
+            # Update state transitions
+            self.state_manager.set_in_followup_conversation(user_id, True)
+
+            # Store timeout start time for graceful degradation
+            self._set_followup_timeout(user_id)
+
+            logger.info(
+                f"email_flow_followup_conversation_started | user_id={mask_telegram_id(user_id)}"
+            )
+
+            # Send initial request to LLM to get first question
+            return await self._process_followup_llm_request(update, context, user_id)
+
+        except Exception as e:
+            logger.error(
+                f"Error processing email flow follow-up YES for user {mask_telegram_id(user_id)}: {e}",
+                exc_info=True,
+            )
+            return False
+
+    async def _process_followup_no(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        user_id: int,
+    ) -> bool:
+        """
+        Process NO choice for follow-up questions in email flow.
+
+        This method contains the core logic for declining follow-up questions.
+        It is called by handle_followup_callback (inline buttons).
+
+        Args:
+            update: Telegram update object
+            context: Telegram context
+            user_id: User's Telegram ID
+
+        Returns:
+            True if processed successfully, False otherwise
+        """
+        try:
+            logger.info(f"email_flow_followup_declined | user_id={mask_telegram_id(user_id)}")
+
+            # Get cached improved prompt
+            improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
+            if not improved_prompt:
+                # Fallback if cache is missing
+                email_flow_data = self.state_manager.get_email_flow_data(user_id)
+                improved_prompt = email_flow_data.get("original_prompt", "")
+
+            # Reset follow-up state
+            self.state_manager.set_waiting_for_followup_choice(user_id, False)
+
+            # Proceed directly to optimization and email delivery
+            return await self._run_optimization_and_email_delivery(
+                update, context, user_id, improved_prompt
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error processing email flow follow-up NO for user {mask_telegram_id(user_id)}: {e}",
                 exc_info=True,
             )
             return False
@@ -1202,17 +1430,35 @@ class EmailFlowOrchestrator:
         self.state_manager.set_improved_prompt_cache(user_id, None)
         self.conversation_manager.reset(user_id)
 
-    async def _safe_reply(self, update: Update, text: str, **kwargs):
-        """Safely reply to user with error handling."""
+    async def _safe_reply(
+        self, update: Update, text: str, parse_mode: str = None, reply_markup=None, **kwargs
+    ) -> None:
+        """Safely send reply to user with error handling.
+
+        Handles both regular messages and callback queries.
+        """
         try:
-            await update.message.reply_text(text, **kwargs)
+            # Check if this is a callback query (update.message will be None)
+            if update.message:
+                await update.message.reply_text(
+                    text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs
+                )
+            elif update.callback_query and update.callback_query.message:
+                await update.callback_query.message.reply_text(
+                    text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs
+                )
+            else:
+                logger.error("No message or callback_query.message available for reply")
         except Exception as e:
-            logger.error(f"Error sending message: {e}")
-            # Try without special formatting as fallback
+            logger.error(f"Error sending reply: {e}")
+            # Try without parse_mode as fallback
             try:
-                await update.message.reply_text(text)
+                if update.message:
+                    await update.message.reply_text(text, reply_markup=reply_markup)
+                elif update.callback_query and update.callback_query.message:
+                    await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
             except Exception as e2:
-                logger.error(f"Error sending fallback message: {e2}")
+                logger.error(f"Error sending fallback reply: {e2}")
 
     async def _get_improved_prompt(self, original_prompt: str, user_id: int) -> str:
         """
@@ -2034,20 +2280,6 @@ class EmailFlowOrchestrator:
         self.state_manager.set_post_optimization_result(user_id, None)
         self.conversation_manager.reset(user_id)
         self.redis_client.delete_flow_state(user_id)
-
-    async def _safe_reply(
-        self, update: Update, text: str, parse_mode: str = None, reply_markup=None
-    ) -> None:
-        """Safely send reply to user with error handling."""
-        try:
-            await update.message.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
-        except Exception as e:
-            logger.error(f"Error sending reply: {e}")
-            # Try without parse_mode as fallback
-            try:
-                await update.message.reply_text(text, reply_markup=reply_markup)
-            except Exception as e2:
-                logger.error(f"Error sending fallback reply: {e2}")
 
 
 # Global email flow orchestrator instance

@@ -14,9 +14,9 @@ services:
       - ./google_service_key.json:/app/google_service_key.json:ro
       - ./logs:/app/logs
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
-      - REDIS_WRITE_CHECK_STRICT=true
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_WRITE_CHECK_STRICT: "true"
 
   # Redis for OTP storage and rate limiting
   redis:

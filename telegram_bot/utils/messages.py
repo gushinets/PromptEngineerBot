@@ -5,7 +5,7 @@ This module contains all the static messages and templates used by the Telegram 
 for consistent messaging and easier maintenance.
 """
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
 
 # ===== Language Settings =====
@@ -30,6 +30,10 @@ BTN_HELP = _("❓ Помощь", "❓ Help")
 BTN_YES = _("✅ДА", "✅YES")
 BTN_NO = _("❌НЕТ", "❌NO")
 BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Generate Prompt")
+
+# Callback data constants for inline buttons
+CALLBACK_FOLLOWUP_YES = "followup_yes"
+CALLBACK_FOLLOWUP_NO = "followup_no"
 
 # Email delivery buttons
 BTN_EMAIL_DELIVERY = _("📧 Отправить 3 промпта на email", "📧 Send 3 prompts to email")
@@ -558,7 +562,25 @@ SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 # Follow-up feature keyboards
+# DEPRECATED: Use FOLLOWUP_CHOICE_INLINE_KEYBOARD instead.
+# This keyboard is kept for backward compatibility and will be removed in a future version.
+# The follow-up choice flow now uses inline buttons attached to the message.
 FOLLOWUP_CHOICE_KEYBOARD = ReplyKeyboardMarkup([[BTN_YES, BTN_NO]], resize_keyboard=True)
+
+# Inline keyboard for follow-up choice (attached to message)
+FOLLOWUP_CHOICE_INLINE_KEYBOARD = InlineKeyboardMarkup(
+    [
+        [
+            InlineKeyboardButton(BTN_YES, callback_data=CALLBACK_FOLLOWUP_YES),
+            InlineKeyboardButton(BTN_NO, callback_data=CALLBACK_FOLLOWUP_NO),
+        ]
+    ]
+)
+
+# Regular keyboard with only Reset button (shown below inline buttons)
+FOLLOWUP_CHOICE_RESET_KEYBOARD = ReplyKeyboardMarkup(
+    [[KeyboardButton(BTN_RESET)]], resize_keyboard=True
+)
 
 FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
     [[BTN_GENERATE_PROMPT], [BTN_RESET]], resize_keyboard=True

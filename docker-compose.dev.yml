@@ -5,7 +5,8 @@ services:
   prompt-improver-bot:
     restart: unless-stopped
     environment:
-      - LOG_LEVEL=DEBUG
+      LOG_LEVEL: INFO
+      SMTP_HOST: mailpit
 
   redis:
     restart: unless-stopped

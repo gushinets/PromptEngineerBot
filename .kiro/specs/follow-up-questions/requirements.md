@@ -88,3 +88,17 @@ The Follow-up questions feature enhances the prompt improvement process by allow
 6. WHEN the system generates a refined prompt from follow-up THEN the system SHALL log the follow-up session tokens to Google Sheets with all standard fields: BotID, TelegramID, LLM, OptimizationModel ("FOLLOWUP"), UserRequest (improved prompt from step 2), Answer (refined prompt), prompt_tokens, completion_tokens, total_tokens
 7. WHEN logging tokens THEN each session SHALL be logged as a separate entry with appropriate method names (initial method vs "FOLLOWUP")
 8. WHEN token logging fails THEN the system SHALL continue normal operation without affecting user experience
+
+### Requirement 8
+
+**User Story:** As a user, I want the follow-up choice buttons (YES/NO) to be inline buttons attached to the question message, so that the interaction is cleaner and the buttons are directly associated with the question.
+
+#### Acceptance Criteria
+
+1. WHEN the follow-up offer message is sent THEN the system SHALL display [ДА] and [НЕТ] as inline buttons attached to the message (not as regular keyboard buttons)
+2. WHEN displaying inline buttons THEN the system SHALL arrange [ДА] and [НЕТ] side by side in one row
+3. WHEN displaying inline buttons THEN the system SHALL use callback data "followup_yes" for [ДА] and "followup_no" for [НЕТ]
+4. WHEN the user clicks an inline button THEN the system SHALL handle the callback query and process the choice
+5. WHEN the user clicks an inline button THEN the system SHALL edit the message to show disabled buttons (buttons remain visible but non-functional)
+6. WHEN displaying the follow-up offer THEN the system SHALL also show a regular keyboard with only the Reset button below
+7. WHEN implementing inline buttons THEN the change SHALL apply to both the regular follow-up flow and the email flow

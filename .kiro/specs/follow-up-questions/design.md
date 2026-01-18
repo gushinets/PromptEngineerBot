@@ -94,11 +94,28 @@ FOLLOWUP_OFFER_MESSAGE = _(
 
 
 # Button labels
-BTN_YES = _("ДА", "YES")
-BTN_NO = _("НЕТ", "NO") 
-BTN_GENERATE_PROMPT = _("Сгенерировать промпт", "Generate Prompt")
+BTN_YES = _("✅ДА", "✅YES")
+BTN_NO = _("❌НЕТ", "❌NO") 
+BTN_GENERATE_PROMPT = _("🤖Сгенерировать промпт", "🤖Generate Prompt")
 
-# Keyboard layouts
+# Callback data constants for inline buttons
+CALLBACK_FOLLOWUP_YES = "followup_yes"
+CALLBACK_FOLLOWUP_NO = "followup_no"
+
+# Inline keyboard for follow-up choice (attached to message)
+FOLLOWUP_CHOICE_INLINE_KEYBOARD = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton(BTN_YES, callback_data=CALLBACK_FOLLOWUP_YES),
+        InlineKeyboardButton(BTN_NO, callback_data=CALLBACK_FOLLOWUP_NO)
+    ]
+])
+
+# Regular keyboard with only Reset button (shown below inline buttons)
+FOLLOWUP_CHOICE_RESET_KEYBOARD = ReplyKeyboardMarkup(
+    [[BTN_RESET]], resize_keyboard=True
+)
+
+# DEPRECATED: Keep for backward compatibility during transition
 FOLLOWUP_CHOICE_KEYBOARD = ReplyKeyboardMarkup(
     [[BTN_YES, BTN_NO]], resize_keyboard=True
 )
@@ -117,6 +134,51 @@ FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
 async def _handle_followup_choice(self, update: Update, user_id: int, text: str)
 async def _handle_followup_conversation(self, update: Update, user_id: int, text: str)
 async def _process_followup_generation(self, update: Update, user_id: int)
+async def handle_followup_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE)
+```
+
+**Callback Query Handler:**
+```python
+async def handle_followup_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle inline button callbacks for follow-up choice."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    callback_data = query.data
+    
+    # Answer the callback query to remove loading state
+    await query.answer()
+    
+    if callback_data == CALLBACK_FOLLOWUP_YES:
+        # Disable buttons by editing message
+        await self._disable_followup_buttons(query, selected="yes")
+        # Process YES choice
+        await self._process_followup_yes(update, user_id)
+        
+    elif callback_data == CALLBACK_FOLLOWUP_NO:
+        # Disable buttons by editing message
+        await self._disable_followup_buttons(query, selected="no")
+        # Process NO choice
+        await self._process_followup_no(update, user_id)
+
+async def _disable_followup_buttons(self, query, selected: str):
+    """Edit message to show disabled buttons after user selection."""
+    # Create disabled version of buttons (using ✓ to indicate selection)
+    if selected == "yes":
+        disabled_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✓ " + BTN_YES, callback_data="disabled"),
+                InlineKeyboardButton(BTN_NO, callback_data="disabled")
+            ]
+        ])
+    else:
+        disabled_keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(BTN_YES, callback_data="disabled"),
+                InlineKeyboardButton("✓ " + BTN_NO, callback_data="disabled")
+            ]
+        ])
+    
+    await query.edit_message_reply_markup(reply_markup=disabled_keyboard)
 ```
 
 **Modified Existing Methods:**
@@ -332,3 +394,56 @@ class TokenSession:
 3. **Memory Management**: Prevent memory leaks from cached improved prompts
 4. **Rate Limiting**: Apply existing rate limiting to follow-up conversations
 5. **Content Filtering**: Apply same content filters to follow-up responses
+
+## Inline Button Implementation
+
+### Callback Handler Registration
+
+The callback query handler must be registered in the Telegram application setup:
+
+```python
+# In main.py or bot setup
+from telegram.ext import CallbackQueryHandler
+
+# Register callback handler for follow-up choice buttons
+application.add_handler(
+    CallbackQueryHandler(
+        bot_handler.handle_followup_callback,
+        pattern="^followup_(yes|no)$"
+    )
+)
+
+# Register handler for disabled button clicks (no-op)
+application.add_handler(
+    CallbackQueryHandler(
+        lambda update, context: update.callback_query.answer(),
+        pattern="^disabled$"
+    )
+)
+```
+
+### Message Flow with Inline Buttons
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as Bot
+    participant T as Telegram API
+    
+    B->>T: Send optimized prompt
+    B->>T: Send follow-up offer with inline buttons + Reset keyboard
+    T->>U: Display message with [ДА][НЕТ] inline buttons
+    U->>T: Click [ДА] button
+    T->>B: CallbackQuery(data="followup_yes")
+    B->>T: answer() callback query
+    B->>T: edit_message_reply_markup (disabled buttons)
+    B->>U: Start follow-up conversation
+```
+
+### Disabled Button Behavior
+
+After user clicks YES or NO:
+1. The callback query is answered immediately (removes loading indicator)
+2. The message is edited to show disabled buttons with selection indicator
+3. Clicking disabled buttons triggers a no-op handler that just answers the query
+4. The selected button shows a checkmark (✓) prefix to indicate the choice made

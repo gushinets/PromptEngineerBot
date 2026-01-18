@@ -255,3 +255,65 @@ Based on the updated requirements for proper token calculation, the following ta
   - Test that declining follow-up doesn't cause additional logging
   - Verify all Google Sheets payload fields are correctly populated
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
+
+## 🔧 Inline Buttons for Follow-up Choice
+
+Convert the follow-up choice buttons (YES/NO) from regular keyboard buttons to inline buttons attached to the message.
+
+- [x] 29. Add inline keyboard constants and callback data to messages module
+  - Add CALLBACK_FOLLOWUP_YES = "followup_yes" constant
+  - Add CALLBACK_FOLLOWUP_NO = "followup_no" constant
+  - Create FOLLOWUP_CHOICE_INLINE_KEYBOARD using InlineKeyboardMarkup with BTN_YES and BTN_NO side by side
+  - Create FOLLOWUP_CHOICE_RESET_KEYBOARD with only BTN_RESET as regular keyboard
+  - Keep existing FOLLOWUP_CHOICE_KEYBOARD for backward compatibility (mark as deprecated)
+  - Write unit tests for new keyboard constants
+  - _Requirements: 8.1, 8.2, 8.3_
+
+- [x] 30. Implement callback query handler for follow-up choice
+  - Create handle_followup_callback method in BotHandler to process callback queries
+  - Handle "followup_yes" callback data by processing YES choice
+  - Handle "followup_no" callback data by processing NO choice
+  - Answer callback query immediately to remove loading indicator
+  - Extract common logic from _handle_followup_choice into reusable methods
+  - Write unit tests for callback handler
+  - _Requirements: 8.4_
+
+- [x] 31. Implement button disabling after selection
+  - Create _disable_followup_buttons helper method
+  - Edit message reply markup to show disabled buttons after selection
+  - Add checkmark (✓) prefix to selected button to indicate choice
+  - Use "disabled" callback data for disabled buttons
+  - Handle disabled button clicks with no-op handler
+  - Write unit tests for button disabling logic
+  - _Requirements: 8.5_
+
+- [x] 32. Update _process_with_llm to use inline buttons
+  - Replace FOLLOWUP_CHOICE_KEYBOARD with FOLLOWUP_CHOICE_INLINE_KEYBOARD
+  - Send follow-up offer message with inline buttons attached
+  - Also send FOLLOWUP_CHOICE_RESET_KEYBOARD as regular keyboard for Reset button
+  - Ensure proper message ordering (optimized prompt, then offer with inline buttons)
+  - Write integration tests for updated flow
+  - _Requirements: 8.1, 8.6_
+
+- [x] 33. Register callback handlers in main application
+  - Add CallbackQueryHandler for "followup_yes" and "followup_no" patterns
+  - Add CallbackQueryHandler for "disabled" pattern (no-op handler)
+  - Ensure handlers are registered with correct priority
+  - Write integration tests for handler registration
+  - _Requirements: 8.4_
+
+- [x] 34. Update email flow to use inline buttons
+  - Modify email_flow.py to use FOLLOWUP_CHOICE_INLINE_KEYBOARD
+  - Add callback handling for email flow follow-up choice
+  - Ensure email flow uses same inline button behavior as regular flow
+  - Write integration tests for email flow with inline buttons
+  - _Requirements: 8.7_
+
+- [x] 35. Update existing tests for inline button changes
+  - Update test_followup_integration.py to test inline buttons instead of regular keyboard
+  - Update test_post_optimization_integration.py for new keyboard structure
+  - Update test_messages.py for new keyboard constants
+  - Add tests for callback query handling
+  - Add tests for button disabling behavior
+  - Verify all existing tests pass with new implementation
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_

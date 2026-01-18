@@ -1,6 +1,6 @@
 """Tests for the messages module."""
 
-from telegram import InlineKeyboardMarkup
+from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 from telegram_bot.utils.messages import (
     BTN_CRAFT,
@@ -10,9 +10,13 @@ from telegram_bot.utils.messages import (
     BTN_NO,
     BTN_SUPPORT,
     BTN_YES,
+    CALLBACK_FOLLOWUP_NO,
+    CALLBACK_FOLLOWUP_YES,
     EMAIL_OTP_CONSENT_MESSAGE,
     EMAIL_OTP_SENT,
+    FOLLOWUP_CHOICE_INLINE_KEYBOARD,
     FOLLOWUP_CHOICE_KEYBOARD,
+    FOLLOWUP_CHOICE_RESET_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_OFFER_MESSAGE,
     LANGUAGE,
@@ -652,6 +656,111 @@ class TestFollowUpFeatureMessages:
 
             # Messages should contain appropriate language content
             # This is a basic check - more specific checks are in individual tests
+
+
+class TestFollowupInlineKeyboardConstants:
+    """Test cases for follow-up inline keyboard constants.
+
+    Validates: Requirements 8.1, 8.2, 8.3
+    """
+
+    def test_callback_followup_yes_constant_exists(self):
+        """Test that CALLBACK_FOLLOWUP_YES constant is defined correctly.
+
+        Validates: Requirements 8.3
+        """
+
+        assert CALLBACK_FOLLOWUP_YES is not None
+        assert CALLBACK_FOLLOWUP_YES == "followup_yes"
+
+    def test_callback_followup_no_constant_exists(self):
+        """Test that CALLBACK_FOLLOWUP_NO constant is defined correctly.
+
+        Validates: Requirements 8.3
+        """
+
+        assert CALLBACK_FOLLOWUP_NO is not None
+        assert CALLBACK_FOLLOWUP_NO == "followup_no"
+
+    def test_followup_choice_inline_keyboard_exists(self):
+        """Test that FOLLOWUP_CHOICE_INLINE_KEYBOARD is defined.
+
+        Validates: Requirements 8.1
+        """
+
+        assert FOLLOWUP_CHOICE_INLINE_KEYBOARD is not None
+        assert isinstance(FOLLOWUP_CHOICE_INLINE_KEYBOARD, InlineKeyboardMarkup)
+
+    def test_followup_choice_inline_keyboard_structure(self):
+        """Test that FOLLOWUP_CHOICE_INLINE_KEYBOARD has correct structure.
+
+        Validates: Requirements 8.1, 8.2
+        """
+
+        # Should have one row with two buttons side by side
+        assert len(FOLLOWUP_CHOICE_INLINE_KEYBOARD.inline_keyboard) == 1
+        assert len(FOLLOWUP_CHOICE_INLINE_KEYBOARD.inline_keyboard[0]) == 2
+
+        # Get the buttons
+        yes_button = FOLLOWUP_CHOICE_INLINE_KEYBOARD.inline_keyboard[0][0]
+        no_button = FOLLOWUP_CHOICE_INLINE_KEYBOARD.inline_keyboard[0][1]
+
+        # Check button text
+        assert yes_button.text == BTN_YES
+        assert no_button.text == BTN_NO
+
+        # Check callback data
+        assert yes_button.callback_data == CALLBACK_FOLLOWUP_YES
+        assert no_button.callback_data == CALLBACK_FOLLOWUP_NO
+
+    def test_followup_choice_inline_keyboard_callback_data(self):
+        """Test that inline buttons have correct callback data.
+
+        Validates: Requirements 8.3
+        """
+
+        yes_button = FOLLOWUP_CHOICE_INLINE_KEYBOARD.inline_keyboard[0][0]
+        no_button = FOLLOWUP_CHOICE_INLINE_KEYBOARD.inline_keyboard[0][1]
+
+        # Callback data should match the constants
+        assert yes_button.callback_data == "followup_yes"
+        assert no_button.callback_data == "followup_no"
+
+    def test_followup_choice_reset_keyboard_exists(self):
+        """Test that FOLLOWUP_CHOICE_RESET_KEYBOARD is defined."""
+
+        assert FOLLOWUP_CHOICE_RESET_KEYBOARD is not None
+        assert isinstance(FOLLOWUP_CHOICE_RESET_KEYBOARD, ReplyKeyboardMarkup)
+
+    def test_followup_choice_reset_keyboard_structure(self):
+        """Test that FOLLOWUP_CHOICE_RESET_KEYBOARD has correct structure."""
+        from telegram_bot.utils.messages import BTN_RESET
+
+        # Should have one row with one button (Reset only)
+        assert len(FOLLOWUP_CHOICE_RESET_KEYBOARD.keyboard) == 1
+        assert len(FOLLOWUP_CHOICE_RESET_KEYBOARD.keyboard[0]) == 1
+
+        # Should contain Reset button
+        reset_button = FOLLOWUP_CHOICE_RESET_KEYBOARD.keyboard[0][0]
+        assert reset_button.text == BTN_RESET
+
+        # Should be resizable
+        assert FOLLOWUP_CHOICE_RESET_KEYBOARD.resize_keyboard is True
+
+    def test_followup_choice_keyboard_deprecated_still_works(self):
+        """Test that deprecated FOLLOWUP_CHOICE_KEYBOARD still works for backward compatibility."""
+        # The deprecated keyboard should still exist and work
+        assert FOLLOWUP_CHOICE_KEYBOARD is not None
+        assert isinstance(FOLLOWUP_CHOICE_KEYBOARD, ReplyKeyboardMarkup)
+
+        # Should have one row with two buttons
+        assert len(FOLLOWUP_CHOICE_KEYBOARD.keyboard) == 1
+        assert len(FOLLOWUP_CHOICE_KEYBOARD.keyboard[0]) == 2
+
+        # Should contain YES and NO buttons
+        buttons = [btn.text for btn in FOLLOWUP_CHOICE_KEYBOARD.keyboard[0]]
+        assert BTN_YES in buttons
+        assert BTN_NO in buttons
 
 
 class TestFollowupResponseErrorHandling:

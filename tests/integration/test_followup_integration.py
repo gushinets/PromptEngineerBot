@@ -12,7 +12,7 @@ from telegram_bot.utils.messages import (
     BTN_NO,
     BTN_RESET,
     BTN_YES,
-    FOLLOWUP_CHOICE_KEYBOARD,
+    FOLLOWUP_CHOICE_INLINE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_DECLINED_MESSAGE,
     FOLLOWUP_OFFER_MESSAGE,
@@ -410,8 +410,8 @@ class TestFollowupIntegration:
                 improved_prompt_sent = True
             if FOLLOWUP_OFFER_MESSAGE in message_text:
                 followup_offer_sent = True
-                # Verify correct keyboard was used
-                assert call[1]["reply_markup"] == FOLLOWUP_CHOICE_KEYBOARD
+                # Verify inline keyboard was used (Requirements 8.1)
+                assert call[1]["reply_markup"] == FOLLOWUP_CHOICE_INLINE_KEYBOARD
 
         assert improved_prompt_sent, "Improved prompt was not sent"
         assert followup_offer_sent, "Follow-up offer was not sent"

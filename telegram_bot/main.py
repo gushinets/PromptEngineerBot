@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -162,6 +163,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await bot_handler.handle_message(update, context)
 
 
+async def handle_followup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle inline button callbacks for follow-up choice (YES/NO).
+
+    This handler processes callback queries from the inline buttons attached
+    to the follow-up offer message.
+
+    Requirements: 8.4
+    """
+    await bot_handler.handle_followup_callback(update, context)
+
+
+async def handle_disabled_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle clicks on disabled inline buttons (no-op handler).
+
+    This handler simply answers the callback query to remove the loading
+    indicator when users click on already-disabled buttons.
+
+    Requirements: 8.4
+    """
+    query = update.callback_query
+    await query.answer()
+
+
 async def main():
     """Start the bot."""
     # Get the token
@@ -283,6 +307,17 @@ async def main():
         # Add handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+        # Add callback query handlers for follow-up inline buttons
+        # Handler for follow-up choice buttons (YES/NO)
+        application.add_handler(
+            CallbackQueryHandler(handle_followup_callback, pattern="^followup_(yes|no)$")
+        )
+        # Handler for disabled button clicks (no-op)
+        application.add_handler(
+            CallbackQueryHandler(handle_disabled_callback, pattern="^disabled$")
+        )
+        logger.info("Callback handlers registered for follow-up inline buttons")
 
         # Start the Bot with error handling
         logger.info("Starting polling...")

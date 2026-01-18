@@ -4,7 +4,7 @@ Telegram bot message handlers and core logic.
 
 import logging
 
-from telegram import ReplyKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from tenacity import (
     RetryError,
@@ -30,6 +30,8 @@ from telegram_bot.utils.messages import (
     BTN_POST_OPTIMIZATION_EMAIL,
     BTN_RESET,
     BTN_YES,
+    CALLBACK_FOLLOWUP_NO,
+    CALLBACK_FOLLOWUP_YES,
     ERROR_EMAIL_INPUT_FAILED,
     ERROR_EMAIL_SERVICE_ERROR,
     ERROR_EMAIL_SERVICE_UNAVAILABLE,
@@ -43,7 +45,7 @@ from telegram_bot.utils.messages import (
     ERROR_STATE_RECOVERY_SUCCESS,
     FOLLOWUP_API_ERROR_FALLBACK,
     FOLLOWUP_API_ERROR_RESTART,
-    FOLLOWUP_CHOICE_KEYBOARD,
+    FOLLOWUP_CHOICE_INLINE_KEYBOARD,
     FOLLOWUP_CONVERSATION_KEYBOARD,
     FOLLOWUP_DECLINED_MESSAGE,
     FOLLOWUP_GENERIC_ERROR_RESTART,
@@ -474,16 +476,22 @@ class BotHandler:
         # Session was already created in _handle_prompt_input, now we set the method
         self._set_session_optimization_method(user_id, method_name)
 
-        # Send processing message
+        # Send processing message with Reset keyboard attached
+        # This keyboard will persist and be available during follow-up choice phase
         processing_method = method_name.lower().replace(" ", "_")
         try:
             await update.message.reply_text(
-                get_processing_message(processing_method), parse_mode="Markdown"
+                get_processing_message(processing_method),
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
             )
         except Exception as e:
             # Fallback without Markdown if parsing fails
             logger.warning(f"Markdown parsing failed: {e}")
-            await update.message.reply_text(get_processing_message(processing_method))
+            await update.message.reply_text(
+                get_processing_message(processing_method),
+                reply_markup=ReplyKeyboardMarkup([[BTN_RESET]], resize_keyboard=True),
+            )
 
         # Process with LLM
         await self._process_with_llm(update, user_id, method_name)
@@ -545,100 +553,206 @@ class BotHandler:
             await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
 
     async def _handle_followup_choice(self, update: Update, user_id: int, text: str):
-        """Handle follow-up choice (YES/NO) from user."""
+        """Handle follow-up choice (YES/NO) from user.
+
+        This method handles text-based button clicks from the regular keyboard.
+        For inline button callbacks, use handle_followup_callback instead.
+        """
         if text == BTN_NO:
-            # User declined follow-up questions
-            # Preserve optimization result for post-optimization email button
-
-            # Get the original prompt before any resets
-            original_prompt = self.conversation_manager.get_user_prompt(user_id)
-
-            # First check if we have a cached improved prompt (this should be available after optimization)
-            improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
-
-            # Get the cached method name (stored when the improved prompt was cached)
-            cached_method = self.state_manager.get_cached_method_name(user_id)
-
-            if improved_prompt:
-                # We have an improved prompt from the initial optimization, use it
-                # Use the cached method name, or fallback to "Optimization"
-                method_name = cached_method if cached_method else "Optimization"
-
-                self.state_manager.set_post_optimization_result(
-                    user_id,
-                    {
-                        "type": "single_method",
-                        "method_name": method_name,
-                        "content": improved_prompt,
-                        "original_prompt": original_prompt,
-                    },
-                )
-                logger.info(
-                    f"followup_declined_using_cached_prompt | user_id={user_id} | method={method_name} | content_length={len(improved_prompt)} | has_original={bool(original_prompt)}"
-                )
-            else:
-                # This should not happen with proper state management
-                # Log warning and continue without storing result
-                logger.warning(
-                    f"followup_declined_no_cached_prompt | user_id={user_id} | This indicates a state management issue"
-                )
-
-            # Send follow-up declined message with post-optimization email button
-            await self._safe_reply(
-                update,
-                FOLLOWUP_DECLINED_MESSAGE,
-                parse_mode="Markdown",
-                reply_markup=POST_FOLLOWUP_DECLINE_KEYBOARD,
-            )
-
-            # Reset state to prompt input ready
-            self.state_manager.set_waiting_for_followup_choice(user_id, False)
-            self.state_manager.set_waiting_for_prompt(user_id, True)
-            self.state_manager.set_improved_prompt_cache(user_id, None)  # Clear cache
-            self.state_manager.set_cached_method_name(user_id, None)  # Clear cached method
-            self.conversation_manager.reset(user_id)
-
-            logger.info(f"followup_declined | user_id={user_id}")
-
+            await self._process_followup_no(update, user_id)
         elif text == BTN_YES:
-            # User accepted follow-up questions
-            # Get cached improved prompt
-            improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
-            if not improved_prompt:
-                # Fallback if cache is missing - should not happen in normal flow
-                logger.warning(f"followup_accepted_no_cache | user_id={user_id}")
-                await self._safe_reply(
-                    update,
-                    RESET_CONFIRMATION,
-                    parse_mode="Markdown",
-                    reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True),
-                )
-                self.reset_user_state(user_id)
-                return
-
-            # Mark session as using followup optimization (Requirements 6.2)
-            self._set_session_followup_used(user_id)
-
-            # Start follow-up conversation immediately
-            # Update state transitions to go directly from choice to conversation
-            self.state_manager.set_waiting_for_followup_choice(user_id, False)
-
-            # Start follow-up conversation using cached improved prompt
-            self.conversation_manager.start_followup_conversation(user_id, improved_prompt)
-
-            logger.info(f"followup_accepted | user_id={user_id}")
-
-            # Send initial request to LLM to get first question
-            try:
-                await self._process_followup_llm_request(update, user_id)
-            except Exception as e:
-                await self._handle_followup_error(update, user_id, e, "conversation")
-
+            await self._process_followup_yes(update, user_id)
         else:
             # Invalid choice, show options again
             # This should not happen with proper keyboard, but handle gracefully
             logger.warning(f"invalid_followup_choice | user_id={user_id} | text={text}")
             # Keep the same state and don't respond - user should use buttons
+
+    async def _process_followup_no(self, update: Update, user_id: int):
+        """Process NO choice for follow-up questions.
+
+        This method contains the core logic for declining follow-up questions.
+        It is called by both _handle_followup_choice (text buttons) and
+        handle_followup_callback (inline buttons).
+        """
+        # User declined follow-up questions
+        # Preserve optimization result for post-optimization email button
+
+        # Get the original prompt before any resets
+        original_prompt = self.conversation_manager.get_user_prompt(user_id)
+
+        # First check if we have a cached improved prompt (this should be available after optimization)
+        improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
+
+        # Get the cached method name (stored when the improved prompt was cached)
+        cached_method = self.state_manager.get_cached_method_name(user_id)
+
+        if improved_prompt:
+            # We have an improved prompt from the initial optimization, use it
+            # Use the cached method name, or fallback to "Optimization"
+            method_name = cached_method if cached_method else "Optimization"
+
+            self.state_manager.set_post_optimization_result(
+                user_id,
+                {
+                    "type": "single_method",
+                    "method_name": method_name,
+                    "content": improved_prompt,
+                    "original_prompt": original_prompt,
+                },
+            )
+            logger.info(
+                f"followup_declined_using_cached_prompt | user_id={user_id} | method={method_name} | content_length={len(improved_prompt)} | has_original={bool(original_prompt)}"
+            )
+        else:
+            # This should not happen with proper state management
+            # Log warning and continue without storing result
+            logger.warning(
+                f"followup_declined_no_cached_prompt | user_id={user_id} | This indicates a state management issue"
+            )
+
+        # Send follow-up declined message with post-optimization email button
+        await self._safe_reply(
+            update,
+            FOLLOWUP_DECLINED_MESSAGE,
+            parse_mode="Markdown",
+            reply_markup=POST_FOLLOWUP_DECLINE_KEYBOARD,
+        )
+
+        # Reset state to prompt input ready
+        self.state_manager.set_waiting_for_followup_choice(user_id, False)
+        self.state_manager.set_waiting_for_prompt(user_id, True)
+        self.state_manager.set_improved_prompt_cache(user_id, None)  # Clear cache
+        self.state_manager.set_cached_method_name(user_id, None)  # Clear cached method
+        self.conversation_manager.reset(user_id)
+
+        logger.info(f"followup_declined | user_id={user_id}")
+
+    async def _process_followup_yes(self, update: Update, user_id: int):
+        """Process YES choice for follow-up questions.
+
+        This method contains the core logic for accepting follow-up questions.
+        It is called by both _handle_followup_choice (text buttons) and
+        handle_followup_callback (inline buttons).
+        """
+        # User accepted follow-up questions
+        # Get cached improved prompt
+        improved_prompt = self.state_manager.get_improved_prompt_cache(user_id)
+        if not improved_prompt:
+            # Fallback if cache is missing - should not happen in normal flow
+            logger.warning(f"followup_accepted_no_cache | user_id={user_id}")
+            await self._safe_reply(
+                update,
+                RESET_CONFIRMATION,
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup([[]], resize_keyboard=True),
+            )
+            self.reset_user_state(user_id)
+            return
+
+        # Mark session as using followup optimization (Requirements 6.2)
+        self._set_session_followup_used(user_id)
+
+        # Start follow-up conversation immediately
+        # Update state transitions to go directly from choice to conversation
+        self.state_manager.set_waiting_for_followup_choice(user_id, False)
+
+        # Start follow-up conversation using cached improved prompt
+        self.conversation_manager.start_followup_conversation(user_id, improved_prompt)
+
+        logger.info(f"followup_accepted | user_id={user_id}")
+
+        # Send initial request to LLM to get first question
+        try:
+            await self._process_followup_llm_request(update, user_id)
+        except Exception as e:
+            await self._handle_followup_error(update, user_id, e, "conversation")
+
+    async def handle_followup_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle inline button callbacks for follow-up choice.
+
+        This method processes callback queries from inline buttons (YES/NO)
+        attached to the follow-up offer message.
+
+        Args:
+            update: Telegram update object containing the callback query
+            context: Telegram context object
+
+        Requirements: 8.4
+        """
+        query = update.callback_query
+        user_id = query.from_user.id
+        callback_data = query.data
+
+        # Answer the callback query immediately to remove loading indicator
+        await query.answer()
+
+        logger.info(
+            f"followup_callback_received | user_id={user_id} | callback_data={callback_data}"
+        )
+
+        # Verify user is in the correct state for follow-up choice
+        user_state = self.state_manager.get_user_state(user_id)
+        if not user_state.waiting_for_followup_choice:
+            logger.warning(
+                f"followup_callback_invalid_state | user_id={user_id} | "
+                f"waiting_for_followup_choice={user_state.waiting_for_followup_choice}"
+            )
+            # User is not in follow-up choice state, ignore the callback
+            return
+
+        if callback_data == CALLBACK_FOLLOWUP_YES:
+            # Disable buttons by editing message
+            await self._disable_followup_buttons(query, selected="yes")
+            # Process YES choice
+            logger.info(f"followup_callback_yes | user_id={user_id}")
+            await self._process_followup_yes(update, user_id)
+
+        elif callback_data == CALLBACK_FOLLOWUP_NO:
+            # Disable buttons by editing message
+            await self._disable_followup_buttons(query, selected="no")
+            # Process NO choice
+            logger.info(f"followup_callback_no | user_id={user_id}")
+            await self._process_followup_no(update, user_id)
+
+    async def _disable_followup_buttons(self, query, selected: str):
+        """Edit message to show disabled buttons after user selection.
+
+        This method edits the inline keyboard to show which button was selected
+        and disables both buttons to prevent further clicks.
+
+        Args:
+            query: The callback query object from Telegram
+            selected: Which button was selected ("yes" or "no")
+
+        Requirements: 8.5
+        """
+        # Create disabled version of buttons (using ✓ to indicate selection)
+        if selected == "yes":
+            disabled_keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("✓ " + BTN_YES, callback_data="disabled"),
+                        InlineKeyboardButton(BTN_NO, callback_data="disabled"),
+                    ]
+                ]
+            )
+        else:
+            disabled_keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(BTN_YES, callback_data="disabled"),
+                        InlineKeyboardButton("✓ " + BTN_NO, callback_data="disabled"),
+                    ]
+                ]
+            )
+
+        try:
+            await query.edit_message_reply_markup(reply_markup=disabled_keyboard)
+            logger.info(f"followup_buttons_disabled | selected={selected}")
+        except Exception as e:
+            # Log but don't fail if button editing fails (e.g., message too old)
+            logger.warning(f"followup_buttons_disable_failed | error={e}")
 
     async def _handle_followup_conversation(self, update: Update, user_id: int, text: str):
         """Handle follow-up conversation during question-answer phase."""
@@ -1212,12 +1326,15 @@ class BotHandler:
                 # Complete session tracking - improved prompt delivered (Requirements 2.1)
                 self._complete_current_session(user_id)
 
-                # Send follow-up offer message with YES/NO buttons
+                # Send follow-up offer message with inline YES/NO buttons attached
+                # Requirements 8.1, 8.6: Use inline buttons for follow-up choice
+                # Note: Reset keyboard was already attached to the processing message
+                # and will persist, so no need to send a separate message for it
                 await self._safe_reply(
                     update,
                     FOLLOWUP_OFFER_MESSAGE,
                     parse_mode="Markdown",
-                    reply_markup=FOLLOWUP_CHOICE_KEYBOARD,
+                    reply_markup=FOLLOWUP_CHOICE_INLINE_KEYBOARD,
                 )
 
                 # Reset conversation but set up for follow-up choice
@@ -1835,7 +1952,10 @@ class BotHandler:
             logger.error(f"Failed to log conversation totals: {e}", exc_info=True)
 
     async def _safe_reply(self, update: Update, text: str, **kwargs) -> bool:
-        """Safely send a reply with error handling and length limits."""
+        """Safely send a reply with error handling and length limits.
+
+        Handles both regular messages and callback queries.
+        """
         try:
             await self._send_message_with_retry(update, text, **kwargs)
             return True
@@ -1859,8 +1979,21 @@ class BotHandler:
         reraise=True,
     )
     async def _send_message_with_retry(self, update: Update, text: str, **kwargs):
-        """Send message with retry logic using tenacity."""
+        """Send message with retry logic using tenacity.
+
+        Handles both regular messages and callback queries.
+        """
         MAX_MESSAGE_LENGTH = 4096
+
+        # Determine the correct message object to use for reply
+        # For callback queries, update.message is None, so we use callback_query.message
+        message = update.message
+        if message is None and update.callback_query and update.callback_query.message:
+            message = update.callback_query.message
+
+        if message is None:
+            logger.error("No message object available for reply")
+            return
 
         if len(text) > MAX_MESSAGE_LENGTH:
             # Log message splitting
@@ -1876,7 +2009,7 @@ class BotHandler:
                 chunk_num = (i // MAX_MESSAGE_LENGTH) + 1
 
                 try:
-                    await update.message.reply_text(chunk, **kwargs)
+                    await message.reply_text(chunk, **kwargs)
                     logger.debug(
                         f"message_chunk_sent | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
                     )
@@ -1884,7 +2017,7 @@ class BotHandler:
                     # If it's a Markdown parsing error, try without parse_mode
                     if "parse entities" in str(e).lower() or "markdown" in str(e).lower():
                         kwargs_no_parse = {k: v for k, v in kwargs.items() if k != "parse_mode"}
-                        await update.message.reply_text(chunk, **kwargs_no_parse)
+                        await message.reply_text(chunk, **kwargs_no_parse)
                         logger.info(
                             f"message_chunk_sent_no_markdown | user_id={user_id} | chunk={chunk_num}/{num_chunks}"
                         )
@@ -1897,12 +2030,12 @@ class BotHandler:
                 kwargs.pop("reply_markup", None)
         else:
             try:
-                await update.message.reply_text(text, **kwargs)
+                await message.reply_text(text, **kwargs)
             except Exception as e:
                 # If it's a Markdown parsing error, try without parse_mode
                 if "parse entities" in str(e).lower() or "markdown" in str(e).lower():
                     kwargs_no_parse = {k: v for k, v in kwargs.items() if k != "parse_mode"}
-                    await update.message.reply_text(text, **kwargs_no_parse)
+                    await message.reply_text(text, **kwargs_no_parse)
                     logger.info("Message sent successfully without Markdown parsing")
                 else:
                     # Re-raise for tenacity to handle
