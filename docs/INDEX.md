@@ -12,7 +12,10 @@ Welcome to the Telegram Prompt Engineer Bot documentation. This index provides q
 
 ## User Guides
 
+- [Bot User Guide](guides/BOT_USER_GUIDE.md) - Complete guide for end users on how to use the bot
 - [End-to-End User Paths](guides/E2E_USER_PATHS_DOCUMENTATION.md) - Complete user journey documentation and testing paths
+- [Manual Test Plan](guides/MANUAL_TEST_PLAN.md) - Comprehensive manual testing procedures and checklists
+- [Migration Guide](guides/MIGRATION_GUIDE.md) - Guide for migrating to the new project structure
 
 ## Guidelines
 
@@ -81,9 +84,20 @@ telegram_bot/
 └── dependencies.py    # Dependency injection container
 ```
 
-## Migration Guide
+## Security
 
-- [Migration Guide](MIGRATION_GUIDE.md) - Guide for migrating to the new project structure
+Security documentation and testing reports:
+
+- [Quick Start](security/QUICK_START.md) - Quick start guide for security tooling
+- [Project Configuration](security/PROJECT_CONFIGURATION.md) - Security-related project configuration
+- [Implementation Summary](security/IMPLEMENTATION_SUMMARY.md) - Security implementation overview
+- [Pre-commit Setup](security/pre-commit-setup.md) - Security pre-commit hooks configuration
+- [CI Integration](security/ci-integration.md) - Security checks in CI/CD pipeline
+- [Tool Reference](security/tool-reference.md) - Reference for security scanning tools
+- [Test Results](security/test-results.md) - Security test execution results
+- [OWASP Top 10 Test Report](security/OWASP_TOP10_TEST_REPORT.md) - OWASP Top 10 vulnerability assessment
+- [Troubleshooting](security/troubleshooting.md) - Security tooling troubleshooting guide
+- [Scan Results](security/scan-results/README.md) - Security scan results and reports
 
 ## Quick Links
 
