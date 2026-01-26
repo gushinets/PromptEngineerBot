@@ -450,22 +450,38 @@ INFO_ALL_METHODS_OPTIMIZATION = _(
     "🔄 Starting prompt optimization with all three methods...",
 )
 
+# TEMPORARILY HIDDEN: Original message with email option commented out below
+# SELECT_METHOD_MESSAGE_WITH_EMAIL = _(
+#     "📝 **Ваш запрос получен!**\n\n"
+#     "Теперь выберите один метод оптимизации:\n\n"
+#     "⚡ Быстро — мгновенный результат\n"
+#     "🛠 По шагам — структурированный подход\n"
+#     "🎯 Под результат — фокус на цели, минимум вопросов\n\n"
+#     'Или нажмите кнопку "Отправить на e-mail" и получите запрос, '
+#     "оптимизированный всеми тремя методами сразу, на вашу почту.\n\n"
+#     "👉 *Нажмите на кнопку ниже, чтобы начать*:",
+#     "📝 **Your request has been received!**\n\n"
+#     "Now choose one optimization method:\n\n"
+#     "⚡ Quick — instant results\n"
+#     "🛠 Step-by-step — structured approach\n"
+#     "🎯 Result-focused — goal-focused, minimal questions\n\n"
+#     'Or click the "Send to e-mail" button and receive your request '
+#     "optimized with all three methods at once in your email.\n\n"
+#     "👉 *Click the button below to start*:",
+# )
+
 SELECT_METHOD_MESSAGE = _(
     "📝 **Ваш запрос получен!**\n\n"
     "Теперь выберите один метод оптимизации:\n\n"
     "⚡ Быстро — мгновенный результат\n"
     "🛠 По шагам — структурированный подход\n"
     "🎯 Под результат — фокус на цели, минимум вопросов\n\n"
-    'Или нажмите кнопку "Отправить на e-mail" и получите запрос, '
-    "оптимизированный всеми тремя методами сразу, на вашу почту.\n\n"
     "👉 *Нажмите на кнопку ниже, чтобы начать*:",
     "📝 **Your request has been received!**\n\n"
     "Now choose one optimization method:\n\n"
     "⚡ Quick — instant results\n"
     "🛠 Step-by-step — structured approach\n"
     "🎯 Result-focused — goal-focused, minimal questions\n\n"
-    'Or click the "Send to e-mail" button and receive your request '
-    "optimized with all three methods at once in your email.\n\n"
     "👉 *Click the button below to start*:",
 )
 
@@ -557,8 +573,11 @@ FOLLOWUP_OFFER_MESSAGE = _(
 
 # ===== Keyboard Layouts =====
 # Method selection keyboard
+# TEMPORARILY HIDDEN: Email button row commented out - to restore, uncomment the BTN_EMAIL_DELIVERY row
 SELECT_METHOD_KEYBOARD = ReplyKeyboardMarkup(
-    [[BTN_EMAIL_DELIVERY], [BTN_LYRA, BTN_CRAFT, BTN_GGL]], resize_keyboard=True
+    # [[BTN_EMAIL_DELIVERY], [BTN_LYRA, BTN_CRAFT, BTN_GGL]], resize_keyboard=True  # Original with email
+    [[BTN_LYRA, BTN_CRAFT, BTN_GGL]],
+    resize_keyboard=True,  # Without email button
 )
 
 # Follow-up feature keyboards
@@ -587,12 +606,18 @@ FOLLOWUP_CONVERSATION_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 # Post-optimization email keyboards
+# TEMPORARILY HIDDEN: Email button row commented out - to restore, uncomment the BTN_POST_OPTIMIZATION_EMAIL row
 POST_FOLLOWUP_COMPLETION_KEYBOARD = ReplyKeyboardMarkup(
-    [[BTN_POST_OPTIMIZATION_EMAIL], [BTN_RESET]], resize_keyboard=True
+    # [[BTN_POST_OPTIMIZATION_EMAIL], [BTN_RESET]], resize_keyboard=True  # Original with email
+    [[BTN_RESET]],
+    resize_keyboard=True,  # Without email button
 )
 
+# TEMPORARILY HIDDEN: Email button row commented out - to restore, uncomment the BTN_POST_OPTIMIZATION_EMAIL row
 POST_FOLLOWUP_DECLINE_KEYBOARD = ReplyKeyboardMarkup(
-    [[BTN_POST_OPTIMIZATION_EMAIL], [BTN_RESET]], resize_keyboard=True
+    # [[BTN_POST_OPTIMIZATION_EMAIL], [BTN_RESET]], resize_keyboard=True  # Original with email
+    [[BTN_RESET]],
+    resize_keyboard=True,  # Without email button
 )
 
 # ===== Improved Prompt Response =====
