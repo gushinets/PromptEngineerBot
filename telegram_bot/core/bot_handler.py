@@ -14,6 +14,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from telegram_bot.services.llm import openrouter_client
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
 from telegram_bot.services.llm.base import LLMClientBase
@@ -199,6 +200,8 @@ class BotHandler:
             # Session ID should remain available for post-completion email tracking (Requirements 7.4)
             self.state_manager.set_current_session_id(user_id, None)
         self.conversation_manager.reset(user_id)
+    
+        
 
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command or New Prompt button."""
@@ -240,7 +243,32 @@ class BotHandler:
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming messages from users."""
         user_id = update.effective_user.id
-        text = update.message.text
+        text = None
+        
+        if update.message.voice:
+            voice = update.message.voice
+
+            tg_file = await context.bot.get_file(voice.file_id)
+            audio_ba = await tg_file.download_as_bytearray()
+            audio_bytes = bytes(audio_ba)
+
+            logger.info(f"VOICE file_id={voice.file_id} size={len(audio_bytes)}")
+
+            with open("debug_voice.ogg", "wb") as f:
+                f.write(audio_bytes)
+
+            text = await self.llm_client.transcribe_audio(
+                audio_bytes=audio_bytes,
+                audio_format="ogg",
+                transcription_model=self.config.model_name,)
+            
+            await update.message.reply_text(f"📝 Распознанный текст:\n\n{text}")
+
+        
+        elif update.message.text:
+            text = update.message.text
+        else:
+            return
 
         # Track user interaction early in message processing (Requirement 7.1)
         # This creates user on first interaction or updates last_interaction_at
