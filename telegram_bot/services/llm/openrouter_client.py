@@ -1,8 +1,9 @@
 import asyncio
 import logging
-
+from typing import Optional
 import aiohttp
 
+import base64
 from telegram_bot.services.llm.base import LLMClientBase, TokenUsage
 
 
@@ -20,6 +21,7 @@ class OpenRouterClient(LLMClientBase):
             timeout (float): Request timeout in seconds.
         """
         super().__init__(api_key, model_name)
+        self.transcription_base_url = 'https://openrouter.ai/api/v1/audio/transcriptions'
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
         self.timeout = timeout
         self.headers = {
@@ -57,11 +59,11 @@ class OpenRouterClient(LLMClientBase):
                         def __init__(self, resp):
                             self._resp = resp
 
-                        async def __aenter__(self):
-                            return self._resp
+                    async def __aenter__(self):
+                        return self._resp
 
-                        async def __aexit__(self, exc_type, exc, tb):
-                            return False
+                    async def __aexit__(self, exc_type, exc, tb):
+                        return False
 
                     response_cm = _ResponseWrapper(response_obj)
 
@@ -96,3 +98,96 @@ class OpenRouterClient(LLMClientBase):
             except TimeoutError:
                 self.logger.error(f"{log_prefix} Request timed out after {self.timeout} seconds")
                 raise
+    
+    async def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        *,
+        audio_format: str = "ogg",
+        transcription_model: Optional[str] = None,
+        log_prefix: str = "",
+        ) -> str:
+
+        model = transcription_model or self.model_name
+
+        import base64
+        b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+
+        payload = {
+            "model": model,
+            "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Transcribe the audio exactly as spoken. "
+                            "Do not add or invent anything. "
+                            "Return ONLY the final transcription as plain text."
+                        ),
+                    },
+                    {
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": b64_audio,
+                            "format": audio_format,
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+
+        async with aiohttp.ClientSession() as session:
+
+            async def _do_request():
+                post_result = session.post(
+                    self.base_url,  
+                    headers=self.headers,
+                    json=payload,
+                )
+
+                if hasattr(post_result, "__aenter__"):
+                    response_cm = post_result
+                else:
+                    response_obj = await post_result
+
+                    class _ResponseWrapper:
+                        def __init__(self, resp):
+                            self._resp = resp
+
+                        async def __aenter__(self):
+                            return self._resp
+
+                        async def __aexit__(self, exc_type, exc, tb):
+                            return False
+
+                    response_cm = _ResponseWrapper(response_obj)
+
+                async with response_cm as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        self.logger.error(
+                            f"{log_prefix} Transcription failed: "
+                            f"status={response.status} body={error_text}"
+                        )
+                        raise Exception(
+                            f"Transcription failed: status={response.status} body={error_text}"
+                        )
+
+                    data = await response.json()
+                    text = data["choices"][0]["message"]["content"].strip()
+
+                    self.logger.info(f"{log_prefix} Transcription result: {text}")
+                    return text
+
+            return await asyncio.wait_for(_do_request(), timeout=self.timeout)
+
+
+                
+            
+                            
+                    
+                
+                
