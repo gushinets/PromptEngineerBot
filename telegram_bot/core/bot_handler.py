@@ -254,9 +254,6 @@ class BotHandler:
 
             logger.info(f"VOICE file_id={voice.file_id} size={len(audio_bytes)}")
 
-            with open("debug_voice.ogg", "wb") as f:
-                f.write(audio_bytes)
-
             text = await self.llm_client.transcribe_audio(
                 audio_bytes=audio_bytes,
                 audio_format="ogg",
