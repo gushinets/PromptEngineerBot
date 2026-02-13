@@ -3,7 +3,7 @@ Configuration management for the Telegram bot.
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import Field, dataclass
 
 from dotenv import load_dotenv
 
@@ -87,6 +87,13 @@ class BotConfig:
     # Redis write check strictness
     redis_write_check_strict: bool = False
 
+    # Voise massage
+    VOICE_ENABLED: bool = False
+    VOICE_BACKEND: str = "OPENAI_WHISPER"
+    WHISPER_MODEL: str = "whisper-1"
+    VOICE_LANGUAGE: str = "ru"  # 'ru', 'en', 'auto'
+    VOICE_MAX_DURATION: int = 60  # seconds
+
     @staticmethod
     def _get_default_smtp_port() -> int:
         """Get default SMTP port based on TLS/SSL settings."""
@@ -121,6 +128,12 @@ class BotConfig:
             raise ValueError("OPENAI_API_KEY is required when using OpenAI backend")
         if llm_backend == "OPENROUTER" and not os.getenv("OPENROUTER_API_KEY"):
             raise ValueError("OPENROUTER_API_KEY is required when using OpenRouter backend")
+        
+        voice_enabled = os.getenv("VOICE_ENABLED", "false").lower() in ("true", "1", "yes")
+        voice_backend = os.getenv("VOICE_BACKEND", "OPENAI_WHISPER")
+        whisper_model = os.getenv("WHISPER_MODEL", "whisper-1")
+        voice_language = os.getenv("VOICE_LANGUAGE", "ru")
+        voice_max_duration = int(os.getenv("VOICE_MAX_DURATION", 60))
 
         return cls(
             telegram_token=telegram_token,
@@ -185,6 +198,11 @@ class BotConfig:
             # Redis write check strictness
             redis_write_check_strict=os.getenv("REDIS_WRITE_CHECK_STRICT", "false").lower()
             in ("true", "1", "yes"),
+            VOICE_ENABLED=voice_enabled,
+            VOICE_BACKEND=voice_backend,
+            WHISPER_MODEL=whisper_model,
+            VOICE_LANGUAGE=voice_language,
+            VOICE_MAX_DURATION=voice_max_duration,
         )
 
     def validate(self) -> None:

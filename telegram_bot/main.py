@@ -306,7 +306,7 @@ async def main():
 
         # Add handlers
         application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, bot_handler.handle_message))
 
         # Add callback query handlers for follow-up inline buttons
         # Handler for follow-up choice buttons (YES/NO)

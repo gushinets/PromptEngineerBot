@@ -3,9 +3,15 @@ Telegram bot message handlers and core logic.
 """
 
 import logging
+import os
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
-from telegram.ext import ContextTypes
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    Update,
+)
+from telegram.ext import ContextTypes, ConversationHandler
 from tenacity import (
     RetryError,
     retry,
@@ -14,6 +20,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from telegram_bot.services.voice.factory import VoiceServiceFactory
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
 from telegram_bot.services.llm.base import LLMClientBase
@@ -148,6 +155,18 @@ class BotHandler:
             # Database not initialized - session tracking will be disabled
             self.session_service = None
 
+        self.voice_service = None
+        if getattr(config, 'VOICE_ENABLED', False):
+            try:
+                logger.info(f"🎤 Initializing voice service | backend={getattr(config, 'VOICE_BACKEND', 'OPENAI_WHISPER')}")
+                logger.info(f"🎤 OPENAI_API_KEY present: {bool(getattr(config, 'openai_api_key', None))}")  # ← snake_case!
+                
+                self.voice_service = VoiceServiceFactory.create(config)
+                logger.info("✅ Voice service initialized successfully")
+            except Exception as e:
+                logger.error(f"❌ FAILED TO INITIALIZE VOICE SERVICE: {e}", exc_info=True)
+                logger.warning("Voice processing will be disabled")
+
     def set_email_flow_orchestrator(self, orchestrator):
         """Set the email flow orchestrator after initialization."""
         self.email_flow_orchestrator = orchestrator
@@ -240,7 +259,22 @@ class BotHandler:
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming messages from users."""
         user_id = update.effective_user.id
-        text = update.message.text
+        message = update.message        
+        
+        # verification for voice messages
+        if getattr(self.config, 'VOICE_ENABLED', False) and message and hasattr(message, 'voice') and message.voice is not None:
+            logger.info(f"🎤 Voice message received: duration={message.voice.duration}s, size={message.voice.file_size} bytes")
+            return await self._handle_voice_message(update, context)
+        
+        # Text validation (after voice check)
+        if not message or not message.text:
+            await self._safe_reply(
+                update,
+                "Пожалуйста, отправьте текстовый промпт или голосовое сообщение 🎙️"
+            )
+            return ConversationHandler.END
+        
+        text = message.text.strip()
 
         # Track user interaction early in message processing (Requirement 7.1)
         # This creates user on first interaction or updates last_interaction_at
@@ -366,7 +400,7 @@ class BotHandler:
             SELECT_METHOD_MESSAGE,
             reply_markup=ReplyKeyboardMarkup(method_keyboard, resize_keyboard=True),
         )
-
+    
     async def _handle_method_selection(
         self,
         update: Update,
@@ -2040,3 +2074,124 @@ class BotHandler:
                 else:
                     # Re-raise for tenacity to handle
                     raise e
+
+    async def _handle_voice_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Transparent voice processing: recognize - process by state"""
+        if not self.voice_service:
+            await self._safe_reply(update, "Голосовая обработка временно недоступна.")
+            return ConversationHandler.END
+
+        voice = update.message.voice
+        
+        if voice.duration > self.config.VOICE_MAX_DURATION:
+            await self._safe_reply(
+                update,
+                f"⏳ Слишком длинное сообщение (макс. {self.config.VOICE_MAX_DURATION} сек)."
+            )
+            return ConversationHandler.END
+        
+        await update.message.chat.send_action(action="typing")
+        
+        ogg_path = f"/tmp/voice_{update.message.message_id}_{update.effective_user.id}.ogg"
+        
+        try:
+            file = await context.bot.get_file(voice.file_id)
+            await file.download_to_drive(ogg_path)
+            
+            transcribed_text = await self.voice_service.transcribe(
+                ogg_path,
+                language=self.config.VOICE_LANGUAGE
+            )
+            
+            if os.path.exists(ogg_path):
+                os.remove(ogg_path)
+            
+            # We show the transcript
+            await self._safe_reply(
+                update,
+                f"🎙️ «{transcribed_text[:100]}{'...' if len(transcribed_text) > 100 else ''}»",
+                parse_mode="HTML"
+            )
+            
+            user_id = update.effective_user.id
+            user_state = self.state_manager.get_user_state(user_id)
+            
+            # Processing recognized text by state
+            
+            # If this is a reset button
+            if transcribed_text.strip() == BTN_RESET:
+                await self.handle_start(update, context)
+                return
+            
+            # Followup conversation - we pass it to the handler followup
+            if user_state.in_followup_conversation:
+                email_flow_data = user_state.email_flow_data
+                if email_flow_data and self.email_flow_orchestrator:
+                    await self.email_flow_orchestrator.handle_followup_conversation(
+                        update, context, user_id, transcribed_text
+                    )
+                else:
+                    await self._handle_followup_conversation(update, user_id, transcribed_text)
+                return
+            
+            # Followup choice
+            if user_state.waiting_for_followup_choice:
+                email_flow_data = user_state.email_flow_data
+                if email_flow_data and self.email_flow_orchestrator:
+                    await self.email_flow_orchestrator.handle_followup_choice(
+                        update, context, user_id, transcribed_text
+                    )
+                else:
+                    await self._handle_followup_choice(update, user_id, transcribed_text)
+                return
+            
+            # Email OTP input
+            if user_state.waiting_for_otp_input:
+                if self.email_flow_orchestrator:
+                    try:
+                        await self.email_flow_orchestrator.handle_otp_input(
+                            update, context, user_id, transcribed_text
+                        )
+                    except Exception as e:
+                        logger.error(f"OTP input handling error for user {user_id}: {e}")
+                        await self._safe_reply(update, ERROR_OTP_VERIFICATION_FAILED)
+                else:
+                    await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
+                return
+            
+            # Email input
+            if user_state.waiting_for_email_input:
+                if self.email_flow_orchestrator:
+                    try:
+                        await self.email_flow_orchestrator.handle_email_input(
+                            update, context, user_id, transcribed_text
+                        )
+                    except Exception as e:
+                        logger.error(f"Email input handling error for user {user_id}: {e}")
+                        await self._safe_reply(update, ERROR_EMAIL_INPUT_FAILED)
+                else:
+                    await self._safe_reply(update, ERROR_EMAIL_SERVICE_UNAVAILABLE)
+                return
+            
+            # Method selection
+            if self.conversation_manager.is_waiting_for_method(user_id):
+                await self._handle_method_selection(update, context, user_id, transcribed_text)
+                return
+            
+            # Multi-turn conversation
+            if not user_state.waiting_for_prompt:
+                await self._handle_conversation_turn(update, user_id, transcribed_text)
+                return
+            
+            await self._handle_prompt_input(update, user_id, transcribed_text)
+            
+        except Exception as e:
+            if os.path.exists(ogg_path):
+                os.remove(ogg_path)
+            
+            await self._safe_reply(
+                update,
+                "❌ Не удалось распознать голос. Попробуйте ещё раз или напишите текстом."
+            )
+            return ConversationHandler.END
+        
