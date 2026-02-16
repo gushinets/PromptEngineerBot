@@ -2188,6 +2188,11 @@ class BotHandler:
         except Exception as e:
             if os.path.exists(ogg_path):
                 os.remove(ogg_path)
+
+            logger.error(
+                f"🎤 Voice processing FAILED for user {update.effective_user.id}: {e}",
+                exc_info=True
+            )
             
             await self._safe_reply(
                 update,
