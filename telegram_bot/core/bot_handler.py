@@ -4,6 +4,7 @@ Telegram bot message handlers and core logic.
 
 import logging
 import os
+from pathlib import Path
 
 from telegram import (
     InlineKeyboardButton,
@@ -2092,7 +2093,8 @@ class BotHandler:
         
         await update.message.chat.send_action(action="typing")
         
-        ogg_path = f"/tmp/voice_{update.message.message_id}_{update.effective_user.id}.ogg"
+        ogg_path = Path("tmp") / f"voice_{update.message.message_id}_{update.effective_user.id}.ogg"
+        ogg_path.parent.mkdir(parents=True, exist_ok=True)
         
         try:
             file = await context.bot.get_file(voice.file_id)
