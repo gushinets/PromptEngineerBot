@@ -45,6 +45,12 @@ class LLMClientFactory:
                 api_key=config.openrouter_api_key,
                 model_name=config.model_name,
                 timeout=config.openrouter_timeout,
+                transcription_api_name=(
+                    config.bot_api_for_transcription or config.openrouter_api_key
+                ),
+                transcription_model_name=(
+                    config.bot_model_for_transcription or config.model_name
+                ),
             )
 
         raise ValueError(f"Unsupported LLM backend: {config.llm_backend}")

@@ -13,7 +13,10 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-
+from telegram_bot.services.llm.errors import (
+    TranscriptionNotSupportedError,
+    CountryRegionTerritoryNotSupportedError
+)
 from telegram_bot.services.llm import openrouter_client
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
@@ -37,6 +40,9 @@ from telegram_bot.utils.messages import (
     ERROR_EMAIL_SERVICE_ERROR,
     ERROR_EMAIL_SERVICE_UNAVAILABLE,
     ERROR_GENERIC,
+    ERROR_INTERNAL_SERVER,
+    ERROR_VOICE_NOT_SUPPORTED,
+    ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED,
     ERROR_OTP_VERIFICATION_FAILED,
     ERROR_PROMPT_GENERATION_FAILED,
     ERROR_PROMPT_RETRIEVAL_FALLBACK,
@@ -71,6 +77,7 @@ from telegram_bot.utils.messages import (
     parse_followup_response,
     parse_llm_response,
 )
+
 
 
 logger = logging.getLogger(__name__)
@@ -254,10 +261,22 @@ class BotHandler:
 
             logger.info(f"VOICE file_id={voice.file_id} size={len(audio_bytes)}")
 
-            text = await self.llm_client.transcribe_audio(
-                audio_bytes=audio_bytes,
-                audio_format="ogg",
-                transcription_model=self.config.model_name,)
+            try:
+                text = await self.llm_client.transcribe_audio(
+                    audio_bytes=audio_bytes,
+                    audio_format="ogg",
+                    transcription_model=(
+                        self.config.bot_model_for_transcription or self.config.model_name
+                    ),
+                )
+            except openrouter_client.TranscriptionNotSupportedError:
+                await update.message.reply_text(ERROR_VOICE_NOT_SUPPORTED)
+                return
+            except openrouter_client.CountryRegionTerritoryNotSupportedError:
+                await update.message.reply_text(ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED)
+                return
+            except openrouter_client.InternalServerError:
+                await update.message.reply_text(ERROR_INTERNAL_SERVER)
             
             await update.message.reply_text(f"📝 Распознанный текст:\n\n{text}")
 

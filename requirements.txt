@@ -30,3 +30,6 @@ hypothesis==6.148.7
 
 # Performance monitoring dependencies
 psutil==7.1.3
+
+# Voice processing dependencies
+imageio-ffmpeg

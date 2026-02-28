@@ -19,6 +19,8 @@ class BotConfig:
     telegram_token: str
     llm_backend: str
     model_name: str
+    bot_api_for_transcription: str | None = None  
+    bot_model_for_transcription: str | None = None
     initial_prompt: str | None = None
     bot_id: str | None = None
 
@@ -79,6 +81,9 @@ class BotConfig:
     # Session tracking settings
     session_timeout_seconds: int = 86400  # 24 hours default
 
+    # Health monitoring settings
+    health_monitor_enabled: bool = False
+    
     # Localization settings
     language: str = "EN"  # EN or RU
 
@@ -126,6 +131,8 @@ class BotConfig:
             telegram_token=telegram_token,
             llm_backend=llm_backend,
             model_name=model_name,
+            bot_api_for_transcription=os.getenv("BOT_API_FOR_TRANSCRIPTION"),
+            bot_model_for_transcription=os.getenv("BOT_MODEL_FOR_TRANSCRIPTION"),
             initial_prompt=os.getenv("INITIAL_PROMPT"),
             bot_id=os.getenv("BOT_ID"),
             # OpenAI settings

@@ -159,6 +159,16 @@ ERROR_EMAIL_SERVICE_UNAVAILABLE = _(
     "❌ Email service not available. Please try again later.",
 )
 
+ERROR_VOICE_NOT_SUPPORTED = _(
+    "⚠️ Текущая модель не поддерживает голосовые сообщения. Отправьте текст или выберите модель с поддержкой аудио.",
+    "⚠️ The current model does not support voice messages. Send text or choose a model with audio support.",
+)
+
+ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED = _(
+    "❌ Выбранная страна, регион или территория не поддерживается вашей моделью.",
+    "❌ The selected country, region, or territory is not supported by your model.",
+)
+
 ERROR_OTP_VERIFICATION_FAILED = _(
     "❌ Ошибка проверки OTP. Попробуйте позже.",
     "❌ OTP verification error. Please try again later.",
@@ -192,6 +202,11 @@ ERROR_RATE_LIMIT = _(
 ERROR_NETWORK = _(
     "🌐 Ошибка сети. Пожалуйста, проверьте подключение и попробуйте снова.",
     "🌐 Network error. Please check your connection and try again.",
+)
+
+ERROR_INTERNAL_SERVER = (
+    "❌ Внутренняя ошибка сервера. Пожалуйста, попробуйте позже.",
+    "❌ Internal server error. Please try again later.",
 )
 
 # Follow-up specific error messages
