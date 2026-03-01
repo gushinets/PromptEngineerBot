@@ -11,15 +11,6 @@ from telegram_bot.services.llm.base import LLMClientBase, TokenUsage
 from pathlib import Path
 import imageio_ffmpeg
 from telegram_bot.services.llm.errors import parse_openrouter_error, InternalServerError, CountryRegionTerritoryNotSupportedError, TranscriptionNotSupportedError, TranscriptionProviderNotSupportedError
-
-class CountryRegionTerritoryNotSupportedError(Exception):
-    """Raised when selected model does not support country/region/territory-specific features."""
-
-class TranscriptionNotSupportedError(Exception):
-    """Raised when selected model does not support audio transcription."""
-
-class TranscriptionProviderNotSupportedError(Exception):
-    """Raised when configured transcription provider is not supported by this client."""
     
 class OpenRouterClient(LLMClientBase):
     """
@@ -48,7 +39,7 @@ class OpenRouterClient(LLMClientBase):
         self.transcription_model_name = transcription_model_name or model_name
         self.headers = {
             "Authorization": f"Bearer {api_key}",
-            "HTTP-Referer": "https://github.com/",  # Replace with your actual domain
+            "HTTP-Referer": "https://github.com/",  
             "Content-Type": "application/json",
         }
 
@@ -69,9 +60,9 @@ class OpenRouterClient(LLMClientBase):
         async with aiohttp.ClientSession() as session:
 
             async def _do_request():
-                # Support both real session.post (async CM) and AsyncMock returning coroutine in tests
+                
                 post_result = session.post(self.base_url, headers=self.headers, json=payload)
-                # If the result is an async context manager, use it; otherwise await it and wrap
+                
                 if hasattr(post_result, "__aenter__"):
                     response_cm = post_result
                 else:
@@ -174,9 +165,9 @@ class OpenRouterClient(LLMClientBase):
                     "-y",
                     "-loglevel", "error",
                     "-i", str(in_path),
-                    "-ac", "1",          # mono
-                    "-ar", "16000",      # 16kHz
-                    "-c:a", "pcm_s16le", # PCM signed 16-bit little-endian
+                    "-ac", "1",          
+                    "-ar", "16000",      
+                    "-c:a", "pcm_s16le", 
                     str(out_path),
                 ]
                 try:
@@ -300,7 +291,7 @@ class OpenRouterClient(LLMClientBase):
                                 ", ".join(supported),
                             )
 
-                            # в приоритете wav, потом mp3
+                            
                             preferred_order = ["wav", "mp3"]
                             ordered = [f for f in preferred_order if f in supported] + [
                                 f for f in supported if f not in preferred_order
