@@ -32,4 +32,4 @@ hypothesis==6.148.7
 psutil==7.1.3
 
 # Voice processing dependencies
-imageio-ffmpeg
+imageio-ffmpeg == 0.6.0
