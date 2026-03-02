@@ -143,6 +143,7 @@ config.validate()
 logger.info("Configuration loaded successfully")
 logger.info(f"LLM Backend: {config.llm_backend}")
 logger.info(f"Model: {config.model_name}")
+logger.info(f'Transcription Model: {config.openai_model_transcription or config.bot_model_for_transcription}')
 
 # Create LLM client
 llm_client = LLMClientFactory.create_client(config)
