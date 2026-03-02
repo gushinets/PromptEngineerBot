@@ -45,7 +45,7 @@ class OpenAIClient(LLMClientBase):
         max_wait_time: float = 300.0,
         transcription_api_name: Optional[str] = None,
         transcription_model_name: Optional[str] = None,
-    ):
+    ):     
         """
         Initialize the OpenAI client.
 
@@ -177,6 +177,7 @@ class OpenAIClient(LLMClientBase):
         transcription_model: Optional[str] = None,
         log_prefix: str = "",
     ) -> str:
+        self.logger.info("%s STT request: model=%s base_url=%s", log_prefix, transcription_model, getattr(self.client, "base_url", None))
         """
         Transcribe audio to text using OpenAI Audio Transcriptions API.
         Логика полностью как в OpenRouterClient.transcribe_audio:
