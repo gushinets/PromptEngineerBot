@@ -4,6 +4,8 @@ Telegram bot message handlers and core logic.
 
 import logging
 
+import openai
+from openai.types.audio import transcription
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from tenacity import (
@@ -13,9 +15,12 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from telegram_bot.services.llm import openai_client
 from telegram_bot.services.llm.errors import (
     TranscriptionNotSupportedError,
-    CountryRegionTerritoryNotSupportedError
+    CountryRegionTerritoryNotSupportedError,
+    IncorrectAPIKeyError,
+    InternalServerError
 )
 from telegram_bot.services.llm import openrouter_client
 from telegram_bot.dependencies import get_container
@@ -42,6 +47,7 @@ from telegram_bot.utils.messages import (
     ERROR_GENERIC,
     ERROR_INTERNAL_SERVER,
     ERROR_VOICE_NOT_SUPPORTED,
+    ERROR_WRONG_API,
     ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED,
     ERROR_OTP_VERIFICATION_FAILED,
     ERROR_PROMPT_GENERATION_FAILED,
@@ -260,23 +266,27 @@ class BotHandler:
             audio_bytes = bytes(audio_ba)
 
             logger.info(f"VOICE file_id={voice.file_id} size={len(audio_bytes)}")
-
+            if self.config.llm_backend == 'openai' or 'OPENAI':
+                transcription_model = self.config.openai_model_transcription
+            else:
+                transcription_model = self.config.bot_model_for_transcription
             try:
                 text = await self.llm_client.transcribe_audio(
-                    audio_bytes=audio_bytes,
-                    audio_format="ogg",
-                    transcription_model=(
-                        self.config.bot_model_for_transcription or self.config.model_name
-                    ),
+                audio_bytes=audio_bytes,
+                audio_format="ogg",
+                transcription_model=transcription_model,
                 )
-            except openrouter_client.TranscriptionNotSupportedError:
+            except TranscriptionNotSupportedError:
                 await update.message.reply_text(ERROR_VOICE_NOT_SUPPORTED)
                 return
-            except openrouter_client.CountryRegionTerritoryNotSupportedError:
+            except CountryRegionTerritoryNotSupportedError:
                 await update.message.reply_text(ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED)
                 return
-            except openrouter_client.InternalServerError:
+            except InternalServerError:
                 await update.message.reply_text(ERROR_INTERNAL_SERVER)
+                return
+
+            
             
             await update.message.reply_text(f"📝 Распознанный текст:\n\n{text}")
 
