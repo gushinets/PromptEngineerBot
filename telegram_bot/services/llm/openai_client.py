@@ -27,6 +27,7 @@ from telegram_bot.services.llm.errors import (
     TranscriptionNotSupportedError,
     TranscriptionProviderNotSupportedError,
     parse_error,
+    IncorrectAPIKeyError,
 )
 
 
@@ -42,6 +43,8 @@ class OpenAIClient(LLMClientBase):
         max_retries: int = 5,
         request_timeout: float = 60.0,
         max_wait_time: float = 300.0,
+        transcription_api_name: Optional[str] = None,
+        transcription_model_name: Optional[str] = None,
     ):
         """
         Initialize the OpenAI client.
@@ -59,6 +62,7 @@ class OpenAIClient(LLMClientBase):
         self.max_wait_time = max_wait_time
         self.client = OpenAI(api_key=api_key)
         self.start_time = None
+        
 
     def _log_retry(self, retry_state: RetryCallState) -> bool:
         """Log retry attempts and check max wait time."""
@@ -374,6 +378,12 @@ class OpenAIClient(LLMClientBase):
                         f"Model '{model}' does not support transcription on this endpoint"
                     )
 
+                if status in (401, 403) and (
+                    info.code and info.code in {'Incorrect API key', 'invalid_api_key', 'authentication_error', 'invalid_request_error'}
+                ):
+                    raise IncorrectAPIKeyError(
+                        "Authentication with OpenAI API failed. Check your API key."
+                        )
                 
                 if status == 403 and (
                     (info.code and info.code == "unsupported_country_region_territory")
