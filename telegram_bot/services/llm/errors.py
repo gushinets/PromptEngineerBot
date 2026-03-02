@@ -6,12 +6,12 @@ from typing import Optional
 @dataclass
 class ProviderErrorInfo:
     http_status: int
-    provider_name: Optional[str] = None  # openrouter metadata.provider_name
-    code: Optional[str] = None           # normalized error code (string)
-    type: Optional[str] = None           # normalized error type (string)
-    message: Optional[str] = None        # human readable message
-    raw: Optional[str] = None            # openrouter metadata.raw (string)
-    full_text: str = ""                  # original body text (best-effort)
+    provider_name: Optional[str] = None  
+    code: Optional[str] = None           
+    type: Optional[str] = None           
+    message: Optional[str] = None        
+    raw: Optional[str] = None            
+    full_text: str = ""                  
 
 
 def parse_error(http_status: int, body_text: str) -> ProviderErrorInfo:
@@ -78,7 +78,7 @@ def parse_error(http_status: int, body_text: str) -> ProviderErrorInfo:
     return info
 
 
-# Backward compatibility (so existing OpenRouterClient keeps working until you update imports)
+
 parse_openrouter_error = parse_error
 
 
@@ -96,3 +96,6 @@ class TranscriptionProviderNotSupportedError(Exception):
 
 class InternalServerError(Exception):
     """Raised when the LLM provider returns a 500 Internal Server Error."""
+    
+class IncorrectAPIKeyError(Exception):
+    """Raised when the LLM provider returns a 401 Unauthorized error, indicating an incorrect API key."""
