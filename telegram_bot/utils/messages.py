@@ -209,6 +209,11 @@ ERROR_INTERNAL_SERVER = (
     "❌ Internal server error. Please try again later.",
 )
 
+ERROR_WRONG_API = (
+    "❌ Неверный API ключ. Пожалуйста, проверьте настройки и попробуйте снова.",
+    "❌ Invalid API key. Please check your settings and try again.",
+)
+
 # Follow-up specific error messages
 ERROR_FOLLOWUP_TIMEOUT = _(
     "⏱️ Время ожидания истекло во время уточняющих вопросов. Используем исходный улучшенный промпт.",
