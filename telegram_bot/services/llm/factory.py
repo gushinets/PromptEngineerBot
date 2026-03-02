@@ -35,7 +35,11 @@ class LLMClientFactory:
                 max_retries=config.openai_max_retries,
                 request_timeout=config.openai_request_timeout,
                 max_wait_time=config.openai_max_wait_time,
-            )
+                transcription_api_name=(
+                    config.openai_api_key),
+                transcription_model_name=(
+                    config.openai_model_transcription)
+                )
 
         if config.llm_backend == "OPENROUTER":
             if not config.openrouter_api_key:
@@ -46,10 +50,10 @@ class LLMClientFactory:
                 model_name=config.model_name,
                 timeout=config.openrouter_timeout,
                 transcription_api_name=(
-                    config.bot_api_for_transcription or config.openrouter_api_key
+                    config.openrouter_api_key
                 ),
                 transcription_model_name=(
-                    config.bot_model_for_transcription or config.model_name
+                    config.bot_model_for_transcription
                 ),
             )
 
