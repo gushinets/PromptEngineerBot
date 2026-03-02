@@ -10,7 +10,7 @@ import base64
 from telegram_bot.services.llm.base import LLMClientBase, TokenUsage
 from pathlib import Path
 import imageio_ffmpeg
-from telegram_bot.services.llm.errors import parse_openrouter_error, InternalServerError, CountryRegionTerritoryNotSupportedError, TranscriptionNotSupportedError, TranscriptionProviderNotSupportedError
+from telegram_bot.services.llm.errors import parse_openrouter_error, IncorrectAPIKeyError, InternalServerError, CountryRegionTerritoryNotSupportedError, TranscriptionNotSupportedError, TranscriptionProviderNotSupportedError
     
 class OpenRouterClient(LLMClientBase):
     """
@@ -268,6 +268,11 @@ class OpenRouterClient(LLMClientBase):
                         return text
 
                     info = parse_openrouter_error(status, error_text)
+                    
+                    if status == 401 and info.code == "invalid_api_key":
+                        raise IncorrectAPIKeyError(
+                            "Authentication with OpenRouter API failed. Check your API key."
+                        )
                     
                     if status == 400 and info.code == 'is not a valid model ID':
                         raise TranscriptionProviderNotSupportedError(f"Model '{model}' does not exist")
