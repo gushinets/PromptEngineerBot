@@ -204,7 +204,7 @@ ERROR_NETWORK = _(
     "🌐 Network error. Please check your connection and try again.",
 )
 
-ERROR_INTERNAL_SERVER = (
+ERROR_INTERNAL_SERVER = _(
     "❌ Внутренняя ошибка сервера. Пожалуйста, попробуйте позже.",
     "❌ Internal server error. Please try again later.",
 )
