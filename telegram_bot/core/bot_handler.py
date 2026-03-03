@@ -266,7 +266,11 @@ class BotHandler:
             audio_bytes = bytes(audio_ba)
 
             logger.info(f"VOICE file_id={voice.file_id} size={len(audio_bytes)}")
-            if self.config.llm_backend == 'openai' or 'OPENAI':
+            
+            # Now we always cast the record to a large register for verification
+            # From .env the values ​​come to us in str, therefore verification by str is valid
+            backend = (self.config.llm_backend or "").strip().upper()
+            if backend == "OPENAI":
                 transcription_model = self.config.openai_model_transcription
             else:
                 transcription_model = self.config.bot_model_for_transcription
