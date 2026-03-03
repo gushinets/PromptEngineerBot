@@ -72,11 +72,11 @@ class OpenRouterClient(LLMClientBase):
                         def __init__(self, resp):
                             self._resp = resp
 
-                    async def __aenter__(self):
-                        return self._resp
+                        async def __aenter__(self):
+                            return self._resp
 
-                    async def __aexit__(self, exc_type, exc, tb):
-                        return False
+                        async def __aexit__(self, exc_type, exc, tb):
+                            return False
 
                     response_cm = _ResponseWrapper(response_obj)
 
