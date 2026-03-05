@@ -169,6 +169,11 @@ ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED = _(
     "❌ The selected country, region, or territory is not supported by your model.",
 )
 
+ERROR_TRANSCRIPTION_PROVIDER_NOT_SUPPORTED = _(
+    "❌ Провайдер транскрибации не поддерживается. Проверьте настройки.",
+    "❌ Transcription provider not supported. Please check your settings.",
+)
+
 ERROR_OTP_VERIFICATION_FAILED = _(
     "❌ Ошибка проверки OTP. Попробуйте позже.",
     "❌ OTP verification error. Please try again later.",
