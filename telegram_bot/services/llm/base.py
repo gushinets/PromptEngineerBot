@@ -47,7 +47,6 @@ class LLMClientBase(ABC):
             Exception: If the request fails after retries
         """
 
-    @abstractmethod
     async def transcribe_audio(
         self,
         audio_bytes: bytes,
@@ -73,6 +72,8 @@ class LLMClientBase(ABC):
             TranscriptionProviderNotSupportedError: If provider not supported
             Exception: For other transcription errors
         """
+        from telegram_bot.services.llm.errors import TranscriptionNotSupportedError
+        raise TranscriptionNotSupportedError("Transcription not supported by this client")
 
     def get_last_usage(self) -> dict[str, int] | None:
         """Get the last token usage as a dict for backward compatibility."""
