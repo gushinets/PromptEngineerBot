@@ -20,6 +20,7 @@ from telegram_bot.services.llm.errors import (
     TranscriptionNotSupportedError,
     CountryRegionTerritoryNotSupportedError,
     IncorrectAPIKeyError,
+    TranscriptionProviderNotSupportedError,
     InternalServerError
 )
 from telegram_bot.services.llm import openrouter_client
@@ -49,6 +50,7 @@ from telegram_bot.utils.messages import (
     ERROR_VOICE_NOT_SUPPORTED,
     ERROR_WRONG_API,
     ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED,
+    ERROR_TRANSCRIPTION_PROVIDER_NOT_SUPPORTED,
     ERROR_OTP_VERIFICATION_FAILED,
     ERROR_PROMPT_GENERATION_FAILED,
     ERROR_PROMPT_RETRIEVAL_FALLBACK,
@@ -285,6 +287,12 @@ class BotHandler:
                 return
             except CountryRegionTerritoryNotSupportedError:
                 await update.message.reply_text(ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED)
+                return
+            except IncorrectAPIKeyError:
+                await update.message.reply_text(ERROR_WRONG_API)
+                return
+            except TranscriptionProviderNotSupportedError:
+                await update.message.reply_text(ERROR_TRANSCRIPTION_PROVIDER_NOT_SUPPORTED)
                 return
             except InternalServerError:
                 await update.message.reply_text(ERROR_INTERNAL_SERVER)
