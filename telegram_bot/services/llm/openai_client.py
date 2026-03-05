@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from datetime import datetime
 
@@ -28,6 +29,7 @@ from telegram_bot.services.llm.errors import (
     TranscriptionProviderNotSupportedError,
     parse_error,
     IncorrectAPIKeyError,
+    ProviderErrorInfo,
 )
 
 
@@ -272,19 +274,29 @@ class OpenAIClient(LLMClientBase):
 
                 return out_path.read_bytes()
 
-        def _map_openai_error(exc: Exception) -> tuple[int | None, str, str | None]:
+        def _map_openai_error(exc: Exception) -> ProviderErrorInfo:
 
             status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
             code = getattr(exc, "code", None)
             msg = str(exc)
 
             body = getattr(exc, "body", None)
+            full_text = ""
             if isinstance(body, dict):
+                full_text = json.dumps(body) if body else ""
                 err = body.get("error") or {}
                 msg = err.get("message") or msg
                 code = err.get("code") or code
+            else:
+                full_text = str(body) if body else msg
 
-            return status, msg, code
+            info = ProviderErrorInfo(
+                http_status=int(status) if status is not None else 0,
+                code=code,
+                message=msg,
+                full_text=full_text
+            )
+            return info
 
         async def _request_transcription(request_audio: bytes, request_format: str):
             with tempfile.TemporaryDirectory(prefix="oa_transcribe_req_") as tmpdir:
@@ -315,23 +327,23 @@ class OpenAIClient(LLMClientBase):
                         request_format,
                         text,
                     )
-                    return True, text, 200, ""
+                    info = ProviderErrorInfo(http_status=200, message="")
+                    return True, text, info
 
                 except Exception as e:
-                    status, msg, code = _map_openai_error(e)
-                    error_text = msg or str(e)
+                    info = _map_openai_error(e)
 
                     self.logger.error(
                         "%s Transcription failed: status=%s format=%s code=%s body=%s",
                         log_prefix,
-                        status,
+                        info.http_status,
                         request_format,
-                        code,
-                        error_text,
+                        info.code,
+                        info.message,
                     )
 
 
-                    return False, "", int(status) if status is not None else 0, error_text
+                    return False, "", info
 
         async def _do_request():
             tried: set[tuple[str, int]] = set()
@@ -344,15 +356,12 @@ class OpenAIClient(LLMClientBase):
                     continue
                 tried.add(key)
 
-                ok, text, status, error_text = await _request_transcription(req_audio, req_format)
+                ok, text, info = await _request_transcription(req_audio, req_format)
                 if ok:
                     return text
 
-
-                low = (error_text or "").lower()
-
-
-                info = parse_error(status, error_text or "")
+                status = info.http_status
+                error_text = info.full_text or info.message or ""
 
 
                 if status in (400, 404) and (
