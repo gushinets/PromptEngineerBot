@@ -4,7 +4,7 @@ Abstract base class for LLM clients to ensure consistent interface.
 
 import logging
 from abc import ABC, abstractmethod
-
+from typing import Optional
 
 class TokenUsage:
     """Standardized token usage tracking."""
@@ -46,6 +46,34 @@ class LLMClientBase(ABC):
         Raises:
             Exception: If the request fails after retries
         """
+
+    async def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        audio_format: Optional[str] = "ogg",
+        transcription_model: Optional[str] = None,
+        log_prefix: str = "",
+    ) -> str:
+        """
+        Transcribe audio to text using the LLM.
+
+        Args:
+            audio_bytes: Raw audio data in bytes
+            audio_format: Audio format (default: "ogg")
+            transcription_model: Specific model for transcription (optional)
+            log_prefix: Optional prefix for logging
+
+        Returns:
+            Transcribed text
+
+        Raises:
+            TranscriptionNotSupportedError: If model doesn't support transcription
+            CountryRegionTerritoryNotSupportedError: If country restrictions apply
+            TranscriptionProviderNotSupportedError: If provider not supported
+            Exception: For other transcription errors
+        """
+        from telegram_bot.services.llm.errors import TranscriptionNotSupportedError
+        raise TranscriptionNotSupportedError("Transcription not supported by this client")
 
     def get_last_usage(self) -> dict[str, int] | None:
         """Get the last token usage as a dict for backward compatibility."""

@@ -4,6 +4,8 @@ Telegram bot message handlers and core logic.
 
 import logging
 
+import openai
+from openai.types.audio import transcription
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from tenacity import (
@@ -13,7 +15,15 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-
+from telegram_bot.services.llm import openai_client
+from telegram_bot.services.llm.errors import (
+    TranscriptionNotSupportedError,
+    CountryRegionTerritoryNotSupportedError,
+    IncorrectAPIKeyError,
+    TranscriptionProviderNotSupportedError,
+    InternalServerError
+)
+from telegram_bot.services.llm import openrouter_client
 from telegram_bot.dependencies import get_container
 from telegram_bot.flows.email_flow import get_email_flow_orchestrator
 from telegram_bot.services.llm.base import LLMClientBase
@@ -36,6 +46,11 @@ from telegram_bot.utils.messages import (
     ERROR_EMAIL_SERVICE_ERROR,
     ERROR_EMAIL_SERVICE_UNAVAILABLE,
     ERROR_GENERIC,
+    ERROR_INTERNAL_SERVER,
+    ERROR_VOICE_NOT_SUPPORTED,
+    ERROR_WRONG_API,
+    ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED,
+    ERROR_TRANSCRIPTION_PROVIDER_NOT_SUPPORTED,
     ERROR_OTP_VERIFICATION_FAILED,
     ERROR_PROMPT_GENERATION_FAILED,
     ERROR_PROMPT_RETRIEVAL_FALLBACK,
@@ -70,6 +85,7 @@ from telegram_bot.utils.messages import (
     parse_followup_response,
     parse_llm_response,
 )
+
 
 
 logger = logging.getLogger(__name__)
@@ -199,6 +215,8 @@ class BotHandler:
             # Session ID should remain available for post-completion email tracking (Requirements 7.4)
             self.state_manager.set_current_session_id(user_id, None)
         self.conversation_manager.reset(user_id)
+    
+        
 
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle the /start command or New Prompt button."""
@@ -240,7 +258,55 @@ class BotHandler:
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming messages from users."""
         user_id = update.effective_user.id
-        text = update.message.text
+        text = None
+        
+        if update.message.voice:
+            voice = update.message.voice
+
+            tg_file = await context.bot.get_file(voice.file_id)
+            audio_ba = await tg_file.download_as_bytearray()
+            audio_bytes = bytes(audio_ba)
+
+            logger.info(f"VOICE file_id={voice.file_id} size={len(audio_bytes)}")
+            
+            # Now we always cast the record to a large register for verification
+            # From .env the values ​​come to us in str, therefore verification by str is valid
+            backend = (self.config.llm_backend or "").strip().upper()
+            if backend == "OPENAI":
+                transcription_model = self.config.openai_model_transcription
+            else:
+                transcription_model = self.config.bot_model_for_transcription
+            try:
+                text = await self.llm_client.transcribe_audio(
+                audio_bytes=audio_bytes,
+                audio_format="ogg",
+                transcription_model=transcription_model,
+                )
+            except TranscriptionNotSupportedError:
+                await update.message.reply_text(ERROR_VOICE_NOT_SUPPORTED)
+                return
+            except CountryRegionTerritoryNotSupportedError:
+                await update.message.reply_text(ERROR_COUNTRY_REGION_TERRITORY_NOT_SUPPORTED)
+                return
+            except IncorrectAPIKeyError:
+                await update.message.reply_text(ERROR_WRONG_API)
+                return
+            except TranscriptionProviderNotSupportedError:
+                await update.message.reply_text(ERROR_TRANSCRIPTION_PROVIDER_NOT_SUPPORTED)
+                return
+            except InternalServerError:
+                await update.message.reply_text(ERROR_INTERNAL_SERVER)
+                return
+
+            
+            
+            await update.message.reply_text(f"📝 Распознанный текст:\n\n{text}")
+
+        
+        elif update.message.text:
+            text = update.message.text
+        else:
+            return
 
         # Track user interaction early in message processing (Requirement 7.1)
         # This creates user on first interaction or updates last_interaction_at

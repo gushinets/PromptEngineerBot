@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from datetime import datetime
 
@@ -13,6 +14,23 @@ from tenacity import (
 )
 
 from telegram_bot.services.llm.base import LLMClientBase, TokenUsage
+import re
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Optional
+
+import imageio_ffmpeg
+
+from telegram_bot.services.llm.errors import (
+    InternalServerError,
+    CountryRegionTerritoryNotSupportedError,
+    TranscriptionNotSupportedError,
+    TranscriptionProviderNotSupportedError,
+    parse_error,
+    IncorrectAPIKeyError,
+    ProviderErrorInfo,
+)
 
 
 class OpenAIClient(LLMClientBase):
@@ -27,7 +45,9 @@ class OpenAIClient(LLMClientBase):
         max_retries: int = 5,
         request_timeout: float = 60.0,
         max_wait_time: float = 300.0,
-    ):
+        transcription_api_name: Optional[str] = None,
+        transcription_model_name: Optional[str] = None,
+    ):     
         """
         Initialize the OpenAI client.
 
@@ -44,6 +64,7 @@ class OpenAIClient(LLMClientBase):
         self.max_wait_time = max_wait_time
         self.client = OpenAI(api_key=api_key)
         self.start_time = None
+        
 
     def _log_retry(self, retry_state: RetryCallState) -> bool:
         """Log retry attempts and check max wait time."""
@@ -150,3 +171,283 @@ class OpenAIClient(LLMClientBase):
                 f"{log_prefix} OpenAI API request failed after {total_time:.2f}s: {e!s}"
             )
             raise
+
+    async def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        audio_format: Optional[str] = "ogg",
+        transcription_model: Optional[str] = None,
+        log_prefix: str = "",
+    ) -> str:
+        self.logger.info("%s STT request: model=%s base_url=%s", log_prefix, transcription_model, getattr(self.client, "base_url", None))
+        """
+        Transcribe audio to text using OpenAI Audio Transcriptions API.
+        Логика полностью как в OpenRouterClient.transcribe_audio:
+        - пытаемся отправить как есть
+        - если формат не подходит, вытаскиваем supported formats из ошибки
+        - конвертируем ffmpeg в подходящий формат (приоритет: wav, потом mp3)
+        - маппим типовые ошибки в ваши доменные исключения
+        """
+
+        model = transcription_model or self.model_name
+        initial_format = (audio_format or "ogg").lower().strip()
+
+        def _extract_supported_formats(error_text: str) -> list[str]:
+            self.logger.info(
+                "%s Extracting supported audio formats from error message: %s",
+                log_prefix,
+                error_text,
+            )
+            m = re.search(r"Supported values are:\s*([^\n\r]+)", error_text)
+            if not m:
+                return []
+            segment = m.group(1)
+            formats = re.findall(r"'([a-zA-Z0-9]+)'", segment)
+            out: list[str] = []
+            for fmt in formats:
+                f = fmt.lower().strip()
+                if f and f not in out:
+                    out.append(f)
+            return out
+
+        def _convert_audio_with_ffmpeg(
+            source_bytes: bytes,
+            source_format: str,
+            target_format: str,
+        ) -> bytes | None:
+            self.logger.info(
+                "%s Converting audio from %s to %s using ffmpeg",
+                log_prefix,
+                source_format,
+                target_format,
+            )
+            ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+
+            with tempfile.TemporaryDirectory(prefix="oa_transcribe_") as tmpdir:
+                in_path = Path(tmpdir) / f"input.{source_format}"
+                out_path = Path(tmpdir) / f"output.{target_format}"
+                in_path.write_bytes(source_bytes)
+
+                if target_format == "wav":
+                    cmd = [
+                        ffmpeg_path,
+                        "-y",
+                        "-loglevel", "error",
+                        "-i", str(in_path),
+                        "-ac", "1",
+                        "-ar", "16000",
+                        "-c:a", "pcm_s16le",
+                        str(out_path),
+                    ]
+                else:
+                    cmd = [
+                        ffmpeg_path,
+                        "-y",
+                        "-loglevel", "error",
+                        "-i", str(in_path),
+                        "-ac", "1",
+                        "-ar", "16000",
+                        str(out_path),
+                    ]
+
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                except subprocess.CalledProcessError as conv_err:
+                    err = (conv_err.stderr or b"").decode("utf-8", errors="ignore")
+                    self.logger.warning(
+                        "%s ffmpeg conversion failed %s->%s: %s",
+                        log_prefix,
+                        source_format,
+                        target_format,
+                        err,
+                    )
+                    return None
+
+                if not out_path.exists() or out_path.stat().st_size == 0:
+                    self.logger.warning(
+                        "%s ffmpeg produced empty output for %s->%s",
+                        log_prefix,
+                        source_format,
+                        target_format,
+                    )
+                    return None
+
+                return out_path.read_bytes()
+
+        def _map_openai_error(exc: Exception) -> ProviderErrorInfo:
+
+            status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+            code = getattr(exc, "code", None)
+            msg = str(exc)
+
+            body = getattr(exc, "body", None)
+            full_text = ""
+            if isinstance(body, dict):
+                full_text = json.dumps(body) if body else ""
+                err = body.get("error") or {}
+                msg = err.get("message") or msg
+                code = err.get("code") or code
+            else:
+                full_text = str(body) if body else msg
+
+            info = ProviderErrorInfo(
+                http_status=int(status) if status is not None else 0,
+                code=code,
+                message=msg,
+                full_text=full_text
+            )
+            return info
+
+        async def _request_transcription(request_audio: bytes, request_format: str):
+            with tempfile.TemporaryDirectory(prefix="oa_transcribe_req_") as tmpdir:
+                p = Path(tmpdir) / f"audio.{request_format}"
+                p.write_bytes(request_audio)
+
+                def _sync_call():
+                    with p.open("rb") as f:
+                        resp = self.client.audio.transcriptions.create(
+                            model=model,
+                            file=f,
+                            response_format="text",
+                        )
+
+                        text = getattr(resp, "text", None)
+                        if text is None:
+                            text = str(resp)
+                        return ("" if text is None else str(text)).strip()
+
+                try:
+                    text = await asyncio.get_event_loop().run_in_executor(None, _sync_call)
+                    if not text:
+                        raise Exception("Transcription response contained empty/blank content")
+
+                    self.logger.info(
+                        "%s Transcription result (format=%s): %s",
+                        log_prefix,
+                        request_format,
+                        text,
+                    )
+                    info = ProviderErrorInfo(http_status=200, message="")
+                    return True, text, info
+
+                except Exception as e:
+                    info = _map_openai_error(e)
+
+                    self.logger.error(
+                        "%s Transcription failed: status=%s format=%s code=%s body=%s",
+                        log_prefix,
+                        info.http_status,
+                        request_format,
+                        info.code,
+                        info.message,
+                    )
+
+
+                    return False, "", info
+
+        async def _do_request():
+            tried: set[tuple[str, int]] = set()
+            queue: list[tuple[bytes, str]] = [(audio_bytes, initial_format)]
+
+            while queue:
+                req_audio, req_format = queue.pop(0)
+                key = (req_format, len(req_audio))
+                if key in tried:
+                    continue
+                tried.add(key)
+
+                ok, text, info = await _request_transcription(req_audio, req_format)
+                if ok:
+                    return text
+
+                status = info.http_status
+                error_text = info.full_text or info.message or ""
+
+
+                if status in (400, 404) and (
+                    (info.code and info.code in {"model_not_found", "invalid_model", "not_found"})
+                    or (info.type and info.type in {"invalid_request_error"})
+                    or (
+                        info.message
+                        and "model" in info.message.lower()
+                        and ("not found" in info.message.lower() or "does not exist" in info.message.lower())
+                    )
+                ):
+                    raise TranscriptionProviderNotSupportedError(f"Model '{model}' does not exist")
+
+                
+                if status in (400, 404) and (
+                    (info.code and info.code in {"feature_not_supported", "not_supported"})
+                    or (
+                        info.message
+                        and ("transcrib" in info.message.lower() or "audio/transcriptions" in info.message.lower())
+                        and ("not supported" in info.message.lower() or "does not support" in info.message.lower())
+                    )
+                ):
+                    raise TranscriptionNotSupportedError(
+                        f"Model '{model}' does not support transcription on this endpoint"
+                    )
+
+                if status in (401, 403) and (
+                    info.code and info.code in {'Incorrect API key', 'invalid_api_key', 'authentication_error', 'invalid_request_error'}
+                ):
+                    raise IncorrectAPIKeyError(
+                        "Authentication with OpenAI API failed. Check your API key."
+                        )
+                
+                if status == 403 and (
+                    (info.code and info.code == "unsupported_country_region_territory")
+                    or (info.message and "unsupported_country_region_territory" in info.message.lower())
+                ):
+                    raise CountryRegionTerritoryNotSupportedError(
+                        f"Model '{model}' does not support transcription in the current country/region/territory"
+                    )
+
+                
+                if status == 500 or status >= 500:
+                    raise InternalServerError(
+                        f"Model '{model}' returned Internal Server Error. This may be a temporary issue on the provider side."
+                    )
+
+                
+                if status == 400:
+                    fmt_source = info.full_text or info.message or ""
+                    supported = _extract_supported_formats(fmt_source)
+                    if supported and req_format not in supported:
+                        self.logger.info(
+                            "%s Model rejected format '%s'; supported formats: %s",
+                            log_prefix,
+                            req_format,
+                            ", ".join(supported),
+                        )
+
+                        preferred_order = ["wav", "mp3"]
+                        ordered = [f for f in preferred_order if f in supported] + [
+                            f for f in supported if f not in preferred_order
+                        ]
+
+                        for target in ordered:
+                            if target == req_format:
+                                continue
+                            converted = _convert_audio_with_ffmpeg(req_audio, req_format, target)
+                            if converted:
+                                queue.append((converted, target))
+                                break
+
+                        if queue:
+                            continue
+
+                        raise Exception(
+                            f"Transcription failed: provider accepts only {supported}, "
+                            f"conversion from '{req_format}' to any supported format failed."
+                        )
+
+                raise Exception(f"Transcription failed: status={status} body={error_text}"
+                            f"conversion from '{req_format}' to any supported format failed."
+                        )
+
+                raise Exception(f"Transcription failed: status={status} body={error_text}")
+
+            raise Exception("Transcription failed: exhausted all format attempts")
+
+        return await asyncio.wait_for(_do_request(), timeout=self.request_timeout)

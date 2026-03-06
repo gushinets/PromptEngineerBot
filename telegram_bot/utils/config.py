@@ -27,10 +27,16 @@ class BotConfig:
     openai_max_retries: int = 5
     openai_request_timeout: float = 60.0
     openai_max_wait_time: float = 300.0
+    
+    # OpenAI settings for transcription 
+    openai_model_transcription: str | None = None
 
     # OpenRouter settings
     openrouter_api_key: str | None = None
     openrouter_timeout: float = 60.0
+    
+     # OpenRouter settings for transcription 
+    bot_model_for_transcription: str | None = None
 
     # Google Sheets settings
     gsheets_logging_enabled: bool = False
@@ -79,6 +85,9 @@ class BotConfig:
     # Session tracking settings
     session_timeout_seconds: int = 86400  # 24 hours default
 
+    # Health monitoring settings
+    health_monitor_enabled: bool = False
+    
     # Localization settings
     language: str = "EN"  # EN or RU
 
@@ -130,11 +139,13 @@ class BotConfig:
             bot_id=os.getenv("BOT_ID"),
             # OpenAI settings
             openai_api_key=os.getenv("OPENAI_API_KEY"),
+            openai_model_transcription=os.getenv("OPENAI_BOT_MODEL_FOR_TRANSCRIPTION"),
             openai_max_retries=int(os.getenv("OPENAI_MAX_RETRIES", 5)),
             openai_request_timeout=float(os.getenv("OPENAI_REQUEST_TIMEOUT", 60.0)),
             openai_max_wait_time=float(os.getenv("OPENAI_MAX_WAIT_TIME", 300.0)),
             # OpenRouter settings
             openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
+            bot_model_for_transcription=os.getenv("BOT_MODEL_FOR_TRANSCRIPTION"),
             openrouter_timeout=float(os.getenv("OPENROUTER_TIMEOUT", 60.0)),
             # Google Sheets settings
             gsheets_logging_enabled=os.getenv("GSHEETS_LOGGING_ENABLED", "").lower()

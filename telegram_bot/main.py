@@ -143,6 +143,7 @@ config.validate()
 logger.info("Configuration loaded successfully")
 logger.info(f"LLM Backend: {config.llm_backend}")
 logger.info(f"Model: {config.model_name}")
+logger.info(f'Transcription Model: {config.openai_model_transcription or config.bot_model_for_transcription}')
 
 # Create LLM client
 llm_client = LLMClientFactory.create_client(config)
@@ -160,6 +161,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming messages from users."""
+    
     await bot_handler.handle_message(update, context)
 
 
@@ -306,7 +308,10 @@ async def main():
 
         # Add handlers
         application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(
+    MessageHandler((filters.TEXT | filters.VOICE) & ~filters.COMMAND, handle_message)
+)
+
 
         # Add callback query handlers for follow-up inline buttons
         # Handler for follow-up choice buttons (YES/NO)
